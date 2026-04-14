@@ -1,0 +1,53 @@
+{
+  "name": "dnu-social-backend",
+  "version": "1.0.0",
+  "description": "Backend for DNU Social Network",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "create-groups": "node scripts/createSampleGroups.js",
+    "test-email": "node scripts/testEmail.js",
+    "debug-email": "node scripts/debugEmail.js",
+    "check-env": "node scripts/checkEnv.js",
+    "add-email-config": "node scripts/addEmailConfig.js",
+    "add-gemini-key": "node scripts/addGeminiApiKey.js",
+    "set-gemini-key": "node scripts/setGeminiApiKey.js",
+    "verify-gemini-key": "node scripts/verifyGeminiKey.js",
+    "list-gemini-models": "node scripts/listGeminiModels.js",
+    "test-api-key": "node scripts/testApiKeyDirect.js",
+    "test-gemini-rest": "node scripts/testGeminiRestApi.js",
+    "list-available-models": "node scripts/listAvailableModels.js",
+    "reset-admin-password": "node scripts/resetAdminPassword.js",
+    "create-admin": "node scripts/createAdmin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.73.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.3.1",
+    "express-validator": "^7.0.1",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.11.0",
+    "mongoose": "^8.0.3",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^7.0.12",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
