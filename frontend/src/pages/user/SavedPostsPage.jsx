@@ -1,33 +1,57 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bookmark, Plus, X, MoreHorizontal, Share2, SlidersHorizontal, Search, Send } from 'lucide-react';
+import { Bookmark, Plus, X, MoreHorizontal, Share2, SlidersHorizontal, Search, Send, Heart, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import api from '../../utils/api';
 import { formatTimeAgo } from '../../utils/formatTime';
+import { PostCommentSection } from '../../components/PostCommentSection';
+import { useSavedPostsViewModel } from '../../domains/saved/viewmodels/useSavedPostsViewModel';
 
 export default function SavedPostsPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const [loading, setLoading] = useState(true);
-  const [posts, setPosts] = useState([]);
-  const [previewPost, setPreviewPost] = useState(null);
-  const [activeMenuPostId, setActiveMenuPostId] = useState(null);
-  const [collections, setCollections] = useState([{ id: 'default', name: 'Mặc định' }]);
-  const [postCollectionMap, setPostCollectionMap] = useState({});
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [collectionPickerPost, setCollectionPickerPost] = useState(null);
-  const [showCreateCollectionModal, setShowCreateCollectionModal] = useState(false);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [filterCollectionId, setFilterCollectionId] = useState('all');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterKeyword, setFilterKeyword] = useState('');
-  const [shareModalPost, setShareModalPost] = useState(null);
-  const [shareFriends, setShareFriends] = useState([]);
-  const [shareSearchQuery, setShareSearchQuery] = useState('');
-  const [shareSelectedFriendIds, setShareSelectedFriendIds] = useState(() => new Set());
-  const [shareLoadingFriends, setShareLoadingFriends] = useState(false);
-  const [shareSending, setShareSending] = useState(false);
+  const {
+    loading,
+    posts,
+    filteredPosts,
+    previewPost,
+    setPreviewPost,
+    activeMenuPostId,
+    setActiveMenuPostId,
+    collections,
+    postCollectionMap,
+    newCollectionName,
+    setNewCollectionName,
+    collectionPickerPost,
+    setCollectionPickerPost,
+    showCreateCollectionModal,
+    setShowCreateCollectionModal,
+    showFilterMenu,
+    setShowFilterMenu,
+    filterCollectionId,
+    setFilterCollectionId,
+    filterCategory,
+    setFilterCategory,
+    filterKeyword,
+    setFilterKeyword,
+    shareModalPost,
+    setShareModalPost,
+    shareFriends,
+    shareSearchQuery,
+    setShareSearchQuery,
+    shareSelectedFriendIds,
+    setShareSelectedFriendIds,
+    shareLoadingFriends,
+    shareSending,
+    removeFromSaved,
+    assignPostToCollection,
+    createCollection,
+    openShareModal,
+    confirmShare,
+    fetchSaved,
+    toggleLike,
+    applyPostUpdater
+  } = useSavedPostsViewModel(user);
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
     if (avatar) {
@@ -37,51 +61,6 @@ export default function SavedPostsPage() {
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };
-
-  const fetchSavedPosts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/posts/saved');
-      const list = res.data.posts || [];
-      setPosts(list);
-      window.dispatchEvent(
-        new CustomEvent('savedPostsChanged', { detail: { postIds: list.map((p) => p?._id).filter(Boolean) } })
-      );
-    } catch (error) {
-      console.error('Error fetching saved posts:', error);
-      alert('Lỗi khi tải bài viết đã lưu');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSavedPosts();
-  }, [fetchSavedPosts]);
-
-  useEffect(() => {
-    try {
-      const savedCollections = JSON.parse(localStorage.getItem('savedPostCollections') || 'null');
-      if (Array.isArray(savedCollections) && savedCollections.length > 0) {
-        const hasDefault = savedCollections.some((c) => c.id === 'default');
-        setCollections(hasDefault ? savedCollections : [{ id: 'default', name: 'Mặc định' }, ...savedCollections]);
-      }
-      const savedMap = JSON.parse(localStorage.getItem('savedPostCollectionMap') || '{}');
-      if (savedMap && typeof savedMap === 'object') {
-        setPostCollectionMap(savedMap);
-      }
-    } catch {
-      // ignore malformed local storage
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('savedPostCollections', JSON.stringify(collections));
-  }, [collections]);
-
-  useEffect(() => {
-    localStorage.setItem('savedPostCollectionMap', JSON.stringify(postCollectionMap));
-  }, [postCollectionMap]);
 
   useEffect(() => {
     const closeMenu = () => setActiveMenuPostId(null);
@@ -99,8 +78,7 @@ export default function SavedPostsPage() {
 
   const toggleSave = async (postId) => {
     try {
-      await api.delete(`/posts/${postId}/save`);
-      await fetchSavedPosts();
+      await removeFromSaved(postId);
     } catch (error) {
       console.error('Error unsaving post:', error);
       alert('Lỗi khi bỏ lưu bài viết');
@@ -155,95 +133,26 @@ export default function SavedPostsPage() {
     return raw.length > 90 ? `${raw.slice(0, 90)}...` : raw;
   };
 
-  const filteredPosts = posts.filter((post) => {
-    const collectionId = postCollectionMap[post._id] || 'default';
-    if (filterCollectionId !== 'all' && collectionId !== filterCollectionId) return false;
-    if (filterCategory !== 'all' && (post.category || 'Khác') !== filterCategory) return false;
-    if (filterKeyword.trim()) {
-      const keyword = filterKeyword.trim().toLowerCase();
-      const text = `${post.title || ''} ${post.content || ''} ${post.author?.name || ''}`.toLowerCase();
-      if (!text.includes(keyword)) return false;
-    }
-    return true;
-  });
-
-  const createCollection = () => {
-    const name = newCollectionName.trim();
-    if (!name) return;
-    const exists = collections.some((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (exists) {
-      alert('Tên bộ sưu tập đã tồn tại');
-      return;
-    }
-    const id = `col_${Date.now()}`;
-    setCollections((prev) => [...prev, { id, name }]);
-    setNewCollectionName('');
-    setShowCreateCollectionModal(false);
-  };
-
-  const assignPostToCollection = (postId, collectionId) => {
-    setPostCollectionMap((prev) => ({ ...prev, [postId]: collectionId }));
-    setCollectionPickerPost(null);
-    alert('✅ Đã thêm vào bộ sưu tập');
-  };
-
-  const openShareModal = async (post) => {
-    if (!post?._id) return;
-    setShareModalPost(post);
-    setShareSearchQuery('');
-    setShareSelectedFriendIds(new Set());
-    setShareLoadingFriends(true);
-    try {
-      const friendsRes = await api.get('/friends').catch(() => ({ data: { friends: [] } }));
-      setShareFriends(friendsRes.data.friends || []);
-    } catch (error) {
-      console.error('Error loading friends for sharing:', error);
-      setShareFriends([]);
-    } finally {
-      setShareLoadingFriends(false);
-    }
-  };
-
   const handleShareToFriends = async () => {
-    if (!shareModalPost?._id) return;
-    const ids = [...shareSelectedFriendIds];
-    if (ids.length === 0) return;
-
-    const postId = shareModalPost._id;
-    const postUrl = `${window.location.origin}/home?post=${postId}`;
-    const raw = (shareModalPost.content || '').trim();
-    const preview = raw.length > 120 ? `${raw.slice(0, 120)}…` : raw;
-    const messageText = `${user?.name || 'Một người bạn'} đã chia sẻ bài viết với bạn:\n\n${preview ? `“${preview}”\n\n` : ''}Xem tại: ${postUrl}`;
-
-    setShareSending(true);
+    if (!shareModalPost?._id || shareSelectedFriendIds.size === 0) return;
     try {
-      for (const friendId of ids) {
-        const convRes = await api.get(`/messages/conversation/${friendId}`);
-        const cid = convRes.data?.conversation?._id;
-        if (!cid) continue;
-        const fd = new FormData();
-        fd.append('content', messageText);
-        await api.post(`/messages/${cid}`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+      const sentCount = await confirmShare();
+      if (sentCount > 0) {
+        alert(`Đã gửi tới ${sentCount} người bạn qua tin nhắn.`);
       }
-      const shareRes = await api.post(`/posts/${postId}/share`);
-      const sharesCount = shareRes.data?.sharesCount;
-      if (typeof sharesCount === 'number') {
-        setPosts((prev) =>
-          prev.map((p) => (String(p._id) === String(postId) ? { ...p, shares: sharesCount } : p))
-        );
-      }
-      setShareModalPost(null);
-      setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Share to friends failed:', error);
       alert(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
-    } finally {
-      setShareSending(false);
     }
   };
+
+  const updatePostInLocalState = applyPostUpdater;
+  const toggleLikePost = toggleLike;
+  const fetchSavedPosts = fetchSaved;
+
+  const livePreviewPost = previewPost
+    ? posts.find((p) => String(p._id) === String(previewPost._id)) || previewPost
+    : null;
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)]">
@@ -384,6 +293,8 @@ export default function SavedPostsPage() {
                       {(() => {
                         const media = getPreviewMedia(post);
                         const typeLabel = getSavedPostTypeLabel(post);
+                        const collectionId = postCollectionMap[post._id] || 'default';
+                        const collectionName = collections.find((c) => c.id === collectionId)?.name || 'Mặc định';
                         return (
                       <div className="p-4 flex gap-4">
                         {media ? (
@@ -431,7 +342,7 @@ export default function SavedPostsPage() {
                             </p>
                           </button>
                           <p className="text-sm text-[var(--fb-text-secondary)] mt-1">
-                            {typeLabel} • Đã lưu vào mặc định
+                            {typeLabel} • Đã lưu vào {collectionName}
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <img
@@ -505,17 +416,17 @@ export default function SavedPostsPage() {
           </section>
         </div>
       </main>
-      {previewPost && typeof document !== 'undefined' && createPortal(
+      {livePreviewPost && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[10001] bg-black/50 flex items-center justify-center p-4"
           onClick={() => setPreviewPost(null)}
         >
           <div
-            className="w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-xl bg-[var(--fb-surface)] border border-[var(--fb-divider)] shadow-2xl"
+            className="w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-xl bg-[var(--fb-surface)] border border-[var(--fb-divider)] shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--fb-divider)]">
-              <h3 className="font-bold text-[var(--fb-text-primary)]">Bài viết của {previewPost.author?.name || 'người dùng'}</h3>
+              <h3 className="font-bold text-[var(--fb-text-primary)]">Bài viết của {livePreviewPost.author?.name || 'người dùng'}</h3>
               <button
                 type="button"
                 className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors"
@@ -529,21 +440,21 @@ export default function SavedPostsPage() {
               <div className="p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <img
-                    src={resolveAvatarUrl(previewPost.author?.avatar, previewPost.author?.name)}
-                    alt={previewPost.author?.name}
+                    src={resolveAvatarUrl(livePreviewPost.author?.avatar, livePreviewPost.author?.name)}
+                    alt={livePreviewPost.author?.name}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div>
-                    <p className="font-semibold text-[var(--fb-text-primary)]">{previewPost.author?.name}</p>
+                    <p className="font-semibold text-[var(--fb-text-primary)]">{livePreviewPost.author?.name}</p>
                     <p className="text-xs text-[var(--fb-text-secondary)]">
-                      {formatTimeAgo(previewPost.createdAt)} • {previewPost.category || 'Khác'}
+                      {formatTimeAgo(livePreviewPost.createdAt)} • {livePreviewPost.category || 'Khác'}
                     </p>
                   </div>
                 </div>
-                <p className="text-[var(--fb-text-primary)] whitespace-pre-wrap break-words">{previewPost.content}</p>
+                <p className="text-[var(--fb-text-primary)] whitespace-pre-wrap break-words">{livePreviewPost.content}</p>
               </div>
               {(() => {
-                const media = getPreviewMedia(previewPost);
+                const media = getPreviewMedia(livePreviewPost);
                 if (!media) return null;
                 if (media.type === 'video') {
                   return (
@@ -557,9 +468,59 @@ export default function SavedPostsPage() {
                 }
                 return <img src={media.src} alt="Saved post" className="w-full max-h-[420px] object-cover" />;
               })()}
-              <div className="px-4 py-3 text-sm text-[var(--fb-text-secondary)] border-t border-[var(--fb-divider)] bg-[var(--fb-input)]">
-                {previewPost.likes?.length || 0} lượt thích • {previewPost.comments?.length || 0} bình luận • {previewPost.shares || 0} chia sẻ
-              </div>
+              {(() => {
+                const uid = String(user?.id || user?._id || '');
+                const likedByMe = (livePreviewPost.likes || []).some((like) => String(like?._id || like) === uid);
+                return (
+                  <>
+                    <div className="px-4 py-3 text-sm text-[var(--fb-text-secondary)] border-t border-[var(--fb-divider)] bg-[var(--fb-input)]">
+                      {livePreviewPost.likes?.length || 0} lượt thích • {livePreviewPost.comments?.length || 0} bình luận • {livePreviewPost.shares || 0} chia sẻ
+                    </div>
+                    <div className="px-2 py-1 border-t border-[var(--fb-divider)] flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleLikePost(livePreviewPost._id)}
+                        className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors ${
+                          likedByMe ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
+                        }`}
+                      >
+                        <Heart className={`w-4 h-4 ${likedByMe ? 'fill-current' : ''}`} />
+                        {likedByMe ? 'Đã thích' : 'Thích'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('theater-comment-input')?.focus()}
+                        className="flex-1 rounded-lg px-3 py-2 text-sm font-medium inline-flex items-center justify-center gap-2 text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] transition-colors"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Bình luận
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openShareModal(livePreviewPost)}
+                        disabled={shareSending && shareModalPost?._id === livePreviewPost._id}
+                        className="flex-1 rounded-lg px-3 py-2 text-sm font-medium inline-flex items-center justify-center gap-2 text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] transition-colors disabled:opacity-50"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        {shareSending && shareModalPost?._id === livePreviewPost._id ? 'Đang gửi...' : 'Chia sẻ'}
+                      </button>
+                    </div>
+                    <div className="border-t border-[var(--fb-divider)]">
+                      <PostCommentSection
+                        key={String(livePreviewPost._id)}
+                        user={user}
+                        postId={livePreviewPost._id}
+                        post={livePreviewPost}
+                        isVisible
+                        variant="theater"
+                        onClose={() => {}}
+                        onUpdatePost={(id, fn) => updatePostInLocalState(id, fn)}
+                        onRequestRefresh={() => fetchSavedPosts()}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>,

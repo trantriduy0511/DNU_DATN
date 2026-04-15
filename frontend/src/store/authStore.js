@@ -107,6 +107,50 @@ export const useAuthStore = create(
         }
       },
 
+      loginWithGoogle: async (googlePayload) => {
+        try {
+          let prevAccounts = seedAccountsIfMissing(get);
+
+          const response = await api.post('/auth/google', googlePayload);
+          const { user, token } = response.data;
+
+          const accountId = normalizeAccountId(user?.id ?? user?._id);
+          if (!accountId) {
+            return { success: false, message: 'Phản hồi đăng nhập Google không hợp lệ' };
+          }
+
+          const newAccount = {
+            id: accountId,
+            user,
+            token,
+            isAuthenticated: true
+          };
+
+          const existingIndex = prevAccounts.findIndex((acc) => normalizeAccountId(acc.id) === accountId);
+          const merged =
+            existingIndex >= 0
+              ? dedupeAccountsById(
+                  prevAccounts.map((a, i) => (i === existingIndex ? newAccount : a))
+                )
+              : dedupeAccountsById([...prevAccounts, newAccount]);
+
+          set({
+            user,
+            token,
+            isAuthenticated: true,
+            accounts: merged,
+            currentAccountId: accountId
+          });
+
+          return { success: true };
+        } catch (error) {
+          return {
+            success: false,
+            message: error.response?.data?.message || 'Lỗi đăng nhập Google'
+          };
+        }
+      },
+
       register: async (userData) => {
         try {
           let prevAccounts = seedAccountsIfMissing(get);

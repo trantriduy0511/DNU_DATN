@@ -1,8 +1,7 @@
 import User from '../models/User.model.js';
 import Post from '../models/Post.model.js';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import mongoose from 'mongoose';
+import { getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 // @desc    Search users
 // @route   GET /api/users/search
@@ -10,6 +9,7 @@ import fs from 'fs';
 export const searchUsers = async (req, res) => {
   try {
     const { q, limit = 10 } = req.query;
+    const currentUserId = req.user?.id;
 
     if (!q || q.trim().length < 2) {
       return res.status(200).json({
@@ -26,6 +26,7 @@ export const searchUsers = async (req, res) => {
     const searchQuery = escapeRegex(q.trim());
 
     const users = await User.find({
+      ...(currentUserId ? { _id: { $ne: currentUserId } } : {}),
       $or: [
         { name: { $regex: searchQuery, $options: 'i' } },
         { email: { $regex: searchQuery, $options: 'i' } },
@@ -109,7 +110,23 @@ export const getAllUsers = async (req, res) => {
 // @access  Private
 export const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id)
+    const requestedId = String(req.params.id || '').trim();
+    const normalizedId =
+      !requestedId ||
+      requestedId === 'undefined' ||
+      requestedId === 'null' ||
+      requestedId === 'me'
+        ? String(req.user?.id || '')
+        : requestedId;
+
+    if (!mongoose.Types.ObjectId.isValid(normalizedId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID người dùng không hợp lệ'
+      });
+    }
+
+    const user = await User.findById(normalizedId)
       .select('-password')
       .populate('groups', 'name avatar members')
       .populate({ path: 'followers', select: 'name avatar email studentRole major' })
@@ -703,23 +720,7 @@ export const uploadAvatar = async (req, res) => {
       });
     }
 
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-
-    // Xóa avatar cũ nếu có (không phải default) – bỏ qua lỗi nếu không xoá được
-    try {
-      if (user.avatar && !user.avatar.includes('ui-avatars.com') && user.avatar.includes('/uploads/')) {
-        const oldAvatarPath = path.join(__dirname, '..', user.avatar);
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-        }
-      }
-    } catch (cleanupErr) {
-      console.warn('Không thể xoá avatar cũ:', cleanupErr.message);
-    }
-
-    // Lưu đường dẫn file do multer lưu sẵn trong thư mục uploads/images
-    user.avatar = `/uploads/images/${req.file.filename}`;
+    user.avatar = getUploadedImageUrl(req.file);
     await user.save();
 
     return res.status(200).json({
@@ -757,58 +758,14 @@ export const uploadCoverPhoto = async (req, res) => {
       });
     }
 
-    // Resize và optimize cover photo (1200x400px)
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const filePath = path.join(__dirname, '../uploads/images', req.file.filename);
-    const outputPath = path.join(__dirname, '../uploads/images', `cover-${req.file.filename}`);
+    user.coverPhoto = getUploadedImageUrl(req.file);
+    await user.save();
 
-    try {
-      // Try to use sharp if available
-      const sharpModule = await import('sharp');
-      const sharp = sharpModule.default || sharpModule;
-      await sharp(filePath)
-        .resize(1200, 400, {
-          fit: 'cover',
-          position: 'center'
-        })
-        .jpeg({ quality: 85 })
-        .toFile(outputPath);
-
-      // Xóa file gốc
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-
-      // Xóa cover photo cũ nếu có
-      if (user.coverPhoto && fs.existsSync(path.join(__dirname, '..', user.coverPhoto))) {
-        fs.unlinkSync(path.join(__dirname, '..', user.coverPhoto));
-      }
-
-      // Lưu đường dẫn cover photo mới
-      user.coverPhoto = `/uploads/images/cover-${req.file.filename}`;
-      await user.save();
-
-      res.status(200).json({
-        success: true,
-        message: 'Cập nhật ảnh bìa thành công',
-        coverPhoto: user.coverPhoto
-      });
-    } catch (sharpError) {
-      console.error('Sharp error:', sharpError);
-      // Nếu sharp không có, dùng file gốc
-      if (user.coverPhoto && fs.existsSync(path.join(__dirname, '..', user.coverPhoto))) {
-        fs.unlinkSync(path.join(__dirname, '..', user.coverPhoto));
-      }
-      user.coverPhoto = `/uploads/images/${req.file.filename}`;
-      await user.save();
-
-      res.status(200).json({
-        success: true,
-        message: 'Cập nhật ảnh bìa thành công',
-        coverPhoto: user.coverPhoto
-      });
-    }
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật ảnh bìa thành công',
+      coverPhoto: user.coverPhoto
+    });
   } catch (error) {
     console.error('Error uploading cover photo:', error);
     res.status(500).json({

@@ -230,7 +230,7 @@ html .fixed-action-buttons,
 .chat-window-fixed-absolute {
   position: fixed !important;
   bottom: 1rem !important;
-  right: 1rem !important;
+  right: var(--chat-users-right, 1rem) !important;
   z-index: 9999 !important;
   transform: none !important;
   isolation: isolate !important;
@@ -238,8 +238,8 @@ html .fixed-action-buttons,
 
 @media (min-width: 640px) {
   .chat-window-fixed-absolute {
-    bottom: 1.5rem !important;
-    right: 1.5rem !important;
+    bottom: 1rem !important;
+    right: var(--chat-users-right, 1.5rem) !important;
   }
 }
 
@@ -252,7 +252,7 @@ html .chat-window-fixed-absolute,
   position: fixed !important;
   transform: none !important;
   bottom: 1rem !important;
-  right: 1rem !important;
+  right: var(--chat-users-right, 1rem) !important;
 }
 
 @media (min-width: 640px) {
@@ -261,8 +261,8 @@ html .chat-window-fixed-absolute,
   #root .chat-window-fixed-absolute,
   .page-container .chat-window-fixed-absolute,
   [class*="page"] .chat-window-fixed-absolute {
-    bottom: 1.5rem !important;
-    right: 1.5rem !important;
+    bottom: 1rem !important;
+    right: var(--chat-users-right, 1.5rem) !important;
   }
 }
 
@@ -310,7 +310,7 @@ html .edit-post-window-fixed-absolute,
 .chat-ai-window-fixed-absolute {
   position: fixed !important;
   bottom: 1rem !important;
-  right: 6.5rem !important;
+  right: var(--chat-ai-right, 6.5rem) !important;
   z-index: 9998 !important;
   transform: none !important;
   isolation: isolate !important;
@@ -319,7 +319,7 @@ html .edit-post-window-fixed-absolute,
 @media (min-width: 640px) {
   .chat-ai-window-fixed-absolute {
     bottom: 1rem !important;
-    right: 6.5rem !important;
+    right: var(--chat-ai-right, 6.5rem) !important;
   }
 }
 
@@ -332,7 +332,7 @@ html .chat-ai-window-fixed-absolute,
   position: fixed !important;
   transform: none !important;
   bottom: 1rem !important;
-  right: 6.5rem !important;
+  right: var(--chat-ai-right, 6.5rem) !important;
 }
 
 @media (min-width: 640px) {
@@ -342,7 +342,7 @@ html .chat-ai-window-fixed-absolute,
   .page-container .chat-ai-window-fixed-absolute,
   [class*="page"] .chat-ai-window-fixed-absolute {
     bottom: 1rem !important;
-    right: 6.5rem !important;
+    right: var(--chat-ai-right, 6.5rem) !important;
   }
 }
 

@@ -1,6 +1,7 @@
 import Comment from '../models/Comment.model.js';
 import Post from '../models/Post.model.js';
 import { createNotification } from './notification.controller.js';
+import { getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 // @desc    Create comment
 // @route   POST /api/comments/:postId
@@ -13,7 +14,7 @@ export const createComment = async (req, res) => {
     const imageFiles = Array.isArray(req.uploadedImages)
       ? req.uploadedImages
       : (Array.isArray(req.files) ? req.files : []);
-    const images = imageFiles.map((file) => `/uploads/images/${file.filename}`);
+    const images = imageFiles.map((file) => getUploadedImageUrl(file)).filter(Boolean);
 
     const post = await Post.findById(postId).populate('author', 'name');
 

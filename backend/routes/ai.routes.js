@@ -1,5 +1,5 @@
 import express from 'express';
-import { chatWithGemini } from '../controllers/ai.controller.js';
+import { chatWithGemini, getAIChatHistory, clearAIChatHistory } from '../controllers/ai.controller.js';
 import { 
   analyzeDataWithAI, 
   predictTrends, 
@@ -19,6 +19,8 @@ const router = express.Router();
 
 // Chat with AI (Gemini)
 router.post('/chat', protect, chatWithGemini);
+router.get('/chat/history', protect, getAIChatHistory);
+router.delete('/chat/history', protect, clearAIChatHistory);
 
 // AI Analytics & Predictions
 router.get('/analytics', protect, analyzeDataWithAI);

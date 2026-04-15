@@ -1,7 +1,6 @@
 import GroupFile from '../models/GroupFile.model.js';
 import Group from '../models/Group.model.js';
-import path from 'path';
-import fs from 'fs';
+import { getUploadedFileUrl } from '../utils/uploadUrl.js';
 
 // @desc    Upload file to group library
 // @route   POST /api/groups/:groupId/files
@@ -53,7 +52,7 @@ export const uploadGroupFile = async (req, res) => {
         uploadedBy: req.user.id,
         name: fileName,
         description: description || '',
-        filePath: `/uploads/files/${uploadedFile.filename}`,
+        filePath: getUploadedFileUrl(uploadedFile),
         fileName: uploadedFile.originalname,
         fileSize: uploadedFile.size,
         fileType: path.extname(uploadedFile.originalname).substring(1).toLowerCase(),
@@ -190,15 +189,6 @@ export const downloadGroupFile = async (req, res) => {
       });
     }
 
-    // Check if file exists
-    const filePath = path.join(process.cwd(), file.filePath);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        message: 'File không tồn tại trên server'
-      });
-    }
-
     // Update download count
     const hasDownloaded = file.downloadedBy.some(
       d => d.user.toString() === req.user.id
@@ -213,17 +203,13 @@ export const downloadGroupFile = async (req, res) => {
     file.downloadCount += 1;
     await file.save();
 
-    // Send file
-    res.download(filePath, file.fileName, (err) => {
-      if (err) {
-        console.error('Error downloading file:', err);
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            message: 'Lỗi tải file'
-          });
-        }
-      }
+    if (typeof file.filePath === 'string' && file.filePath.startsWith('http')) {
+      return res.redirect(file.filePath);
+    }
+
+    return res.status(404).json({
+      success: false,
+      message: 'File không tồn tại trên server'
     });
   } catch (error) {
     console.error('Error downloading file:', error);
@@ -272,12 +258,6 @@ export const deleteGroupFile = async (req, res) => {
         success: false,
         message: 'Bạn không có quyền xóa file này'
       });
-    }
-
-    // Delete physical file
-    const filePath = path.join(process.cwd(), file.filePath);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
     }
 
     // Delete record

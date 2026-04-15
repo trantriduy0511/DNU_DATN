@@ -8,6 +8,7 @@ import api from '../../utils/api';
 import { formatTimeAgo } from '../../utils/formatTime';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import PostImageGallery from '../../components/PostImageGallery';
+import { useProfileMediaInteractionsViewModel } from '../../domains/profile/viewmodels/useProfileMediaInteractionsViewModel';
 
 function isProfilePostGalleryVideoPath(src) {
   if (!src || typeof src !== 'string') return false;
@@ -27,7 +28,14 @@ export default function UserProfile() {
   const [showImageLightbox, setShowImageLightbox] = useState(false);
   const [lightboxImage, setLightboxImage] = useState('');
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [showLightboxMenu, setShowLightboxMenu] = useState(false);
+  const [deletingLightboxImage, setDeletingLightboxImage] = useState(false);
   const [friendStatus, setFriendStatus] = useState('none');
+  const normalizedFriendStatus = useMemo(() => {
+    const allowed = new Set(['none', 'request_sent', 'request_received', 'friends', 'self']);
+    return allowed.has(friendStatus) ? friendStatus : 'none';
+  }, [friendStatus]);
+
   const [followStatus, setFollowStatus] = useState('not_following'); // following | not_following
   const [actionLoading, setActionLoading] = useState(false);
   const [showPostOptions, setShowPostOptions] = useState(null);
@@ -68,7 +76,16 @@ export default function UserProfile() {
   });
   const [aboutSection, setAboutSection] = useState('overview'); // overview | contact | basic
   const [showEditAboutModal, setShowEditAboutModal] = useState(false);
-  const [editAboutForm, setEditAboutForm] = useState({ bio: '', location: '', studentId: '', phone: '', website: '', facebook: '' });
+  const [editAboutForm, setEditAboutForm] = useState({
+    name: '',
+    major: '',
+    bio: '',
+    location: '',
+    studentId: '',
+    phone: '',
+    website: '',
+    facebook: ''
+  });
   const [editAboutError, setEditAboutError] = useState('');
   const [editAboutSaving, setEditAboutSaving] = useState(false);
 
@@ -86,6 +103,15 @@ export default function UserProfile() {
   const getFeedPostLikeDisplayCount = (post) =>
     (post?.likes?.length || 0) +
     (likedPosts.has(post._id) && !isPostLikedFromPayload(post) ? 1 : 0);
+
+  const {
+    profileMediaCommentInput,
+    setProfileMediaCommentInput,
+    profileMediaInteractions,
+    toggleProfileMediaLike,
+    shareProfileMedia,
+    submitProfileMediaComment
+  } = useProfileMediaInteractionsViewModel({ profileId, currentUser });
 
   useEffect(() => {
     const onDocDown = (e) => {
@@ -173,23 +199,10 @@ export default function UserProfile() {
     }
   };
 
-  // Edit basic info (name + major) - moved from Home modal
-  const [showEditBasicModal, setShowEditBasicModal] = useState(false);
-  const [editBasicForm, setEditBasicForm] = useState({ name: '', major: '' });
-  const [editBasicError, setEditBasicError] = useState('');
-  const [editBasicSaving, setEditBasicSaving] = useState(false);
-
-  const openEditBasic = () => {
-    setEditBasicForm({
-      name: profileUser?.name || currentUser?.name || '',
-      major: profileUser?.major || currentUser?.major || ''
-    });
-    setEditBasicError('');
-    setShowEditBasicModal(true);
-  };
-
   const openEditAbout = () => {
     setEditAboutForm({
+      name: profileUser?.name || currentUser?.name || '',
+      major: profileUser?.major || currentUser?.major || '',
       bio: profileUser?.bio || '',
       location: profileUser?.location || '',
       studentId: profileUser?.studentId || '',
@@ -211,7 +224,15 @@ export default function UserProfile() {
     try {
       setEditAboutSaving(true);
       setEditAboutError('');
+      const name = (editAboutForm.name || '').trim();
+      const major = (editAboutForm.major || '').trim();
+      if (!name) {
+        setEditAboutError('Vui lòng nhập họ và tên');
+        return;
+      }
       const payload = {
+        name,
+        major,
         bio: editAboutForm.bio ?? '',
         location: editAboutForm.location ?? '',
         studentId: editAboutForm.studentId ?? '',
@@ -231,38 +252,6 @@ export default function UserProfile() {
       setEditAboutError(error.response?.data?.message || 'Lỗi cập nhật giới thiệu');
     } finally {
       setEditAboutSaving(false);
-    }
-  };
-
-  const handleEditBasicChange = (e) => {
-    const { name, value } = e.target;
-    setEditBasicForm((prev) => ({ ...prev, [name]: value }));
-    setEditBasicError('');
-  };
-
-  const handleSubmitEditBasic = async () => {
-    setEditBasicError('');
-    const name = (editBasicForm.name || '').trim();
-    const major = (editBasicForm.major || '').trim();
-    if (!name) {
-      setEditBasicError('Vui lòng nhập họ và tên');
-      return;
-    }
-
-    try {
-      setEditBasicSaving(true);
-      const res = await api.put('/users/profile', { name, major });
-      if (res?.data?.user) {
-        updateUser(res.data.user);
-        setProfileUser((prev) => (prev ? { ...prev, ...res.data.user } : res.data.user));
-      } else {
-        setProfileUser((prev) => (prev ? { ...prev, name, major } : prev));
-      }
-      setShowEditBasicModal(false);
-    } catch (error) {
-      setEditBasicError(error.response?.data?.message || 'Lỗi cập nhật thông tin');
-    } finally {
-      setEditBasicSaving(false);
     }
   };
 
@@ -364,6 +353,33 @@ export default function UserProfile() {
       fetchFriendStatus();
     }
   }, [profileId, currentUser?.id, currentUser?._id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const videos = Array.from(document.querySelectorAll('video[data-scroll-autoplay="true"]'));
+    if (!videos.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          if (!(video instanceof HTMLVideoElement)) return;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+              playPromise.catch(() => {});
+            }
+          } else if (!video.paused) {
+            video.pause();
+          }
+        });
+      },
+      { threshold: [0, 0.6, 1] }
+    );
+
+    videos.forEach((video) => observer.observe(video));
+    return () => observer.disconnect();
+  }, [userPosts, activeTab]);
 
   // Đóng dropdown khi click ra ngoài
   useEffect(() => {
@@ -471,6 +487,7 @@ export default function UserProfile() {
   const openLightbox = (imageUrl, index = 0) => {
     setLightboxImage(imageUrl);
     setLightboxIndex(index);
+    setShowLightboxMenu(false);
     setShowImageLightbox(true);
   };
 
@@ -479,21 +496,61 @@ export default function UserProfile() {
     const next = (lightboxIndex + direction + allPhotoUrls.length) % allPhotoUrls.length;
     setLightboxIndex(next);
     setLightboxImage(allPhotoUrls[next]);
+    setShowLightboxMenu(false);
+  };
+
+  const handleDeleteCurrentLightboxImage = async () => {
+    const photo = currentLightboxPhoto;
+    if (!photo || photo.type !== 'post-image' || !photo.postId) {
+      alert('Ảnh này không hỗ trợ xóa từ màn hình xem nhanh.');
+      return;
+    }
+
+    const post = userPosts.find((p) => String(p._id) === String(photo.postId));
+    if (!post) {
+      alert('Không tìm thấy bài viết chứa ảnh này.');
+      return;
+    }
+
+    const nextImages = (post.images || []).filter((img) => String(img || '') !== String(photo.raw || ''));
+    if (nextImages.length === (post.images || []).length) {
+      alert('Không thể xác định ảnh cần xóa.');
+      return;
+    }
+
+    if (!window.confirm('Bạn có chắc muốn xóa ảnh này?')) return;
+
+    try {
+      setDeletingLightboxImage(true);
+      setShowLightboxMenu(false);
+      const formData = new FormData();
+      formData.append('existingImages', JSON.stringify(nextImages));
+      const res = await api.put(`/posts/${post._id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const updatedPost = res?.data?.post;
+      setUserPosts((prev) =>
+        prev.map((p) => (String(p._id) === String(post._id) ? (updatedPost || { ...p, images: nextImages }) : p))
+      );
+    } catch (error) {
+      console.error('Delete image failed:', error);
+      alert(error.response?.data?.message || 'Xóa ảnh thất bại');
+    } finally {
+      setDeletingLightboxImage(false);
+    }
   };
 
   const handleDownloadFile = (file) => {
-    // Nếu file có URL, dùng URL đó, nếu không thì dùng download API
-    if (file.url) {
-      const fileUrl = file.url.startsWith('/uploads') 
-        ? `http://localhost:5000${file.url}` 
-        : file.url;
-      
-      // Extract filename từ URL
-      const filename = file.url.split('/').pop();
-      window.open(`http://localhost:5000/api/files/download/${filename}?name=${encodeURIComponent(file.name)}`, '_blank');
-    } else {
-      alert(`📥 Đang tải xuống: ${file.name}`);
+    if (!file?.url) {
+      alert(`📥 Đang tải xuống: ${file?.name || 'file'}`);
+      return;
     }
+    const fileUrl = file.url.startsWith('http') ? file.url : `http://localhost:5000${file.url}`;
+    const fileName = file.name || file.url.split('/').pop() || 'download';
+    window.open(
+      `http://localhost:5000/api/files/download-url?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`,
+      '_blank'
+    );
   };
 
   const postAttachmentUrl = (file) => {
@@ -559,9 +616,11 @@ export default function UserProfile() {
   const fetchFriendStatus = async () => {
     try {
       const res = await api.get(`/friends/status/${profileId}`);
-      setFriendStatus(res.data.status);
+      const status = res.data?.status;
+      setFriendStatus(status || 'none');
     } catch (error) {
       console.error('Error fetching friend status:', error);
+      setFriendStatus('none');
     }
   };
 
@@ -675,34 +734,53 @@ export default function UserProfile() {
   };
 
   const profileTabs = useMemo(() => ([
-    { id: 'posts', label: 'Bài viết' },
+    { id: 'posts', label: 'Tất cả' },
     { id: 'about', label: 'Giới thiệu' },
     { id: 'friends', label: 'Bạn bè' },
     { id: 'photos', label: 'Ảnh' },
   ]), []);
 
-  const allPhotoUrls = useMemo(() => {
-    const urls = [];
-    if (profileUser?.avatar) urls.push(resolveAvatarUrl(profileUser.avatar, profileUser.name, '3b82f6'));
-    if (profileUser?.coverPhoto) urls.push(resolveCoverUrl(profileUser.coverPhoto));
+  const allPhotos = useMemo(() => {
+    const items = [];
+    if (profileUser?.avatar) {
+      const url = resolveAvatarUrl(profileUser.avatar, profileUser.name, '3b82f6');
+      items.push({ url, type: 'avatar', key: `avatar:${url}` });
+    }
+    if (profileUser?.coverPhoto) {
+      const url = resolveCoverUrl(profileUser.coverPhoto);
+      items.push({ url, type: 'cover', key: `cover:${url}` });
+    }
 
     for (const post of userPosts || []) {
       for (const img of post?.images || []) {
-        const s = String(img || '');
-        if (!s) continue;
-        urls.push(s.startsWith('/uploads') ? `http://localhost:5000${s}` : s);
+        const raw = String(img || '');
+        if (!raw) continue;
+        const url = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        items.push({
+          url,
+          raw,
+          type: 'post-image',
+          postId: post?._id,
+          key: `post:${post?._id}:${raw}`
+        });
       }
     }
 
     // Deduplicate while preserving order
     const seen = new Set();
-    return urls.filter((u) => {
-      if (!u) return false;
-      if (seen.has(u)) return false;
-      seen.add(u);
+    return items.filter((item) => {
+      if (!item?.url) return false;
+      if (seen.has(item.url)) return false;
+      seen.add(item.url);
       return true;
     });
   }, [profileUser?.avatar, profileUser?.coverPhoto, profileUser?.name, userPosts]);
+
+  const allPhotoUrls = useMemo(() => allPhotos.map((p) => p.url), [allPhotos]);
+  const currentLightboxPhoto = useMemo(
+    () => (lightboxIndex >= 0 && lightboxIndex < allPhotos.length ? allPhotos[lightboxIndex] : null),
+    [allPhotos, lightboxIndex]
+  );
 
   const filteredFriends = useMemo(() => {
     const q = friendsQuery.trim().toLowerCase();
@@ -719,6 +797,54 @@ export default function UserProfile() {
         (f.email || '').toLowerCase().includes(q)
     );
   }, [shareFriendsList, shareFriendQuery]);
+
+  const openPhotoAtIndex = (index) => {
+    const idx = Number(index);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= allPhotos.length) return;
+    const photo = allPhotos[idx];
+    if (!photo) return;
+
+    // Tab Ảnh: nếu URL thuộc bất kỳ ảnh nào trong bài viết thì luôn mở theater đầy đủ như ảnh mẫu.
+    const matchedPost = (userPosts || []).find((p) =>
+      (p.images || []).some((img) => {
+        const raw = String(img || '');
+        if (!raw) return false;
+        const resolved = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        return resolved === photo.url;
+      })
+    );
+    if (matchedPost) {
+      const postImageIndex = (matchedPost.images || []).findIndex((img) => {
+        const raw = String(img || '');
+        if (!raw) return false;
+        const resolved = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        return resolved === photo.url;
+      });
+      openProfileImageTheater(matchedPost, postImageIndex >= 0 ? postImageIndex : 0);
+      return;
+    }
+
+    // Ảnh đại diện/ảnh bìa: mở cùng theater để giao diện đồng nhất.
+    openProfileImageTheater(
+      {
+        _id: null,
+        author: {
+          _id: profileUser?._id || profileUser?.id || currentUser?.id || currentUser?._id,
+          name: profileUser?.name || currentUser?.name || 'Thành viên',
+          avatar: profileUser?.avatar || currentUser?.avatar || '',
+        },
+        content: photo.type === 'avatar' ? 'Ảnh đại diện' : 'Ảnh bìa',
+        images: [photo.url],
+        likes: [],
+        comments: [],
+        shares: 0,
+        tags: [],
+        __mediaType: photo.type,
+        createdAt: profileUser?.updatedAt || profileUser?.createdAt || new Date().toISOString(),
+      },
+      0
+    );
+  };
 
   const toggleComments = (postId) => {
     setShowComments((prev) => {
@@ -951,6 +1077,26 @@ export default function UserProfile() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [showImageLightbox, lightboxIndex, allPhotoUrls.length]);
 
+  useEffect(() => {
+    if (!showImageLightbox) return;
+    const n = allPhotoUrls.length;
+    if (n === 0) {
+      setShowImageLightbox(false);
+      setShowLightboxMenu(false);
+      return;
+    }
+    if (lightboxIndex >= n) {
+      const next = n - 1;
+      setLightboxIndex(next);
+      setLightboxImage(allPhotoUrls[next]);
+      return;
+    }
+    const expected = allPhotoUrls[lightboxIndex];
+    if (expected && lightboxImage !== expected) {
+      setLightboxImage(expected);
+    }
+  }, [showImageLightbox, allPhotoUrls, lightboxIndex, lightboxImage]);
+
   const PostCard = ({ post }) => (
     <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] shadow-sm hover:shadow-md transition-shadow mb-4 overflow-hidden">
       {/* Post Header */}
@@ -1025,7 +1171,7 @@ export default function UserProfile() {
         {post.title && (
           <h3 className="text-lg font-bold text-[var(--fb-text-primary)] mb-2">{post.title}</h3>
         )}
-        <p className="text-[var(--fb-text-primary)] whitespace-pre-wrap">{post.content}</p>
+        <p className="text-[var(--fb-text-primary)] whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">{post.content}</p>
 
         {/* Post Images — bố cục kiểu Facebook */}
         {post.images && post.images.length > 0 && (
@@ -1038,9 +1184,7 @@ export default function UserProfile() {
               isVideo={isProfilePostGalleryVideoPath}
               videoPreviewSrc={videoPreviewSrc}
               onCellClick={(idx) => {
-                const raw = post.images[idx];
-                const imageUrl = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
-                openLightbox(imageUrl, idx);
+                openProfileImageTheater(post, idx);
               }}
             />
           </div>
@@ -1057,6 +1201,7 @@ export default function UserProfile() {
                     controls
                     playsInline
                     preload="metadata"
+                    data-scroll-autoplay="true"
                     className="w-full max-h-[480px] rounded-xl bg-black"
                   />
                   {file.name ? (
@@ -1238,30 +1383,30 @@ export default function UserProfile() {
 
           {/* Header Info Row */}
           <div className="px-2 sm:px-4 pb-3">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 -mt-10 sm:-mt-14">
-              <div className="flex items-end gap-4">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3 -mt-8 sm:-mt-14">
+              <div className="flex items-start sm:items-end gap-3 sm:gap-4 min-w-0">
                 {/* Avatar */}
                 <div className="relative">
                   <img
                     src={resolveAvatarUrl(profileUser.avatar, profileUser.name, '3b82f6')}
                     alt={profileUser.name}
-                    className="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-4 border-[var(--fb-surface)] shadow-md object-cover bg-[var(--fb-surface)]"
+                    className="w-24 h-24 sm:w-36 sm:h-36 rounded-full border-4 border-[var(--fb-surface)] shadow-md object-cover bg-[var(--fb-surface)]"
                   />
                   {isMe && (
                     <button
                       onClick={() => setShowAvatarModal(true)}
-                      className="absolute bottom-2 right-2 bg-[var(--fb-surface)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] rounded-full p-2 border border-[var(--fb-divider)] shadow-sm transition-colors"
+                      className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 bg-[var(--fb-surface)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] rounded-full p-1.5 sm:p-2 border border-[var(--fb-divider)] shadow-sm transition-colors"
                       title="Thay đổi ảnh đại diện"
                     >
-                      <Camera className="w-4 h-4" />
+                      <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </button>
                   )}
                 </div>
 
                 {/* Name + meta */}
-                <div className="pb-2">
+                <div className="min-w-0 pt-1 sm:pb-2">
                   <div className="flex items-center gap-2">
-                    <h1 className="text-2xl sm:text-[28px] leading-tight font-extrabold text-[var(--fb-text-primary)]">
+                    <h1 className="text-xl sm:text-[28px] leading-tight font-extrabold text-[var(--fb-text-primary)] break-words">
                       {profileUser.name}
                     </h1>
                     {profileUser.role === 'admin' && (
@@ -1271,7 +1416,7 @@ export default function UserProfile() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--fb-text-secondary)]">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 text-xs sm:text-sm text-[var(--fb-text-secondary)]">
                     {profileUser.studentRole && (
                       <span className="inline-flex items-center gap-1 text-blue-600 font-semibold">
                         <Award className="w-4 h-4" />
@@ -1297,7 +1442,7 @@ export default function UserProfile() {
                 {isMe ? (
                   <>
                     <button
-                      onClick={openEditBasic}
+                      onClick={openEditAbout}
                       className="px-4 py-2 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] border border-[var(--fb-divider)] font-semibold transition-colors"
                     >
                       Chỉnh sửa thông tin
@@ -1319,7 +1464,7 @@ export default function UserProfile() {
                       Nhắn tin
                     </button>
 
-                    {friendStatus === 'none' && (
+                    {normalizedFriendStatus === 'none' && (
                       <button
                         onClick={handleSendFriendRequest}
                         disabled={actionLoading}
@@ -1330,7 +1475,7 @@ export default function UserProfile() {
                       </button>
                     )}
 
-                    {friendStatus === 'request_sent' && (
+                    {normalizedFriendStatus === 'request_sent' && (
                       <button
                         onClick={handleCancelRequest}
                         disabled={actionLoading}
@@ -1341,7 +1486,7 @@ export default function UserProfile() {
                       </button>
                     )}
 
-                    {friendStatus === 'request_received' && (
+                    {normalizedFriendStatus === 'request_received' && (
                       <>
                         <button
                           onClick={handleAcceptRequest}
@@ -1361,7 +1506,7 @@ export default function UserProfile() {
                       </>
                     )}
 
-                    {friendStatus === 'friends' && (
+                    {normalizedFriendStatus === 'friends' && (
                       <button
                         onClick={handleUnfriend}
                         disabled={actionLoading}
@@ -1424,16 +1569,16 @@ export default function UserProfile() {
 
       <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
         {activeTab === 'posts' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             {/* Left column */}
-            <aside className="lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-[76px] lg:self-start">
+            <aside className="md:col-span-5 lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-[76px] lg:self-start">
               {/* Intro */}
               <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Giới thiệu</h2>
                   {isMe && (
                     <button
-                      onClick={openEditBasic}
+                      onClick={openEditAbout}
                       className="px-3 py-1.5 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] border border-[var(--fb-divider)] text-[var(--fb-text-primary)] text-sm font-semibold transition-colors"
                     >
                       Chỉnh sửa
@@ -1488,12 +1633,12 @@ export default function UserProfile() {
                     Xem tất cả ảnh
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 md:grid-cols-3 gap-2">
                   {allPhotoUrls.slice(0, 6).map((url, i) => (
                     <button
                       key={`${url}-${i}`}
                       type="button"
-                      onClick={() => openLightbox(url, i)}
+                      onClick={() => openPhotoAtIndex(i)}
                       className="group relative aspect-square rounded-lg overflow-hidden bg-[var(--fb-input)] border border-[var(--fb-divider)]"
                       title="Xem ảnh"
                     >
@@ -1532,7 +1677,7 @@ export default function UserProfile() {
                 <p className="text-sm text-[var(--fb-text-secondary)] mb-3">
                   {friendsLoading ? 'Đang tải...' : `${friends.length} bạn bè`}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 md:grid-cols-3 gap-2">
                   {(friends || []).slice(0, 6).map((f) => (
                     <button
                       key={f._id || f.id || f.email || f.name}
@@ -1566,8 +1711,8 @@ export default function UserProfile() {
             </aside>
 
             {/* Right column */}
-            <main className="lg:col-span-7 xl:col-span-8">
-              <div className="mx-auto lg:mx-0 w-full max-w-[min(100%,680px)] space-y-4">
+            <main className="md:col-span-7 lg:col-span-7 xl:col-span-8">
+              <div className="mx-auto lg:mx-0 w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-4">
               {/* Composer (only me) */}
               {isMe && (
                 <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
@@ -1701,36 +1846,6 @@ export default function UserProfile() {
                         {profileUser.phone?.trim() ? profileUser.phone : '—'}
                       </div>
                     </div>
-                    <div className="bg-[var(--fb-input)] border border-[var(--fb-divider)] rounded-xl p-3">
-                      <div className="text-xs text-[var(--fb-text-secondary)] font-semibold">Website</div>
-                      <div className="mt-1 text-sm text-[var(--fb-text-primary)] break-all">
-                        {profileUser.website?.trim() ? (
-                          <a
-                            href={profileUser.website}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {profileUser.website}
-                          </a>
-                        ) : '—'}
-                      </div>
-                    </div>
-                    <div className="bg-[var(--fb-input)] border border-[var(--fb-divider)] rounded-xl p-3">
-                      <div className="text-xs text-[var(--fb-text-secondary)] font-semibold">Facebook</div>
-                      <div className="mt-1 text-sm text-[var(--fb-text-primary)] break-all">
-                        {profileUser.facebook?.trim() ? (
-                          <a
-                            href={profileUser.facebook}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            {profileUser.facebook}
-                          </a>
-                        ) : '—'}
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1747,10 +1862,6 @@ export default function UserProfile() {
                     <div className="bg-[var(--fb-input)] border border-[var(--fb-divider)] rounded-xl p-3">
                       <div className="text-xs text-[var(--fb-text-secondary)] font-semibold">Vai trò</div>
                       <div className="mt-1 text-sm text-[var(--fb-text-primary)]">{profileUser.studentRole || '—'}</div>
-                    </div>
-                    <div className="bg-[var(--fb-input)] border border-[var(--fb-divider)] rounded-xl p-3">
-                      <div className="text-xs text-[var(--fb-text-secondary)] font-semibold">Mã sinh viên</div>
-                      <div className="mt-1 text-sm text-[var(--fb-text-primary)]">{profileUser.studentId || '—'}</div>
                     </div>
                     <div className="bg-[var(--fb-input)] border border-[var(--fb-divider)] rounded-xl p-3">
                       <div className="text-xs text-[var(--fb-text-secondary)] font-semibold">Ngày tham gia</div>
@@ -2116,7 +2227,7 @@ export default function UserProfile() {
                   <button
                     key={`${url}-${i}`}
                     type="button"
-                    onClick={() => openLightbox(url, i)}
+                    onClick={() => openPhotoAtIndex(i)}
                     className="group relative aspect-square rounded-lg overflow-hidden bg-[var(--fb-input)] border border-[var(--fb-divider)]"
                     title="Xem ảnh"
                   >
@@ -2138,110 +2249,7 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* Edit basic info modal (name + major) */}
-      {showEditBasicModal && typeof document !== 'undefined' && createPortal(
-        <div
-          className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4"
-          onClick={() => {
-            if (editBasicSaving) return;
-            setShowEditBasicModal(false);
-            setEditBasicError('');
-          }}
-        >
-          <div
-            className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl border border-[var(--fb-divider)] w-full max-w-md overflow-hidden flex flex-col h-[90vh] max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-5 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center">
-                    <Edit className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-extrabold text-white">Chỉnh sửa thông tin</h3>
-                    <p className="text-sm text-blue-100 mt-0.5">Thay đổi tên và chuyên ngành</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  disabled={editBasicSaving}
-                  onClick={() => {
-                    setShowEditBasicModal(false);
-                    setEditBasicError('');
-                  }}
-                  className="text-white hover:bg-white/20 p-2 rounded-full transition-colors disabled:opacity-60"
-                  title="Đóng"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {editBasicError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">{editBasicError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
-                  Họ và tên
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={editBasicForm.name}
-                  onChange={handleEditBasicChange}
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nguyễn Văn A"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
-                  Chuyên ngành
-                </label>
-                <input
-                  type="text"
-                  name="major"
-                  value={editBasicForm.major}
-                  onChange={handleEditBasicChange}
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Công nghệ thông tin"
-                />
-              </div>
-            </div>
-
-            <div className="bg-[var(--fb-surface)] border-t border-[var(--fb-divider)] p-4 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                disabled={editBasicSaving}
-                onClick={() => {
-                  setShowEditBasicModal(false);
-                  setEditBasicError('');
-                }}
-                className="px-4 py-2 rounded-xl bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] border border-[var(--fb-divider)] font-semibold transition-colors disabled:opacity-60"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={editBasicSaving}
-                onClick={handleSubmitEditBasic}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors disabled:opacity-60"
-              >
-                {editBasicSaving ? 'Đang lưu...' : 'Lưu'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Edit About modal (bio + basic + contact) */}
+      {/* Unified edit modal (basic + about + contact) */}
       {showEditAboutModal && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4"
@@ -2262,8 +2270,8 @@ export default function UserProfile() {
                     <Edit className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-extrabold text-white">Chỉnh sửa giới thiệu</h3>
-                    <p className="text-sm text-blue-100 mt-0.5">Cập nhật tiểu sử và thông tin liên hệ</p>
+                    <h3 className="text-lg font-extrabold text-white">Chỉnh sửa thông tin</h3>
+                    <p className="text-sm text-blue-100 mt-0.5">Cập nhật cơ bản, giới thiệu và liên hệ</p>
                   </div>
                 </div>
                 <button
@@ -2288,6 +2296,34 @@ export default function UserProfile() {
                   <span className="text-sm">{editAboutError}</span>
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
+                  Họ và tên
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={editAboutForm.name}
+                  onChange={handleEditAboutChange}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nguyễn Văn A"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
+                  Chuyên ngành
+                </label>
+                <input
+                  type="text"
+                  name="major"
+                  value={editAboutForm.major}
+                  onChange={handleEditAboutChange}
+                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="VD: Công nghệ thông tin"
+                />
+              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
@@ -2353,33 +2389,6 @@ export default function UserProfile() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
-                      Website
-                    </label>
-                    <input
-                      type="text"
-                      name="website"
-                      value={editAboutForm.website}
-                      onChange={handleEditAboutChange}
-                      className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="VD: https://example.com"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
-                      Facebook / Link
-                    </label>
-                    <input
-                      type="text"
-                      name="facebook"
-                      value={editAboutForm.facebook}
-                      onChange={handleEditAboutChange}
-                      className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="VD: https://facebook.com/..."
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -2417,6 +2426,14 @@ export default function UserProfile() {
             const livePost =
               userPosts.find((p) => String(p._id) === String(profileImageTheater.post._id)) ||
               profileImageTheater.post;
+            const hasInteractivePost = Boolean(livePost?._id);
+            const profileMediaType =
+              livePost?.__mediaType && ['avatar', 'cover'].includes(livePost.__mediaType)
+                ? livePost.__mediaType
+                : null;
+            const mediaInteractions = profileMediaType
+              ? profileMediaInteractions[profileMediaType] || { likes: 0, likedByMe: false, comments: [], shares: 0 }
+              : null;
             const imgs = (livePost.images || []).filter((x) => typeof x === 'string');
             const n = imgs.length;
             const idx = n ? Math.min(Math.max(0, profileImageTheater.imageIndex), n - 1) : 0;
@@ -2444,9 +2461,10 @@ export default function UserProfile() {
             const theaterLikedByUser = (livePost.likes || []).some(
               (like) => String(like?._id || like) === theaterUid
             );
-            const theaterLikeCount =
-              (livePost.likes?.length || 0) +
-              (likedPosts.has(livePost._id) && !theaterLikedByUser ? 1 : 0);
+            const theaterLikeCount = mediaInteractions
+              ? mediaInteractions.likes || 0
+              : (livePost.likes?.length || 0) +
+                (hasInteractivePost && likedPosts.has(livePost._id) && !theaterLikedByUser ? 1 : 0);
             const curPathRaw = imgs[idx] || '';
             const curIsVideo = isProfilePostGalleryVideoPath(curPathRaw);
             const profilePostZoomIn = (e) => {
@@ -2731,16 +2749,18 @@ export default function UserProfile() {
                           <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] py-1 shadow-xl z-30">
                             <button
                               type="button"
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--fb-hover)] text-amber-700 flex items-center gap-2"
+                              disabled={!hasInteractivePost}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--fb-hover)] text-amber-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                               onClick={() => {
+                                if (!hasInteractivePost) return;
                                 setProfileTheaterPostMenuOpen(false);
                                 toggleSavePost(livePost._id);
                               }}
                             >
-                              <Bookmark className={`w-4 h-4 ${savedSet.has(livePost._id) ? 'fill-current' : ''}`} />
-                              {savedSet.has(livePost._id) ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
+                              <Bookmark className={`w-4 h-4 ${hasInteractivePost && savedSet.has(livePost._id) ? 'fill-current' : ''}`} />
+                              {hasInteractivePost && savedSet.has(livePost._id) ? 'Bỏ lưu bài viết' : 'Lưu bài viết'}
                             </button>
-                            {isOwner ? (
+                            {hasInteractivePost && isOwner ? (
                               <button
                                 type="button"
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--fb-hover)] text-red-600"
@@ -2752,7 +2772,7 @@ export default function UserProfile() {
                               >
                                 Xóa bài viết
                               </button>
-                            ) : (
+                            ) : hasInteractivePost ? (
                               <button
                                 type="button"
                                 className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--fb-hover)] text-red-600"
@@ -2764,6 +2784,10 @@ export default function UserProfile() {
                               >
                                 Báo cáo bài viết
                               </button>
+                            ) : (
+                              <div className="px-3 py-2 text-sm text-[var(--fb-text-secondary)]">
+                                Ảnh hồ sơ
+                              </div>
                             )}
                           </div>
                         ) : null}
@@ -2816,10 +2840,10 @@ export default function UserProfile() {
                     </div>
                     <div className="flex gap-4">
                       <span className="hover:underline cursor-pointer text-[13px]">
-                        {livePost.comments?.length || 0} bình luận
+                        {mediaInteractions ? (mediaInteractions.comments?.length || 0) : (livePost.comments?.length || 0)} bình luận
                       </span>
                       <span className="hover:underline cursor-pointer text-[13px]">
-                        {livePost.shares || 0} chia sẻ
+                        {mediaInteractions ? (mediaInteractions.shares || 0) : (livePost.shares || 0)} chia sẻ
                       </span>
                     </div>
                   </div>
@@ -2827,31 +2851,47 @@ export default function UserProfile() {
                   <div className="shrink-0 flex border-t border-[var(--fb-divider)] px-2 py-1">
                     <button
                       type="button"
-                      onClick={() => toggleLike(livePost._id)}
+                      onClick={() => {
+                        if (mediaInteractions && profileMediaType) {
+                          toggleProfileMediaLike(profileMediaType);
+                          return;
+                        }
+                        if (!hasInteractivePost) return;
+                        toggleLike(livePost._id);
+                      }}
+                      disabled={!hasInteractivePost && !mediaInteractions}
                       className={`flex flex-1 items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        likedPosts.has(livePost._id)
+                        (mediaInteractions ? mediaInteractions.likedByMe : (hasInteractivePost && likedPosts.has(livePost._id)))
                           ? 'text-blue-600 hover:bg-blue-50'
                           : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
-                      }`}
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
-                      <Heart className={`w-5 h-5 ${likedPosts.has(livePost._id) ? 'fill-current' : ''}`} />
-                      {likedPosts.has(livePost._id) ? 'Đã thích' : 'Thích'}
+                      <Heart className={`w-5 h-5 ${(mediaInteractions ? mediaInteractions.likedByMe : (hasInteractivePost && likedPosts.has(livePost._id))) ? 'fill-current' : ''}`} />
+                      {(mediaInteractions ? mediaInteractions.likedByMe : (hasInteractivePost && likedPosts.has(livePost._id))) ? 'Đã thích' : 'Thích'}
                     </button>
                     <button
                       type="button"
                       onClick={() =>
                         document.getElementById('theater-comment-input')?.focus()
                       }
-                      className="flex flex-1 items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium text-blue-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                      disabled={!hasInteractivePost && !mediaInteractions}
+                      className="flex flex-1 items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium text-blue-600 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <MessageCircle className="w-5 h-5" />
                       Bình luận
                     </button>
                     <button
                       type="button"
-                      onClick={() => openShareModal(livePost)}
-                      disabled={shareSending && shareModalPost?._id === livePost._id}
-                      className="flex flex-1 items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                      onClick={() => {
+                        if (mediaInteractions && profileMediaType) {
+                          shareProfileMedia(profileMediaType);
+                          return;
+                        }
+                        if (!hasInteractivePost) return;
+                        openShareModal(livePost);
+                      }}
+                      disabled={(!hasInteractivePost && !mediaInteractions) || (hasInteractivePost && shareSending && shareModalPost?._id === livePost._id)}
+                      className="flex flex-1 items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Share2 className="w-5 h-5" />
                       {shareSending && shareModalPost?._id === livePost._id ? 'Đang gửi…' : 'Chia sẻ'}
@@ -2859,21 +2899,70 @@ export default function UserProfile() {
                   </div>
 
                   <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                    <PostCommentSection
-                      key={String(livePost._id)}
-                      user={currentUser}
-                      postId={livePost._id}
-                      post={livePost}
-                      isVisible
-                      variant="theater"
-                      onClose={() => {}}
-                      onUpdatePost={(id, fn) =>
-                        setUserPosts((prev) => prev.map((p) => (p._id === id ? fn(p) : p)))
-                      }
-                      onRequestRefresh={() => {
-                        setTimeout(() => fetchUserPosts(), 1000);
-                      }}
-                    />
+                    {hasInteractivePost ? (
+                      <PostCommentSection
+                        key={String(livePost._id)}
+                        user={currentUser}
+                        postId={livePost._id}
+                        post={livePost}
+                        isVisible
+                        variant="theater"
+                        onClose={() => {}}
+                        onUpdatePost={(id, fn) =>
+                          setUserPosts((prev) => prev.map((p) => (p._id === id ? fn(p) : p)))
+                        }
+                        onRequestRefresh={() => {
+                          setTimeout(() => fetchUserPosts(), 1000);
+                        }}
+                      />
+                    ) : mediaInteractions ? (
+                      <div className="flex h-full min-h-0 flex-col">
+                        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+                          {mediaInteractions.comments?.length ? (
+                            mediaInteractions.comments.map((c) => (
+                              <div key={c.id} className="rounded-lg bg-[var(--fb-input)] px-3 py-2">
+                                <p className="text-sm font-semibold text-[var(--fb-text-primary)]">{c.authorName}</p>
+                                <p className="text-sm text-[var(--fb-text-primary)] whitespace-pre-wrap break-words">{c.content}</p>
+                                <p className="mt-1 text-xs text-[var(--fb-text-secondary)]">{formatTimeAgo(c.createdAt)}</p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-sm text-[var(--fb-text-secondary)]">
+                              Chưa có bình luận nào.
+                            </div>
+                          )}
+                        </div>
+                        <div className="shrink-0 border-t border-[var(--fb-divider)] p-3">
+                          <div className="flex items-center gap-2">
+                            <input
+                              id="theater-comment-input"
+                              type="text"
+                              value={profileMediaCommentInput}
+                              onChange={(e) => setProfileMediaCommentInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  submitProfileMediaComment(profileMediaType);
+                                }
+                              }}
+                              placeholder="Viết bình luận..."
+                              className="flex-1 rounded-full border border-[var(--fb-divider)] bg-[var(--fb-input)] px-3 py-2 text-sm text-[var(--fb-text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => submitProfileMediaComment(profileMediaType)}
+                              className="rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                              Gửi
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center text-sm text-[var(--fb-text-secondary)]">
+                        Ảnh này không có bình luận.
+                      </div>
+                    )}
                   </div>
                 </aside>
               </div>
@@ -3021,58 +3110,99 @@ export default function UserProfile() {
       />
 
       {/* Image Lightbox */}
-      {showImageLightbox && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowImageLightbox(false)}
-        >
-          <button
+      {showImageLightbox &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[10060] flex h-[100dvh] w-full items-center justify-center bg-black"
             onClick={() => setShowImageLightbox(false)}
-            className="absolute top-4 right-4 text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition-colors"
           >
-            <X className="w-6 h-6" />
-          </button>
-          {allPhotoUrls.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goLightbox(-1);
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/30 hover:bg-black/50 p-2 rounded-full transition-colors"
-                title="Ảnh trước"
-              >
-                <ChevronLeft className="w-7 h-7" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goLightbox(1);
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/30 hover:bg-black/50 p-2 rounded-full transition-colors"
-                title="Ảnh tiếp"
-              >
-                <ChevronRight className="w-7 h-7" />
-              </button>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/70 to-transparent" />
+            <button
+              onClick={() => setShowImageLightbox(false)}
+              className="absolute z-30 top-4 left-3 sm:left-4 text-white hover:bg-white/20 p-2 rounded-full transition-colors"
+              aria-label="Đóng xem ảnh"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            {isMe && (
+              <div className="absolute z-30 top-4 right-3 sm:right-4">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowLightboxMenu((v) => !v);
+                  }}
+                  className="text-white hover:bg-white/20 p-2 rounded-full transition-colors"
+                  aria-label="Tùy chọn ảnh"
+                >
+                  <MoreHorizontal className="w-6 h-6" />
+                </button>
+                {showLightboxMenu && (
+                  <div
+                    className="absolute right-0 mt-2 w-40 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] py-1 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      disabled={!currentLightboxPhoto || currentLightboxPhoto.type !== 'post-image' || deletingLightboxImage}
+                      onClick={handleDeleteCurrentLightboxImage}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>{deletingLightboxImage ? 'Đang xóa...' : 'Xóa ảnh'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {allPhotoUrls.length > 1 && (
+              <div className="absolute z-30 top-5 left-1/2 -translate-x-1/2 text-white/85 text-sm font-medium">
                 {lightboxIndex + 1}/{allPhotoUrls.length}
               </div>
-            </>
-          )}
-          <div
-            className="max-w-[92vw] max-h-[86vh] flex items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src={lightboxImage}
-              alt="Full size"
-              className="max-w-full max-h-full object-contain"
-            />
-          </div>
-        </div>
-      )}
+            )}
+
+            {allPhotoUrls.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goLightbox(-1);
+                  }}
+                  className="absolute z-30 left-2 sm:left-4 top-1/2 -translate-y-1/2 text-white bg-black/35 hover:bg-black/55 p-1.5 sm:p-2 rounded-full transition-colors"
+                  title="Ảnh trước"
+                >
+                  <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goLightbox(1);
+                  }}
+                  className="absolute z-30 right-2 sm:right-4 top-1/2 -translate-y-1/2 text-white bg-black/35 hover:bg-black/55 p-1.5 sm:p-2 rounded-full transition-colors"
+                  title="Ảnh tiếp"
+                >
+                  <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
+                </button>
+              </>
+            )}
+
+            <div
+              className="relative flex h-full w-full items-center justify-center overflow-hidden px-1 sm:px-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={lightboxImage}
+                alt="Full size"
+                className="max-h-[100dvh] w-auto max-w-full object-contain"
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

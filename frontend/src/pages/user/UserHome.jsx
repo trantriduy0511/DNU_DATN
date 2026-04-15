@@ -7,6 +7,7 @@ import api from '../../utils/api';
 import { buildEventShareMessageContent } from '../../utils/eventShareMessage.js';
 import { buildGroupShareMessageContent } from '../../utils/groupShareMessage.js';
 import { formatTimeAgo } from '../../utils/formatTime';
+import { useHomeSavedActionsViewModel } from '../../domains/home/viewmodels/useHomeSavedActionsViewModel';
 // Chat overlays are mounted globally in NavigationBar
 import OnlineUsers from '../../components/OnlineUsers';
 import DocumentAnalyzer from '../../components/DocumentAnalyzer';
@@ -296,6 +297,20 @@ const UserHome = () => {
   const [homeGroupShareSending, setHomeGroupShareSending] = useState(false);
   const [homeGroupShareFriendsLoading, setHomeGroupShareFriendsLoading] = useState(false);
 
+  const {
+    savedCollections,
+    saveCollectionModalPostId,
+    setSaveCollectionModalPostId,
+    saveCollectionChoice,
+    setSaveCollectionChoice,
+    newSaveCollectionName,
+    setNewSaveCollectionName,
+    toggleSave,
+    openSaveToCollectionModal,
+    createSaveCollectionInModal,
+    confirmSaveToCollection
+  } = useHomeSavedActionsViewModel(savedPosts, setSavedPosts);
+
   const filteredShareFriends = useMemo(() => {
     const q = shareFriendQuery.trim().toLowerCase();
     if (!q) return shareFriendsList;
@@ -420,6 +435,33 @@ const UserHome = () => {
       window.removeEventListener('messagesUpdated', refreshGroupChats);
     };
   }, [fetchGroupChats]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const videos = Array.from(document.querySelectorAll('video[data-scroll-autoplay="true"]'));
+    if (!videos.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          if (!(video instanceof HTMLVideoElement)) return;
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            const playPromise = video.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+              playPromise.catch(() => {});
+            }
+          } else if (!video.paused) {
+            video.pause();
+          }
+        });
+      },
+      { threshold: [0, 0.6, 1] }
+    );
+
+    videos.forEach((video) => observer.observe(video));
+    return () => observer.disconnect();
+  }, [posts, activeTab]);
 
   const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
     if (avatar) {
@@ -776,18 +818,10 @@ const UserHome = () => {
             setGroupsLoading(true);
           }
           
-        // Load my groups (only groups user has joined)
-        const myGroupsRes = await api.get('/groups');
-        
-        // Filter to only show groups where user is a member
-        const allGroups = myGroupsRes.data.groups || [];
-        const myJoinedGroups = allGroups.filter(group => {
-          return group.members?.some(m => {
-            const memberId = m.user?._id || m.user;
-            const userId = user?.id || user?._id;
-            return String(memberId) === String(userId);
-          });
-        });
+        // Load joined groups directly from backend.
+        // This prevents missing private groups that are not returned by default /groups.
+        const myGroupsRes = await api.get('/groups', { params: { joined: true } });
+        const myJoinedGroups = myGroupsRes.data.groups || [];
           
           // Update cache
           groupsCacheRef.current = {
@@ -893,23 +927,6 @@ const UserHome = () => {
       }));
     } catch (error) {
       console.error('Error toggling like:', error);
-    }
-  };
-
-  const toggleSave = async (postId) => {
-    const newSaved = new Set(savedPosts);
-    
-    try {
-    if (newSaved.has(postId)) {
-        await api.delete(`/posts/${postId}/save`);
-      newSaved.delete(postId);
-    } else {
-        await api.post(`/posts/${postId}/save`);
-      newSaved.add(postId);
-    }
-    setSavedPosts(newSaved);
-    } catch (error) {
-      console.error('Error toggling save:', error);
     }
   };
 
@@ -1044,10 +1061,17 @@ const UserHome = () => {
   };
 
   const handleDownloadFile = (file) => {
-    // Mock download - In production, this would download from server
     const link = document.createElement('a');
-    link.href = file.url || '#';
-    link.download = file.name || 'document';
+    const fileUrl = String(file?.url || '').trim();
+    const fileName = String(file?.name || 'document').trim() || 'document';
+
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      link.href = `/api/files/download-url?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`;
+      link.target = '_blank';
+    } else {
+      link.href = fileUrl || '#';
+      link.download = fileName;
+    }
     link.click();
   };
   
@@ -2159,7 +2183,7 @@ const UserHome = () => {
               <button
                 onClick={() => {
                   setShowPostOptions(null);
-                  toggleSave(post._id);
+                  openSaveToCollectionModal(post._id);
                 }}
                 className="w-full flex items-center space-x-3 px-4 py-2 text-left hover:bg-amber-50 transition-colors text-amber-700"
               >
@@ -2226,13 +2250,13 @@ const UserHome = () => {
       <div className="px-4 pb-3">
         {post.textBackground && (!post.images || post.images.length === 0) && (!post.files || post.files.length === 0) ? (
           <div
-            className={`w-full min-h-[360px] md:min-h-[420px] rounded-xl px-5 py-8 flex items-center justify-center text-center text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words ${isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'}`}
+            className={`w-full min-h-[220px] sm:min-h-[300px] md:min-h-[420px] rounded-xl px-4 sm:px-5 py-6 sm:py-8 flex items-center justify-center text-center text-xl sm:text-2xl md:text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere] ${isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'}`}
             style={{ background: post.textBackground }}
           >
             {post.content}
           </div>
         ) : (
-          <p className="text-[var(--fb-text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+          <p className="text-[var(--fb-text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">{post.content}</p>
         )}
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -2271,6 +2295,7 @@ const UserHome = () => {
                     controls
                     playsInline
                     preload="metadata"
+                    data-scroll-autoplay="true"
                     className="h-auto w-full max-h-[min(72vh,620px)] rounded-lg bg-black object-contain"
                   />
                 </div>
@@ -2486,7 +2511,7 @@ const UserHome = () => {
 
       {/* Main Feed - Facebook Style (~680px max readable width, full width on small screens) */}
       <div className="lg:col-span-6">
-        <div className="mx-auto w-full max-w-[min(100%,680px)] space-y-4">
+        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-4">
         {/* New Post - Facebook Style */}
         <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
           <div className="p-4">
@@ -3093,7 +3118,7 @@ const UserHome = () => {
               </>
             ) : groupsSubTab === 'feed' ? (
               <>
-                <div className="mx-auto w-full max-w-[min(100%,680px)]">
+                <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px]">
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-[var(--fb-text-primary)] sm:text-xl">
                       Bảng feed nhóm
@@ -3498,7 +3523,7 @@ const UserHome = () => {
         </aside>
 
         <div className="lg:col-span-6">
-          <div className="mx-auto w-full max-w-[min(100%,680px)]">
+          <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px]">
         {/* New Post Form - Hiển thị khi showNewPost = true */}
         {showNewPost && canPostDocument && (
           <div className="bg-white rounded-lg shadow-md p-4 mb-6">
@@ -5139,7 +5164,7 @@ const UserHome = () => {
                           </div>
                         </div>
                         <button
-                          onClick={() => toggleSave(post._id)}
+                          onClick={() => openSaveToCollectionModal(post._id)}
                           className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           title="Bỏ lưu"
                         >
@@ -5177,6 +5202,7 @@ const UserHome = () => {
                               controls
                               playsInline
                               preload="metadata"
+                              data-scroll-autoplay="true"
                               className="h-64 w-full bg-black object-cover"
                             />
                           );
@@ -5196,6 +5222,95 @@ const UserHome = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {saveCollectionModalPostId && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[10020] bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setSaveCollectionModalPostId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-[var(--fb-divider)] flex items-center justify-between">
+              <h3 className="text-base font-bold text-[var(--fb-text-primary)]">Lưu vào bộ sưu tập</h3>
+              <button
+                type="button"
+                onClick={() => setSaveCollectionModalPostId(null)}
+                className="p-2 rounded-full hover:bg-[var(--fb-hover)]"
+              >
+                <X className="w-4 h-4 text-[var(--fb-icon)]" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-xs text-[var(--fb-text-secondary)] mb-1">Chọn bộ sưu tập</label>
+                <select
+                  value={saveCollectionChoice}
+                  onChange={(e) => setSaveCollectionChoice(e.target.value)}
+                  className="w-full rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 py-2 text-sm text-[var(--fb-text-primary)]"
+                >
+                  {savedCollections.map((collection) => (
+                    <option key={collection.id} value={collection.id}>
+                      {collection.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-[var(--fb-text-secondary)] mb-1">Tạo bộ sưu tập mới</label>
+                <div className="flex gap-2">
+                  <input
+                    value={newSaveCollectionName}
+                    onChange={(e) => setNewSaveCollectionName(e.target.value)}
+                    placeholder="Ví dụ: Dự án môn học"
+                    className="flex-1 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 py-2 text-sm text-[var(--fb-text-primary)]"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const result = createSaveCollectionInModal();
+                        if (!result.ok && result.reason === 'duplicate') {
+                          alert('Tên bộ sưu tập đã tồn tại.');
+                        }
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const result = createSaveCollectionInModal();
+                      if (!result.ok && result.reason === 'duplicate') {
+                        alert('Tên bộ sưu tập đã tồn tại.');
+                      }
+                    }}
+                    disabled={!newSaveCollectionName.trim()}
+                    className="px-3 py-2 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] text-sm font-medium text-[var(--fb-text-primary)] disabled:opacity-50"
+                  >
+                    Tạo
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="px-4 py-3 border-t border-[var(--fb-divider)] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSaveCollectionModalPostId(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={confirmSaveToCollection}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Lưu bài viết
+              </button>
             </div>
           </div>
         </div>,
@@ -5715,7 +5830,7 @@ const UserHome = () => {
                               className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--fb-hover)] text-amber-700 flex items-center gap-2"
                               onClick={() => {
                                 setTheaterPostMenuOpen(false);
-                                toggleSave(livePost._id);
+                                openSaveToCollectionModal(livePost._id);
                               }}
                             >
                               <Bookmark className={`w-4 h-4 ${savedPosts.has(livePost._id) ? 'fill-current' : ''}`} />

@@ -3,6 +3,7 @@ import Conversation from '../models/Conversation.model.js';
 import User from '../models/User.model.js';
 import { emitToConversation, emitToUser } from '../socket/socketServer.js';
 import Notification from '../models/Notification.model.js';
+import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 // @desc    Get or create conversation between two users
 // @route   GET /api/messages/conversation/:userId
@@ -218,8 +219,8 @@ export const sendMessage = async (req, res) => {
     let images = [];
     if (req.uploadedImages && req.uploadedImages.length > 0) {
       images = req.uploadedImages.map(file => ({
-        url: `/uploads/images/${file.filename}`,
-        filename: file.filename,
+        url: getUploadedImageUrl(file),
+        filename: file.cloudinaryPublicId || file.filename,
         originalName: file.originalname,
         size: file.size
       }));
@@ -229,8 +230,8 @@ export const sendMessage = async (req, res) => {
     let files = [];
     if (req.uploadedFiles && req.uploadedFiles.length > 0) {
       files = req.uploadedFiles.map(file => ({
-        url: `/uploads/files/${file.filename}`,
-        filename: file.filename,
+        url: getUploadedFileUrl(file),
+        filename: file.cloudinaryPublicId || file.filename,
         originalName: file.originalname,
         size: file.size,
         mimeType: file.mimetype
@@ -889,7 +890,7 @@ export const updateGroupAvatar = async (req, res) => {
       });
     }
 
-    conversation.avatar = `/uploads/images/${file.filename}`;
+    conversation.avatar = getUploadedImageUrl(file);
     await conversation.save();
 
     const populatedConversation = await Conversation.findById(conversationId)

@@ -40,6 +40,64 @@ const sendTokenResponse = (user, statusCode, res) => {
   });
 };
 
+const verifyGoogleCredential = async (credential) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    throw new Error('GOOGLE_CLIENT_ID chưa được cấu hình');
+  }
+
+  const verifyUrl = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`;
+  const response = await fetch(verifyUrl);
+  if (!response.ok) {
+    throw new Error('Token Google không hợp lệ');
+  }
+
+  const payload = await response.json();
+  if (payload.aud !== googleClientId) {
+    throw new Error('Google client id không khớp');
+  }
+  if (payload.email_verified !== 'true') {
+    throw new Error('Email Google chưa được xác thực');
+  }
+
+  return payload;
+};
+
+const verifyGoogleAccessToken = async (accessToken) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  if (!googleClientId) {
+    throw new Error('GOOGLE_CLIENT_ID chưa được cấu hình');
+  }
+
+  const tokenInfoResponse = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+  );
+  if (!tokenInfoResponse.ok) {
+    throw new Error('Access token Google không hợp lệ');
+  }
+
+  const tokenInfo = await tokenInfoResponse.json();
+  if (tokenInfo.aud !== googleClientId) {
+    throw new Error('Google client id không khớp');
+  }
+
+  const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+  if (!userInfoResponse.ok) {
+    throw new Error('Không lấy được thông tin người dùng Google');
+  }
+
+  const userInfo = await userInfoResponse.json();
+  if (!userInfo.email_verified) {
+    throw new Error('Email Google chưa được xác thực');
+  }
+
+  return userInfo;
+};
+
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
@@ -224,6 +282,81 @@ export const login = async (req, res) => {
       success: false,
       message: 'Lỗi đăng nhập',
       error: error.message
+    });
+  }
+};
+
+// @desc    Login/Register with Google
+// @route   POST /api/auth/google
+// @access  Public
+export const googleLogin = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { credential, accessToken } = req.body;
+    if (!credential && !accessToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu token đăng nhập Google'
+      });
+    }
+
+    const payload = credential
+      ? await verifyGoogleCredential(credential)
+      : await verifyGoogleAccessToken(accessToken);
+    const normalizedEmail = payload.email.toLowerCase().trim();
+
+    let user = await User.findOne({ email: normalizedEmail }).select('+password');
+    if (!user) {
+      const randomPassword = `${crypto.randomBytes(12).toString('hex')}@Aa1`;
+      user = await User.create({
+        name: payload.name || normalizedEmail.split('@')[0],
+        email: normalizedEmail,
+        password: randomPassword,
+        avatar:
+          payload.picture ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.name || 'DNU')}&background=3b82f6&color=fff`,
+        emailVerified: true
+      });
+    } else if (!user.emailVerified) {
+      user.emailVerified = true;
+    }
+
+    if (user.status === 'banned') {
+      return res.status(403).json({
+        success: false,
+        message: 'Tài khoản của bạn đã bị khóa'
+      });
+    }
+
+    const sessionId = `${user._id}-${Date.now()}`;
+    user.isOnline = true;
+    user.lastActive = Date.now();
+    user.sessionId = sessionId;
+    if (user.status !== 'active' && user.status !== 'banned') {
+      user.status = 'active';
+    }
+    await user.save({ validateBeforeSave: false });
+
+    sendTokenResponse(user, 200, res);
+  } catch (error) {
+    console.error('Google login error:', error);
+    const message = error?.message || 'Đăng nhập Google thất bại';
+    const statusCode =
+      message.includes('không hợp lệ') ||
+      message.includes('khớp') ||
+      message.includes('xác thực')
+        ? 401
+        : 500;
+    res.status(statusCode).json({
+      success: false,
+      message
     });
   }
 };

@@ -38,9 +38,7 @@ const envPath = path.join(__dirname, '.env');
 if (!existsSync(envPath)) {
   console.error('\n❌ ERROR: File .env không tồn tại!');
   console.error(`   Expected location: ${envPath}`);
-  console.error('\n📝 Vui lòng tạo file backend/.env với nội dung:');
-  console.error('   EMAIL_USER=trantriduy2004ss@gmail.com');
-  console.error('   EMAIL_PASSWORD=ggqxtafanoxplhwp');
+  console.error('\n📝 Vui lòng tạo file backend/.env và cấu hình các biến bắt buộc (EMAIL_USER, EMAIL_PASSWORD, JWT_SECRET, ...).');
   console.error('');
 } else {
   console.log(`\n✅ File .env found at: ${envPath}`);
@@ -59,15 +57,13 @@ if (result.error) {
 // Log environment variables for debugging
 console.log('\n🔍 Checking .env file configuration:');
 console.log(`   File location: ${envPath}`);
-console.log(`   EMAIL_USER: ${process.env.EMAIL_USER ? '✅ SET (' + process.env.EMAIL_USER + ')' : '❌ NOT SET'}`);
+console.log(`   EMAIL_USER: ${process.env.EMAIL_USER ? '✅ SET' : '❌ NOT SET'}`);
 console.log(`   EMAIL_PASSWORD: ${process.env.EMAIL_PASSWORD ? '✅ SET (****)' : '❌ NOT SET'}`);
 console.log(`   GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? '✅ SET (****)' : '❌ NOT SET'}`);
 
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
   console.log('\n⚠️  WARNING: Email configuration is missing!');
-  console.log('   Please create backend/.env file with:');
-  console.log('   EMAIL_USER=trantriduy2004ss@gmail.com');
-  console.log('   EMAIL_PASSWORD=ggqxtafanoxplhwp');
+  console.log('   Please set EMAIL_USER and EMAIL_PASSWORD in backend/.env');
   console.log('');
 }
 
@@ -124,11 +120,12 @@ const corsOptions = {
   credentials: true
 };
 
-const createLimiter = ({ windowMs, max, message, skipSuccessfulRequests = false }) =>
+const createLimiter = ({ windowMs, max, message, skipSuccessfulRequests = false, skip }) =>
   rateLimit({
     windowMs,
     max,
     skipSuccessfulRequests,
+    skip,
     standardHeaders: true,
     legacyHeaders: false,
     message: {
@@ -140,7 +137,11 @@ const createLimiter = ({ windowMs, max, message, skipSuccessfulRequests = false 
 const apiLimiter = createLimiter({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '', 10) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX || '', 10) || 300,
-  message: 'Quá nhiều yêu cầu, vui lòng thử lại sau.'
+  message: 'Quá nhiều yêu cầu, vui lòng thử lại sau.',
+  // Auth và AI đã có logic riêng; skip tại limiter tổng để tránh double-throttling.
+  skip: (req) =>
+    req.originalUrl?.startsWith('/api/auth/') ||
+    req.originalUrl?.startsWith('/api/ai/')
 });
 
 const authLimiter = createLimiter({
@@ -152,8 +153,12 @@ const authLimiter = createLimiter({
 
 const aiLimiter = createLimiter({
   windowMs: parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || '', 10) || 15 * 60 * 1000,
-  max: parseInt(process.env.AI_RATE_LIMIT_MAX || '', 10) || 40,
-  message: 'Bạn đã vượt quá giới hạn yêu cầu AI. Vui lòng thử lại sau.'
+  max: parseInt(process.env.AI_RATE_LIMIT_MAX || '', 10) || 200,
+  message: 'Bạn đã vượt quá giới hạn yêu cầu AI. Vui lòng thử lại sau.',
+  // Bỏ giới hạn cho chat AI theo yêu cầu.
+  skip: (req) =>
+    req.originalUrl?.startsWith('/api/ai/chat') ||
+    req.originalUrl?.startsWith('/api/ai/chat/history')
 });
 
 // Connect to MongoDB (non-blocking - server will start even if MongoDB fails)
@@ -195,21 +200,17 @@ setSocketIO(io);
 // Middleware
 app.use(
   helmet({
-    // Frontend and backend run on different origins in dev (:5173 vs :5000),
-    // so media under /uploads must be allowed to load cross-origin.
+    // Frontend and backend run on different origins in dev (:5173 vs :5000).
     crossOriginResourcePolicy: { policy: 'cross-origin' }
   })
 );
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 app.use(cookieParser());
 app.use('/api', apiLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/ai', aiLimiter);
-
-// Static file serving - Serve uploaded images
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes (with error handling)
 try {

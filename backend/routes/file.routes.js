@@ -1,150 +1,65 @@
 import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { Readable } from 'stream';
 import { protect } from '../middleware/auth.middleware.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// @desc    Download file
-// @route   GET /api/files/download/:filename
+// @desc    Download file from trusted external URL (Cloudinary)
+// @route   GET /api/files/download-url
 // @access  Private
-router.get('/download/:filename', protect, (req, res) => {
+router.get('/download-url', protect, async (req, res) => {
   try {
-    const filename = req.params.filename;
-    
-    // Security: prevent directory traversal và validate filename
-    if (!filename || 
-        filename.includes('..') || 
-        filename.includes('/') || 
-        filename.includes('\\') ||
-        filename.length > 255 ||
-        /[<>:"|?*]/.test(filename)) {
+    const rawUrl = String(req.query.url || '').trim();
+    const rawName = String(req.query.name || 'download').trim();
+
+    if (!rawUrl) {
       return res.status(400).json({
         success: false,
-        message: 'Tên file không hợp lệ'
+        message: 'Thiếu URL file'
       });
     }
-    
-    // Normalize filename để tránh path manipulation
-    const normalizedFilename = path.basename(filename);
-    
-    // Xác định thư mục dựa vào prefix của filename
-    const uploadsImagesDir = path.join(__dirname, '../uploads/images');
-    const uploadsFilesDir = path.join(__dirname, '../uploads/files');
-    
-    let filePath;
-    let uploadsDir;
-    
-    // Kiểm tra file trong uploads/images trước (nếu filename bắt đầu bằng "image-")
-    if (normalizedFilename.startsWith('image-')) {
-      filePath = path.join(uploadsImagesDir, normalizedFilename);
-      uploadsDir = uploadsImagesDir;
-    } else if (normalizedFilename.startsWith('file-')) {
-      // Kiểm tra file trong uploads/files (nếu filename bắt đầu bằng "file-")
-      filePath = path.join(uploadsFilesDir, normalizedFilename);
-      uploadsDir = uploadsFilesDir;
-    } else {
-      // Nếu không có prefix, tìm trong cả hai thư mục
-      const imagePath = path.join(uploadsImagesDir, normalizedFilename);
-      const filePath2 = path.join(uploadsFilesDir, normalizedFilename);
-      
-      if (fs.existsSync(imagePath)) {
-        filePath = imagePath;
-        uploadsDir = uploadsImagesDir;
-      } else if (fs.existsSync(filePath2)) {
-        filePath = filePath2;
-        uploadsDir = uploadsFilesDir;
-      } else {
-        return res.status(404).json({
-          success: false,
-          message: 'File không tồn tại'
-        });
-      }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: 'URL file không hợp lệ'
+      });
     }
-    
-    // Security: Đảm bảo file path nằm trong uploads directory
-    const resolvedPath = path.resolve(filePath);
-    const resolvedUploadsDir = path.resolve(uploadsDir);
-    
-    if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+
+    // Prevent SSRF: only allow Cloudinary delivery hosts.
+    const host = parsedUrl.hostname.toLowerCase();
+    if (!(host === 'res.cloudinary.com' || host.endsWith('.res.cloudinary.com'))) {
       return res.status(403).json({
         success: false,
-        message: 'Truy cập file không được phép'
+        message: 'Nguồn file không được phép tải'
       });
     }
-    
-    // Kiểm tra file có tồn tại không
-    if (!fs.existsSync(filePath)) {
+
+    const response = await fetch(parsedUrl.toString());
+    if (!response.ok || !response.body) {
       return res.status(404).json({
         success: false,
-        message: 'File không tồn tại'
+        message: 'Không lấy được file từ nguồn lưu trữ'
       });
     }
-    
-    // Kiểm tra là file, không phải directory
-    const stats = fs.statSync(filePath);
-    if (!stats.isFile()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Đường dẫn không phải là file'
-      });
-    }
-    
-    // Lấy extension để xác định Content-Type
-    const ext = path.extname(normalizedFilename).toLowerCase();
-    const contentTypeMap = {
-      // Images - dùng image/* để hiển thị, nhưng vẫn force download với Content-Disposition
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      // Documents
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.ppt': 'application/vnd.ms-powerpoint',
-      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      '.txt': 'text/plain',
-      '.csv': 'text/csv',
-      // Archives
-      '.zip': 'application/zip',
-      '.rar': 'application/x-rar-compressed',
-      '.7z': 'application/x-7z-compressed'
-    };
-    
-    const contentType = contentTypeMap[ext] || 'application/octet-stream';
-    
-    // Lấy tên file gốc từ query parameter nếu có, nếu không dùng normalizedFilename
-    const originalName = req.query.name || normalizedFilename;
-    
-    // Set headers để force download
+
+    const safeName = rawName.replace(/[<>:"/\\|?*\x00-\x1F]/g, '').slice(0, 180) || 'download';
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+
     res.setHeader('Content-Type', contentType);
-    // Sử dụng filename* với UTF-8 encoding để hỗ trợ tên file tiếng Việt
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(originalName)}"; filename*=UTF-8''${encodeURIComponent(originalName)}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(safeName)}"; filename*=UTF-8''${encodeURIComponent(safeName)}`
+    );
     res.setHeader('Content-Transfer-Encoding', 'binary');
-    
-    // Stream file
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-    
-    fileStream.on('error', (err) => {
-      console.error('Error streaming file:', err);
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: 'Lỗi đọc file'
-        });
-      }
-    });
+
+    const nodeStream = Readable.fromWeb(response.body);
+    nodeStream.pipe(res);
   } catch (error) {
-    console.error('Download error:', error);
+    console.error('Download external file error:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi tải file',

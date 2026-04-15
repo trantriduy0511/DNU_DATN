@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { Mail, Lock, User, GraduationCap, AlertCircle, Check, X, XCircle, ChevronDown } from 'lucide-react';
+import { Mail, Lock, User, AlertCircle, Check, X, XCircle, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import AuthPageShell from '../components/auth/AuthPageShell';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -43,6 +44,8 @@ const Register = () => {
   ];
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Password validation states
   const [passwordValidation, setPasswordValidation] = useState({
@@ -179,55 +182,37 @@ const Register = () => {
     setLoading(false);
   };
 
+  const inputDark =
+    'w-full pl-10 pr-4 py-3 rounded-xl bg-black/25 border border-white/25 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#4A69BD]/80 focus:border-[#4A69BD]/50 transition-all text-sm';
+  const inputLight =
+    'w-full pl-10 pr-4 py-3 rounded-xl bg-white border border-slate-200/90 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E85A24]/45 focus:border-[#E85A24] transition-all text-sm shadow-inner';
+  const labelClass = 'block text-slate-700 font-semibold text-sm mb-2';
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-orange-500 to-blue-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-orange-500 via-orange-400 to-blue-600 p-8 text-center relative overflow-hidden">
-          {/* Decorative circles */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white bg-opacity-10 rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white bg-opacity-10 rounded-full -ml-12 -mb-12"></div>
-          
-          <div className="relative z-10">
-            {/* Dai Nam logo */}
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-white rounded-full mb-4 shadow-lg overflow-hidden">
-              <img
-                src="/dainam-logo.png"
-                alt="Dai Nam University Logo"
-                className="object-contain"
-                style={{ width: '90%', height: '90%' }}
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-1">ĐẠI NAM</h1>
-            <p className="text-sm text-white opacity-90 mb-1">UNIVERSITY</p>
-            <p className="text-xs text-white opacity-80 italic">Giáo Dục là Thắp Sáng!</p>
-            <p className="text-sm text-white opacity-90 mt-3">Tạo tài khoản mới</p>
+    <AuthPageShell wide showLogo={false}>
+      <div className="font-['Montserrat',sans-serif] text-slate-800">
+        <h2 className="text-xl font-bold text-slate-800 mb-1 text-center">Đăng ký</h2>
+        <p className="text-center text-sm text-slate-600 mb-6">Tạo tài khoản DNU Learning Hub</p>
+
+        {error && (
+          <div className="bg-red-500/15 border border-red-300/50 text-red-50 px-4 py-3 rounded-xl mb-5 flex items-center">
+            <AlertCircle className="w-5 h-5 mr-2 shrink-0 text-red-200" />
+            <span className="text-sm font-medium">{error}</span>
           </div>
-        </div>
+        )}
 
-        {/* Form */}
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">Đăng ký</h2>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Họ và tên</label>
+                <label className={labelClass}>Họ và tên</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <User className="absolute left-3 top-3 w-5 h-5 text-white/50" />
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    className={inputDark}
                     placeholder="Nguyễn Văn A"
                     required
                   />
@@ -235,15 +220,15 @@ const Register = () => {
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Email</label>
+                <label className={labelClass}>Email</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <Mail className="absolute z-10 pointer-events-none left-3 top-3 w-5 h-5 text-slate-300" />
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                    className={inputDark}
                     placeholder="your.email@dnu.edu.vn"
                     required
                   />
@@ -253,30 +238,33 @@ const Register = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Vai trò</label>
+                <label className={labelClass}>Vai trò</label>
                 <select
                   name="studentRole"
                   value={formData.studentRole}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                  className="w-full px-4 py-3 rounded-xl bg-black/25 border border-white/25 text-white focus:outline-none focus:ring-2 focus:ring-[#4A69BD]/80 focus:border-[#4A69BD]/50 transition-all text-sm"
                 >
-                  <option value="Sinh viên">Sinh viên</option>
-                  <option value="Giảng viên">Giảng viên</option>
+                  <option value="Sinh viên" className="text-slate-900">
+                    Sinh viên
+                  </option>
+                  <option value="Giảng viên" className="text-slate-900">
+                    Giảng viên
+                  </option>
                 </select>
               </div>
 
               <div className="relative majors-dropdown-container">
-                <label className="block text-gray-700 font-medium mb-2">
-                  Chuyên ngành <span className="text-orange-600">*</span>
-                  <span className="text-xs text-gray-500 ml-2">(Có thể chọn nhiều ngành)</span>
+                <label className={labelClass}>
+                  Chuyên ngành <span className="text-[#E85A24]">*</span>
+                  <span className="text-xs text-slate-500 ml-2 font-normal">(Có thể chọn nhiều ngành)</span>
                 </label>
-                
-                {/* Dropdown Button */}
+
                 <button
                   type="button"
                   onClick={() => setShowMajorsDropdown(!showMajorsDropdown)}
-                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all text-left flex items-center justify-between bg-white ${
-                    showMajorsDropdown ? 'ring-2 ring-orange-500 border-orange-500' : ''
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none transition-all text-left flex items-center justify-between bg-white/95 border-slate-200/90 text-slate-800 ${
+                    showMajorsDropdown ? 'ring-2 ring-[#E85A24]/60 border-[#E85A24]/50' : ''
                   }`}
                 >
                   <div className="flex-1 min-w-0">
@@ -285,7 +273,7 @@ const Register = () => {
                         {formData.majors.slice(0, 2).map((major) => (
                           <span
                             key={major}
-                            className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-orange-100 to-blue-100 text-orange-700 rounded text-xs font-medium border border-orange-200"
+                            className="inline-flex items-center px-2 py-0.5 bg-gradient-to-r from-orange-100 to-blue-100/90 text-[#c2410c] rounded text-xs font-medium border border-orange-200/80"
                           >
                             {major}
                           </span>
@@ -309,7 +297,7 @@ const Register = () => {
                     {formData.majors.map((major) => (
                       <span
                         key={major}
-                        className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-orange-100 to-blue-100 text-orange-700 rounded-lg text-sm font-medium border border-orange-200"
+                        className="inline-flex items-center space-x-1 px-3 py-1.5 bg-gradient-to-r from-orange-100 to-blue-100/90 text-[#c2410c] rounded-lg text-sm font-medium border border-orange-200/80"
                       >
                         <span>{major}</span>
                         <button
@@ -329,8 +317,8 @@ const Register = () => {
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                     {majorsList.map((category, categoryIndex) => (
                       <div key={categoryIndex} className="border-b border-gray-200 last:border-b-0">
-                        <div className="sticky top-0 bg-gradient-to-r from-orange-50 to-blue-50 px-4 py-2 border-b border-gray-200">
-                          <h4 className="text-sm font-semibold text-gray-700">{category.category}</h4>
+                        <div className="sticky top-0 bg-gradient-to-r from-orange-50 to-blue-50/90 px-4 py-2 border-b border-gray-200">
+                          <h4 className="text-sm font-semibold text-slate-700">{category.category}</h4>
                         </div>
                         <div className="p-2 space-y-1">
                           {category.majors.map((major) => {
@@ -338,8 +326,8 @@ const Register = () => {
                             return (
                               <label
                                 key={major}
-                                className={`flex items-center space-x-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:bg-gray-50 ${
-                                  isSelected ? 'bg-gradient-to-r from-orange-50 to-blue-50 border border-orange-200' : ''
+                                className={`flex items-center space-x-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:bg-slate-50 ${
+                                  isSelected ? 'bg-gradient-to-r from-orange-50 to-blue-50/90 border border-orange-200/80' : ''
                                 }`}
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -347,9 +335,9 @@ const Register = () => {
                                   type="checkbox"
                                   checked={isSelected}
                                   onChange={() => handleMajorToggle(major)}
-                                  className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
+                                  className="w-4 h-4 text-[#E85A24] border-gray-300 rounded focus:ring-[#E85A24] focus:ring-2"
                                 />
-                                <span className={`text-sm ${isSelected ? 'text-orange-700 font-medium' : 'text-gray-700'}`}>
+                                <span className={`text-sm ${isSelected ? 'text-[#c2410c] font-medium' : 'text-slate-700'}`}>
                                   {major}
                                 </span>
                               </label>
@@ -367,36 +355,43 @@ const Register = () => {
             </div>
 
             <div>
-              <label className="block text-gray-700 font-medium mb-2">Mã sinh viên (tùy chọn)</label>
+              <label className={labelClass}>Mã sinh viên (tùy chọn)</label>
               <input
                 type="text"
                 name="studentId"
                 value={formData.studentId}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                className={`${inputDark} pl-4`}
                 placeholder="K17..."
               />
             </div>
 
             <div>
-              <label className="block text-gray-700 font-medium mb-2">Mật khẩu</label>
+              <label className={labelClass}>Mật khẩu</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                  className={`${inputLight} pr-11`}
                   placeholder="••••••••"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-700 transition-colors"
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
-              
-              {/* Password Requirements */}
+
               {formData.password && (
-                <div className="mt-3 p-3 bg-gradient-to-br from-orange-50 to-blue-50 rounded-lg border border-orange-200">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Yêu cầu mật khẩu:</p>
+                <div className="mt-3 p-3 bg-white/90 rounded-xl border border-orange-200/60 shadow-sm">
+                  <p className="text-xs font-medium text-slate-700 mb-2">Yêu cầu mật khẩu:</p>
                   <div className="space-y-1">
                     <div className={`flex items-center text-xs ${passwordValidation.minLength ? 'text-green-600' : 'text-gray-500'}`}>
                       {passwordValidation.minLength ? <Check className="w-4 h-4 mr-2 text-green-600" /> : <X className="w-4 h-4 mr-2 text-gray-400" />}
@@ -424,41 +419,51 @@ const Register = () => {
             </div>
 
             <div>
-              <label className="block text-gray-700 font-medium mb-2">Xác nhận mật khẩu</label>
+              <label className={labelClass}>Xác nhận mật khẩu</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                 <input
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`${inputLight} pr-11`}
                   placeholder="••••••••"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(prev => !prev)}
+                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-700 transition-colors"
+                  aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-orange-500 to-blue-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+              className="w-full py-3.5 rounded-full font-bold text-white uppercase tracking-wider text-sm shadow-lg bg-gradient-to-r from-[#E85A24] to-[#4A69BD] hover:from-[#d64e1c] hover:to-[#3d5aa8] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+              {loading ? 'Đang đăng ký...' : 'ĐĂNG KÝ'}
             </button>
-          </form>
+        </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              Đã có tài khoản?{' '}
-              <Link to="/login" className="text-orange-600 font-semibold hover:text-blue-600 hover:underline transition-colors">
-                Đăng nhập ngay
-              </Link>
-            </p>
-          </div>
+        <div className="mt-6 text-center">
+          <p className="text-sm text-slate-600">
+            Đã có tài khoản?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-[#E85A24] underline underline-offset-2 hover:text-[#4A69BD] transition-colors"
+            >
+              Đăng nhập ngay
+            </Link>
+          </p>
         </div>
       </div>
-    </div>
+    </AuthPageShell>
   );
 };
 

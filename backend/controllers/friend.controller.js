@@ -1,6 +1,8 @@
 import User from '../models/User.model.js';
 import { createNotification } from './notification.controller.js';
 
+const hasId = (arr = [], id = '') => arr.some((x) => String(x) === String(id));
+
 // @desc    Send friend request
 // @route   POST /api/friends/request/:userId
 // @access  Private
@@ -25,7 +27,7 @@ export const sendFriendRequest = async (req, res) => {
     }
 
     // Check if already friends
-    if (targetUser.friends.includes(currentUserId)) {
+    if (hasId(targetUser.friends, currentUserId)) {
       return res.status(400).json({
         success: false,
         message: 'Đã là bạn bè'
@@ -109,10 +111,10 @@ export const acceptFriendRequest = async (req, res) => {
     currentUser.friendRequests[requestIndex].status = 'accepted';
 
     // Add to friends list
-    if (!currentUser.friends.includes(userId)) {
+    if (!hasId(currentUser.friends, userId)) {
       currentUser.friends.push(userId);
     }
-    if (!requester.friends.includes(currentUserId)) {
+    if (!hasId(requester.friends, currentUserId)) {
       requester.friends.push(currentUserId);
     }
 
@@ -296,14 +298,15 @@ export const getFriendStatus = async (req, res) => {
     }
 
     // Check if friends
-    if (currentUser.friends.includes(userId)) {
+    const isFriends = hasId(currentUser.friends, userId) || hasId(targetUser.friends, currentUserId);
+    if (isFriends) {
       return res.status(200).json({
         success: true,
         status: 'friends'
       });
     }
 
-    // Check if current user sent request
+    // Check if current user sent request (pending)
     const sentRequest = targetUser.friendRequests.find(
       req => req.from.toString() === currentUserId && req.status === 'pending'
     );
@@ -315,7 +318,7 @@ export const getFriendStatus = async (req, res) => {
       });
     }
 
-    // Check if received request
+    // Check if current user received request (pending)
     const receivedRequest = currentUser.friendRequests.find(
       req => req.from.toString() === userId && req.status === 'pending'
     );

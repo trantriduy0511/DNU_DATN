@@ -8,6 +8,7 @@ import { formatTimeAgo } from '../utils/formatTime';
 import { getSocket, initializeSocket, disconnectSocket } from '../utils/socket';
 import { parseEventShareFromMessage, resolveEventShareImageUrl } from '../utils/eventShareMessage.js';
 import { parseGroupShareFromMessage, resolveGroupShareImageUrl } from '../utils/groupShareMessage.js';
+import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
 
 /** So sánh id từ Mongo/API/socket (ObjectId vs string) — dùng thay cho === */
 const idsEqual = (a, b) => {
@@ -119,6 +120,9 @@ function lastMessagePreviewBody(lastMessage) {
 }
 
 const ChatUsers = () => {
+  const chatWindowRight = '4.75rem';
+  const chatGap = '0.5rem';
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const resolveAvatarUrl = (avatar, name, background = '10b981') => {
     if (avatar) {
       const a = String(avatar);
@@ -187,6 +191,23 @@ const ChatUsers = () => {
   const groupAvatarInputRef = useRef(null);
   const { user } = useAuthStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    emitAppEvent('chatUsersVisibilityChange', { isOpen });
+
+    return () => {
+      emitAppEvent('chatUsersVisibilityChange', { isOpen: false });
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 900px)');
+    const syncViewport = () => setIsNarrowViewport(media.matches);
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  }, []);
 
   /** URL trong bubble: cùng origin → React Router; khác → tab mới */
   const renderTextWithClickableUrls = useCallback((text, isOwnBubble) => {
@@ -271,7 +292,7 @@ const ChatUsers = () => {
           // Update conversations list (silent update)
           fetchConversations(false);
           fetchUnreadCount();
-          window.dispatchEvent(new CustomEvent('messagesUpdated'));
+          emitAppEvent('messagesUpdated');
         };
 
         const handleTypingStart = (data) => {
@@ -300,7 +321,7 @@ const ChatUsers = () => {
 
         const handleNotificationNew = () => {
           fetchUnreadCount();
-          window.dispatchEvent(new CustomEvent('messagesUpdated'));
+          emitAppEvent('messagesUpdated');
         };
 
         const handleConversationNew = (data) => {
@@ -442,8 +463,8 @@ const ChatUsers = () => {
       }
     };
 
-    window.addEventListener('openChat', handleOpenChat);
-    return () => window.removeEventListener('openChat', handleOpenChat);
+    const offOpenChat = onAppEvent('openChat', handleOpenChat);
+    return () => offOpenChat();
   }, []);
 
   // Listen for openChatWindow event from header
@@ -454,8 +475,8 @@ const ChatUsers = () => {
       fetchUnreadCount();
     };
 
-    window.addEventListener('openChatWindow', handleOpenChatWindow);
-    return () => window.removeEventListener('openChatWindow', handleOpenChatWindow);
+    const offOpenChatWindow = onAppEvent('openChatWindow', handleOpenChatWindow);
+    return () => offOpenChatWindow();
   }, []);
 
   // Open create-group modal directly from other widgets (e.g. Home sidebar)
@@ -467,8 +488,8 @@ const ChatUsers = () => {
       fetchUnreadCount();
     };
 
-    window.addEventListener('openCreateGroupChat', handleOpenCreateGroupChat);
-    return () => window.removeEventListener('openCreateGroupChat', handleOpenCreateGroupChat);
+    const offOpenCreateGroupChat = onAppEvent('openCreateGroupChat', handleOpenCreateGroupChat);
+    return () => offOpenCreateGroupChat();
   }, []);
 
   useEffect(() => {
@@ -589,7 +610,7 @@ const ChatUsers = () => {
       fetchUnreadCount();
       fetchConversations(false); // Don't show loading when marking as read
       // Dispatch event to update header unread count
-      window.dispatchEvent(new CustomEvent('messagesRead'));
+      emitAppEvent('messagesRead');
     } catch (error) {
       console.error('Error marking as read:', error);
     }
@@ -821,8 +842,8 @@ const ChatUsers = () => {
       setSelectedMembers([]);
       setUserSearchQuery('');
       setSearchUsers([]);
-      window.dispatchEvent(new CustomEvent('messagesUpdated'));
-      window.dispatchEvent(new CustomEvent('chatGroupsUpdated'));
+      emitAppEvent('messagesUpdated');
+      emitAppEvent('chatGroupsUpdated');
     } catch (error) {
       console.error('Error creating group:', error);
       alert(error.response?.data?.message || 'Lỗi khi tạo nhóm');
@@ -1320,9 +1341,10 @@ const ChatUsers = () => {
         <div 
           className="chat-window-fixed-absolute bottom-4 right-4 sm:bottom-6 sm:right-6 bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl flex overflow-hidden border border-[var(--fb-divider)]"
           style={{ 
+            '--chat-users-right': isNarrowViewport ? '1rem' : chatWindowRight,
             position: 'fixed',
             bottom: '1rem',
-            right: '6.5rem',
+            right: isNarrowViewport ? '1rem' : chatWindowRight,
             /* Cùng kích thước khi xem danh sách hoặc đang chat — giống khung danh sách Messenger */
             width: '360px',
             maxWidth: 'min(360px, calc(100vw - 2rem))',
@@ -2338,9 +2360,13 @@ const ChatUsers = () => {
           style={{ 
             position: 'fixed',
             bottom: '1rem',
-            right: isOpen ? (selectedConversation ? 'calc(6.5rem + 400px + 1rem)' : 'calc(6.5rem + 360px + 1rem)') : 'calc(6.5rem + 360px + 1rem)',
+            right: isNarrowViewport
+              ? '1rem'
+              : isOpen
+                ? (selectedConversation ? `calc(${chatWindowRight} + 400px + ${chatGap})` : `calc(${chatWindowRight} + 360px + ${chatGap})`)
+                : `calc(${chatWindowRight} + 360px + ${chatGap})`,
             width: '400px',
-            maxWidth: '400px',
+            maxWidth: 'min(400px, calc(100vw - 2rem))',
             height: '600px',
             maxHeight: '90vh',
             zIndex: 9998,

@@ -4802,10 +4802,11 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {selectedPost.images.map((img, index) => {
                       // Xử lý URL: thêm baseURL nếu là relative path
-                      const imageUrl = img.startsWith('/uploads') 
-                        ? `http://localhost:5000${img}` 
+                      const imageUrl = img.startsWith('/uploads')
+                        ? `http://localhost:5000${img}`
                         : img;
                       const imageName = img.split('/').pop() || `image-${index + 1}.jpg`;
+                      const downloadHref = `/api/files/download-url?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(imageName)}`;
                       
                       return (
                         <div key={index} className="relative group">
@@ -4815,22 +4816,7 @@ const AdminDashboard = () => {
                             className="w-full h-48 object-cover rounded-lg border border-gray-200"
                           />
                           <a
-                            href={(() => {
-                              // Nếu là URL từ uploads, dùng route download
-                              if (img.includes('/uploads/images/')) {
-                                const filename = img.split('/uploads/images/')[1] || img.split('/').pop();
-                                return `/api/files/download/${filename}`;
-                              }
-                              if (img.startsWith('/uploads')) {
-                                const filename = img.split('/uploads/')[1]?.split('/').pop() || img.split('/').pop();
-                                return `/api/files/download/${filename}`;
-                              }
-                              if (imageUrl.includes('localhost:5000/uploads')) {
-                                const filename = imageUrl.split('/uploads/images/')[1] || imageUrl.split('/').pop();
-                                return `/api/files/download/${filename}`;
-                              }
-                              return imageUrl;
-                            })()}
+                            href={downloadHref}
                             download={imageName}
                             className="absolute bottom-2 right-2 bg-blue-600 text-white px-3 py-1 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-700"
                             onClick={(e) => {
@@ -4882,6 +4868,9 @@ const AdminDashboard = () => {
                       const fileName = file?.name || `File ${index + 1}`;
                       const fileSize = file?.size || 'N/A';
                       const fileType = file?.type || 'Unknown';
+                      const downloadHref = fileUrl
+                        ? `/api/files/download-url?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`
+                        : null;
                       
                       return (
                         <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -4899,25 +4888,7 @@ const AdminDashboard = () => {
                           </div>
                           {fileUrl ? (
                             <a
-                              href={(() => {
-                                // Nếu là URL từ uploads, dùng route download
-                                if (fileUrl.includes('/uploads/images/')) {
-                                  const filename = fileUrl.split('/uploads/images/')[1] || fileUrl.split('/').pop();
-                                  return `/api/files/download/${filename}`;
-                                }
-                                // Nếu là relative path, thêm baseURL và dùng route download
-                                if (fileUrl.startsWith('/uploads')) {
-                                  const filename = fileUrl.split('/uploads/')[1]?.split('/').pop() || fileUrl.split('/').pop();
-                                  return `/api/files/download/${filename}`;
-                                }
-                                // Nếu là absolute URL từ localhost, extract filename
-                                if (fileUrl.includes('localhost:5000/uploads')) {
-                                  const filename = fileUrl.split('/uploads/images/')[1] || fileUrl.split('/').pop();
-                                  return `/api/files/download/${filename}`;
-                                }
-                                // Các trường hợp khác, dùng trực tiếp
-                                return fileUrl;
-                              })()}
+                              href={downloadHref}
                               download={fileName}
                               className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline px-3 py-1 bg-blue-50 rounded-lg transition-colors"
                               target="_blank"

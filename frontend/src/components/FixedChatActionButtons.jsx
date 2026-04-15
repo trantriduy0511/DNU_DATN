@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, MessageCircle } from 'lucide-react';
 
@@ -6,7 +6,37 @@ import { Bot, MessageCircle } from 'lucide-react';
  * Nút chat + Chat AI góc phải dưới — kích thước thống nhất mọi trang (đồng bộ với trang chủ).
  */
 export function FixedChatActionButtons({ unreadMessagesCount = 0 }) {
+  const [isChatAIOpen, setIsChatAIOpen] = useState(false);
+  const [isChatUsersOpen, setIsChatUsersOpen] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 900px)');
+    const syncViewport = () => setIsNarrowViewport(media.matches);
+    syncViewport();
+    media.addEventListener('change', syncViewport);
+    return () => media.removeEventListener('change', syncViewport);
+  }, []);
+
+  useEffect(() => {
+    const handleAIViz = (event) => {
+      setIsChatAIOpen(Boolean(event.detail?.isOpen));
+    };
+    const handleUsersViz = (event) => {
+      setIsChatUsersOpen(Boolean(event.detail?.isOpen));
+    };
+
+    window.addEventListener('chatAIVisibilityChange', handleAIViz);
+    window.addEventListener('chatUsersVisibilityChange', handleUsersViz);
+    return () => {
+      window.removeEventListener('chatAIVisibilityChange', handleAIViz);
+      window.removeEventListener('chatUsersVisibilityChange', handleUsersViz);
+    };
+  }, []);
+
   if (typeof document === 'undefined') return null;
+  if (isNarrowViewport && (isChatAIOpen || isChatUsersOpen)) return null;
 
   return createPortal(
     <div

@@ -1,7 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { retrieveRagContext } from '../utils/ragRetriever.js';
+import AIChatHistory from '../models/AIChatHistory.model.js';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Lazy init to avoid reading env before dotenv is loaded in server bootstrap.
+const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 // System context for the AI assistant - Trained as a smart learning assistant
 const SYSTEM_CONTEXT = `Bạn là "DNU Buddy" - Trợ lý học tập thông minh của sinh viên Đại học Đại Nam (DNU). Bạn có hai vai trò chính:
@@ -725,15 +727,203 @@ MẸO VÀ THỦ THUẬT:
 
 Hãy luôn nhớ: Bạn là trợ lý học tập, là "sinh viên đàn anh/đàn chị" gương mẫu! Hãy giúp đỡ sinh viên một cách nhiệt tình, nhưng vẫn giữ nguyên tắc liêm chính học thuật! 💪📚`;
 
+const normalizeForIntent = (value = '') =>
+  String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const sanitizeAIText = (value = '') =>
+  String(value)
+    .replace(/\*\*/g, '')
+    .replace(/`/g, '')
+    .replace(/"/g, '')
+    .replace(/[^\p{L}\p{N}\s.,!?;:()'"%\-\/\n]/gu, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const compactAIText = (value = '', maxChars = 280, maxSentences = 3) => {
+  const text = sanitizeAIText(value);
+  if (!text) return text;
+  const sentenceParts = text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, maxSentences);
+  let compact = sentenceParts.join(' ').trim();
+  if (!compact) compact = text;
+  if (compact.length > maxChars) {
+    compact = `${compact.slice(0, maxChars - 3).trim()}...`;
+  }
+  return compact;
+};
+
+const normalizeImageBase64 = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.includes(',')) return raw.split(',').pop() || '';
+  return raw;
+};
+
+const isSupportedImageMime = (mime = '') =>
+  ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'].includes(String(mime).toLowerCase());
+
+const getQuickIntentAnswer = (rawMessage = '') => {
+  const msg = normalizeForIntent(rawMessage).replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (
+    msg.includes('dang bai') &&
+    (msg.includes('lam sao') || msg.includes('cach') || msg.includes('the nao') || msg.includes('o dau'))
+  ) {
+    return 'Vào trang chủ, nhấn nút Bạn đang nghĩ gì hoặc dấu cộng, nhập nội dung rồi bấm Đăng bài.';
+  }
+  if (/(quen mat khau|doi mat khau)/.test(msg)) {
+    return 'Vào Cài đặt > Đổi mật khẩu. Nếu quên mật khẩu, dùng chức năng Quên mật khẩu ở màn hình đăng nhập.';
+  }
+  if (/(tham gia nhom|vao nhom|tim nhom)/.test(msg)) {
+    return 'Mở tab Nhóm học tập, vào Khám phá, chọn nhóm phù hợp rồi nhấn Tham gia.';
+  }
+  if (/(dang ky su kien|tham gia su kien)/.test(msg)) {
+    return 'Vào trang Sự kiện, chọn sự kiện bạn muốn và nhấn Đăng ký quan tâm hoặc Tham gia sự kiện.';
+  }
+  if (/(tai file|download file|tai tai lieu)/.test(msg)) {
+    return 'Mở bài viết có tệp đính kèm rồi nhấn nút Tải về cạnh tên tệp.';
+  }
+  return null;
+};
+
+const DEFAULT_AI_GREETING =
+  'Chào bạn! Mình là trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay?';
+const AI_QUOTA_FALLBACK_MESSAGE =
+  'AI đang tạm quá tải nên chưa phân tích sâu được ngay lúc này. Bạn thử gửi lại sau ít phút hoặc đặt câu hỏi ngắn gọn hơn để mình hỗ trợ nhanh hơn.';
+
+const mapStoredMessages = (stored = []) =>
+  (stored || []).map((item) => ({
+    type: item.type,
+    content: item.content,
+    ragSources: Array.isArray(item.ragSources) ? item.ragSources : [],
+    timestamp: item.createdAt || new Date()
+  }));
+
+const buildHistoryInput = (conversationHistory = []) =>
+  (conversationHistory || [])
+    .filter((msg) => msg && (msg.type === 'user' || msg.type === 'ai') && typeof msg.content === 'string')
+    .map((msg) => ({
+      type: msg.type,
+      content: msg.content
+    }));
+
+export const getAIChatHistory = async (req, res) => {
+  try {
+    const doc = await AIChatHistory.findOne({ userId: req.user.id }).lean();
+    if (!doc || !Array.isArray(doc.messages) || doc.messages.length === 0) {
+      return res.json({
+        success: true,
+        messages: [
+          {
+            type: 'ai',
+            content: DEFAULT_AI_GREETING,
+            ragSources: [],
+            timestamp: new Date()
+          }
+        ]
+      });
+    }
+
+    return res.json({
+      success: true,
+      messages: mapStoredMessages(doc.messages)
+    });
+  } catch (error) {
+    console.error('Error getting AI chat history:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Không lấy được lịch sử chat AI'
+    });
+  }
+};
+
+export const clearAIChatHistory = async (req, res) => {
+  try {
+    await AIChatHistory.findOneAndUpdate(
+      { userId: req.user.id },
+      {
+        $set: {
+          messages: [
+            {
+              type: 'ai',
+              content: DEFAULT_AI_GREETING,
+              ragSources: [],
+              createdAt: new Date()
+            }
+          ]
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    return res.json({
+      success: true,
+      message: 'Đã xóa lịch sử chat AI'
+    });
+  } catch (error) {
+    console.error('Error clearing AI chat history:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Không xóa được lịch sử chat AI'
+    });
+  }
+};
+
 export const chatWithGemini = async (req, res) => {
   try {
-    const { message, conversationHistory = [], studyMaterial = null } = req.body;
+    const { message, conversationHistory = [], studyMaterial = null, imageAttachment = null } = req.body;
     const user = req.user;
+    const normalizedCurrentMessage = String(message || '').trim();
+    const imageMimeType = String(imageAttachment?.mimeType || '').trim().toLowerCase();
+    const imageBase64 = normalizeImageBase64(imageAttachment?.base64 || '');
+    const hasImageAttachment = Boolean(imageMimeType && imageBase64);
 
-    if (!message || !message.trim()) {
+    if (!normalizedCurrentMessage && !hasImageAttachment) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng nhập câu hỏi'
+        message: 'Vui lòng nhập câu hỏi hoặc đính kèm một ảnh'
+      });
+    }
+
+    if (hasImageAttachment && !isSupportedImageMime(imageMimeType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ảnh không hợp lệ. Chỉ hỗ trợ JPG, PNG, WEBP hoặc GIF.'
+      });
+    }
+
+    const quickAnswer = !hasImageAttachment ? getQuickIntentAnswer(normalizedCurrentMessage) : null;
+    if (quickAnswer && !hasImageAttachment) {
+      const concise = compactAIText(quickAnswer, 220, 2);
+      if (user?._id) {
+        await AIChatHistory.findOneAndUpdate(
+          { userId: user._id },
+          {
+            $push: {
+              messages: {
+                $each: [
+                  { type: 'user', content: normalizedCurrentMessage, ragSources: [], createdAt: new Date() },
+                  { type: 'ai', content: concise, ragSources: [], createdAt: new Date() }
+                ],
+                $slice: -60
+              }
+            }
+          },
+          { upsert: true, new: true }
+        );
+      }
+
+      return res.json({
+        success: true,
+        message: concise,
+        ragSources: []
       });
     }
 
@@ -747,15 +937,22 @@ export const chatWithGemini = async (req, res) => {
 
     // Get the Gemini model with improved settings for better understanding
     const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
-    const model = genAI.getGenerativeModel({ 
+    const model = getGenAI().getGenerativeModel({ 
       model: modelName,
       generationConfig: {
-        temperature: 0.8, // Slightly higher for more natural responses
+        temperature: 0.6,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 2048, // Increased for more detailed responses
+        maxOutputTokens: 420
       },
     });
+
+    const ragQuestion = normalizedCurrentMessage || 'Phân tích nội dung ảnh người dùng gửi';
+    let runtimeConversationHistory = buildHistoryInput(conversationHistory);
+    if (runtimeConversationHistory.length === 0 && user?._id) {
+      const doc = await AIChatHistory.findOne({ userId: user._id }).select('messages').lean();
+      runtimeConversationHistory = buildHistoryInput(mapStoredMessages(doc?.messages || []));
+    }
 
     // Build conversation history with system context
     const history = [];
@@ -763,6 +960,18 @@ export const chatWithGemini = async (req, res) => {
     // Prepare context based on whether study material is provided
     let enhancedContext = SYSTEM_CONTEXT;
     
+    let ragContext = { contextBlocks: [], contextText: '' };
+    try {
+      ragContext = await retrieveRagContext({
+        question: ragQuestion,
+        userId: user?._id?.toString(),
+        maxChunks: 6
+      });
+    } catch (ragError) {
+      // RAG chỉ là lớp tăng cường ngữ cảnh: nếu lỗi thì fallback về chat thường, không làm hỏng API chat.
+      console.error('RAG retrieval error:', ragError);
+    }
+
     if (studyMaterial && studyMaterial.trim()) {
       // If study material is provided, add DNU Buddy instructions
       enhancedContext += `\n\n**TÀI LIỆU HỌC TẬP ĐƯỢC CUNG CẤP:**
@@ -777,10 +986,31 @@ ${studyMaterial}
 - Suy luận từng bước trước khi đưa ra đáp án (think step-by-step)
 - Trích dẫn rõ ràng phần nào trong tài liệu (ví dụ: "Theo mục 2 của bài học...", "Trong phần đầu của tài liệu...")
 - Không bịa ra câu trả lời nếu không có trong tài liệu
-- Vẫn giữ phong cách thân thiện, khuyến khích, xưng "mình" và gọi "bạn"`;
+- Vẫn giữ phong cách thân thiện, khuyến khích, xưng "mình" và gọi "bạn"
+- Câu trả lời NGẮN GỌN: tối đa 3 câu, ưu tiên trọng tâm, không liệt kê dài dòng.`;
     } else {
       // Normal mode - general learning assistant
-      enhancedContext += '\n\nQUAN TRỌNG: Hãy trả lời như một trợ lý học tập thực sự, không chỉ đọc lại thông tin. Hãy suy nghĩ, phân tích và đưa ra câu trả lời phù hợp nhất với tình huống cụ thể của người dùng. Nếu câu hỏi không rõ ràng, hãy hỏi lại để hiểu rõ hơn.';
+      enhancedContext += '\n\nQUAN TRỌNG: Trả lời trực tiếp vào ý chính, tối đa 2-3 câu. Không chào hỏi dài, không nhận xét cảm xúc người dùng, không nói lan man.';
+    }
+
+    if (ragContext.contextText) {
+      enhancedContext += `\n\n**NGUỒN TRI THỨC RAG (ưu tiên dùng để trả lời):**
+${ragContext.contextText}
+
+**QUY TẮC KHI DÙNG RAG:**
+- Ưu tiên thông tin trong các nguồn [R1], [R2]... khi có liên quan.
+- Khi trả lời dựa trên nguồn nào, hãy trích dẫn id nguồn ở cuối ý (ví dụ: "(nguồn: R2)").
+- Nếu nguồn RAG không chứa thông tin cần thiết, hãy nói rõ là không tìm thấy dữ liệu nội bộ phù hợp.`;
+    } else {
+      const normalizedMessage = normalizeForIntent(normalizedCurrentMessage);
+      const looksLikeInternalDataQuestion =
+        /(su kien|workshop|nhom|bai viet|tai lieu|lich thi|thong bao|dang ky|tham gia)/.test(normalizedMessage);
+      if (looksLikeInternalDataQuestion) {
+        enhancedContext += `\n\n**LƯU Ý BẮT BUỘC:** Hiện không tìm thấy nguồn dữ liệu nội bộ phù hợp từ RAG cho câu hỏi này.
+- KHÔNG trả lời chung chung kiểu giới thiệu tính năng.
+- Hãy nói rõ là chưa tìm thấy dữ liệu phù hợp trong hệ thống hiện tại.
+- Đề nghị người dùng thử từ khóa cụ thể hơn (ví dụ tên sự kiện/nhóm chính xác).`;
+      }
     }
 
     // Add system context as first message
@@ -808,7 +1038,7 @@ ${studyMaterial}
     }
 
     // Add conversation history (last 10 messages for context)
-    const recentHistory = conversationHistory.slice(-10);
+    const recentHistory = runtimeConversationHistory.slice(-10);
     recentHistory.forEach(msg => {
       history.push({
         role: msg.type === 'user' ? 'user' : 'model',
@@ -820,21 +1050,61 @@ ${studyMaterial}
     const chat = model.startChat({
       history: history,
       generationConfig: {
-        temperature: 0.8, // Slightly higher for more natural responses
+        temperature: 0.6,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 2048, // Increased for more detailed responses
+        maxOutputTokens: 420
       },
     });
 
     // Send current message and get response
-    const result = await chat.sendMessage(message);
+    const requestParts = [];
+    if (normalizedCurrentMessage) {
+      requestParts.push({ text: normalizedCurrentMessage });
+    } else {
+      requestParts.push({ text: 'Hãy phân tích ảnh này ngắn gọn, đúng trọng tâm theo ngữ cảnh người dùng.' });
+    }
+    if (hasImageAttachment) {
+      requestParts.push({
+        inlineData: {
+          mimeType: imageMimeType,
+          data: imageBase64
+        }
+      });
+    }
+
+    const result = await chat.sendMessage(requestParts);
     const response = await result.response;
-    const text = response.text();
+    const text = compactAIText(response.text(), 280, 3);
+
+    if (user?._id) {
+      const storedUserContent = normalizedCurrentMessage || `Đã gửi ảnh${imageAttachment?.fileName ? `: ${imageAttachment.fileName}` : ''}`;
+      const newMessages = [
+        { type: 'user', content: storedUserContent, ragSources: [], createdAt: new Date() },
+        { type: 'ai', content: text, ragSources: ragContext.contextBlocks || [], createdAt: new Date() }
+      ];
+
+      await AIChatHistory.findOneAndUpdate(
+        { userId: user._id },
+        {
+          $push: {
+            messages: {
+              $each: newMessages,
+              $slice: -60
+            }
+          }
+        },
+        {
+          upsert: true,
+          new: true
+        }
+      );
+    }
 
     res.json({
       success: true,
-      message: text
+      message: text,
+      ragSources: ragContext.contextBlocks || []
     });
   } catch (error) {
     console.error('Error calling Gemini API:', error);
@@ -847,10 +1117,12 @@ ${studyMaterial}
       });
     }
 
-    if (error.message?.includes('quota') || error.message?.includes('limit')) {
-      return res.status(429).json({
-        success: false,
-        message: 'Đã vượt quá giới hạn sử dụng. Vui lòng thử lại sau.'
+    if (error.message?.includes('quota') || error.message?.includes('limit') || error.status === 429) {
+      return res.status(200).json({
+        success: true,
+        degraded: true,
+        message: AI_QUOTA_FALLBACK_MESSAGE,
+        ragSources: []
       });
     }
 

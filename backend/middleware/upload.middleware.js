@@ -1,46 +1,8 @@
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { isCloudinaryConfigured, uploadBufferToCloudinary } from '../utils/cloudinary.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Tạo thư mục uploads nếu chưa tồn tại
-const uploadsImagesDir = path.join(__dirname, '../uploads/images');
-const uploadsFilesDir = path.join(__dirname, '../uploads/files');
-if (!fs.existsSync(uploadsImagesDir)) {
-  fs.mkdirSync(uploadsImagesDir, { recursive: true });
-}
-if (!fs.existsSync(uploadsFilesDir)) {
-  fs.mkdirSync(uploadsFilesDir, { recursive: true });
-}
-
-// Cấu hình storage cho images
-const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsImagesDir);
-  },
-  filename: (req, file, cb) => {
-    // Tạo tên file unique: timestamp-random-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `image-${uniqueSuffix}${ext}`);
-  }
-});
-
-// Cấu hình storage cho documents/files
-const fileStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsFilesDir);
-  },
-  filename: (req, file, cb) => {
-    // Tạo tên file unique: timestamp-random-originalname
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `file-${uniqueSuffix}${ext}`);
-  }
-});
+const memoryStorage = multer.memoryStorage();
 
 // Filter chỉ cho phép file ảnh
 const imageFilter = (req, file, cb) => {
@@ -90,7 +52,7 @@ const documentFilter = (req, file, cb) => {
 
 // Cấu hình multer cho images
 const imageUploader = multer({
-  storage: imageStorage,
+  storage: memoryStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB cho ảnh (avatar, ảnh bìa)
   },
@@ -99,17 +61,63 @@ const imageUploader = multer({
 
 // Cấu hình multer cho documents
 const documentUploader = multer({
-  storage: fileStorage,
+  storage: memoryStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB cho documents
   },
   fileFilter: documentFilter
 });
 
+const sanitizeCloudinaryName = (value) =>
+  String(value || '')
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9-_ ]/g, ' ')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+    .slice(0, 80);
+
+const inferCloudinaryResourceType = (mimetype = '') => {
+  const mime = String(mimetype).toLowerCase();
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  return 'raw';
+};
+
+const uploadSingleFileToCloudinary = async (file, folder) => {
+  if (!file?.buffer) return file;
+  const originalName = String(file.originalname || '').trim();
+  const parsedName = path.parse(originalName || 'upload');
+  const safeBaseName = sanitizeCloudinaryName(parsedName.name) || 'upload';
+  const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const publicId = `${safeBaseName}-${uniqueSuffix}`;
+  const finalDisplayName = originalName || `${safeBaseName}${parsedName.ext || ''}`;
+  const uploaded = await uploadBufferToCloudinary(file.buffer, {
+    folder,
+    resource_type: inferCloudinaryResourceType(file.mimetype),
+    public_id: publicId,
+    use_filename: false,
+    unique_filename: false,
+    filename_override: finalDisplayName,
+    display_name: finalDisplayName
+  });
+  return {
+    ...file,
+    cloudinaryUrl: uploaded.secure_url,
+    cloudinaryPublicId: uploaded.public_id,
+    cloudinaryResourceType: uploaded.resource_type
+  };
+};
+
+const uploadManyToCloudinary = async (files, folder) =>
+  Promise.all((files || []).map((file) => uploadSingleFileToCloudinary(file, folder)));
+
 // Wrapper để xử lý multer errors
 const handleUploadError = (uploadMiddleware) => {
   return (req, res, next) => {
-    uploadMiddleware(req, res, (err) => {
+    uploadMiddleware(req, res, async (err) => {
       if (err) {
         // Multer errors
         if (err.name === 'MulterError') {
@@ -157,6 +165,28 @@ const handleUploadError = (uploadMiddleware) => {
         }
       }
 
+      if (!isCloudinaryConfigured()) {
+        return res.status(500).json({
+          success: false,
+          message: 'Cloudinary chưa được cấu hình. Vui lòng kiểm tra CLOUDINARY_* trong backend/.env'
+        });
+      }
+
+      try {
+        if (req.file) {
+          req.file = await uploadSingleFileToCloudinary(req.file, 'dnu-social/images');
+        }
+        if (Array.isArray(req.uploadedFiles) && req.uploadedFiles.length > 0) {
+          req.uploadedFiles = await uploadManyToCloudinary(req.uploadedFiles, 'dnu-social/files');
+        }
+      } catch (uploadErr) {
+        return res.status(500).json({
+          success: false,
+          message: 'Upload Cloudinary thất bại',
+          error: uploadErr.message
+        });
+      }
+
       next();
     });
   };
@@ -185,27 +215,7 @@ export const uploadImagesAndFiles = (req, res, next) => {
   
   // Sử dụng multer.fields để xử lý cả images và files cùng lúc
   const uploadMiddleware = multer({
-    storage: multer.diskStorage({
-      destination: (req, file, cb) => {
-        // Xác định destination dựa vào fieldname
-        if (file.fieldname === 'images') {
-          cb(null, uploadsImagesDir);
-        } else if (file.fieldname === 'files') {
-          cb(null, uploadsFilesDir);
-        } else {
-          cb(new Error('Invalid field name'));
-        }
-      },
-      filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const ext = path.extname(file.originalname);
-        if (file.fieldname === 'images') {
-          cb(null, `image-${uniqueSuffix}${ext}`);
-        } else {
-          cb(null, `file-${uniqueSuffix}${ext}`);
-        }
-      }
-    }),
+    storage: memoryStorage,
     limits: {
       fileSize: 50 * 1024 * 1024 // 50MB (ảnh + video gallery; tài liệu kèm theo)
     },
@@ -224,7 +234,7 @@ export const uploadImagesAndFiles = (req, res, next) => {
     { name: 'files', maxCount: 10 }
   ]);
   
-  uploadMiddleware(req, res, (err) => {
+  uploadMiddleware(req, res, async (err) => {
     if (err) {
       // Xử lý lỗi
       if (err.name === 'MulterError') {
@@ -279,8 +289,26 @@ export const uploadImagesAndFiles = (req, res, next) => {
       delete req.body.files;
     }
     
-    // Debug log (có thể bỏ sau khi test)
-    console.log('Upload middleware - Images:', req.uploadedImages.length, 'Files:', req.uploadedFiles.length);
+    if (!isCloudinaryConfigured()) {
+      return res.status(500).json({
+        success: false,
+        message: 'Cloudinary chưa được cấu hình. Vui lòng kiểm tra CLOUDINARY_* trong backend/.env'
+      });
+    }
+
+    try {
+      req.uploadedImages = await uploadManyToCloudinary(req.uploadedImages, 'dnu-social/images');
+      req.uploadedFiles = await uploadManyToCloudinary(req.uploadedFiles, 'dnu-social/files');
+      req.files = [...req.uploadedImages, ...req.uploadedFiles];
+    } catch (uploadErr) {
+      return res.status(500).json({
+        success: false,
+        message: 'Upload Cloudinary thất bại',
+        error: uploadErr.message
+      });
+    }
+
+    console.log('Upload middleware - Cloudinary images:', req.uploadedImages.length, 'files:', req.uploadedFiles.length);
     
     next();
   });

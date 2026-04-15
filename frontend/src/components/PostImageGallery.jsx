@@ -49,6 +49,7 @@ export default function PostImageGallery({
             controls
             playsInline
             preload="metadata"
+            data-scroll-autoplay="true"
             className="h-auto w-full max-h-[min(72vh,620px)] bg-black object-contain"
             onClick={(e) => e.stopPropagation()}
           />
@@ -61,6 +62,7 @@ export default function PostImageGallery({
             muted
             playsInline
             preload="metadata"
+            data-scroll-autoplay="true"
             className={
               cover
                 ? 'pointer-events-none absolute inset-0 h-full w-full object-cover'
@@ -149,7 +151,22 @@ export default function PostImageGallery({
     );
   }
 
-  /** Bốn ảnh trở lên: lưới 2×2; từ ảnh thứ 5 hiện +N trên ô thứ 4 (click mở theater từ ảnh index 4 — giống feed cũ) */
+  /** Năm ảnh: 2 ô trên + 3 ô dưới (hiển thị đủ 5 ảnh giống feed phổ biến). */
+  if (n === 5) {
+    return (
+      <div
+        className={`grid max-h-[min(70vh,620px)] w-full grid-cols-6 grid-rows-2 overflow-hidden ${GAP} aspect-[3/2]`}
+      >
+        {cellShell(0, true, 'col-span-3 min-h-0 h-full')}
+        {cellShell(1, true, 'col-span-3 min-h-0 h-full')}
+        {cellShell(2, true, 'col-span-2 min-h-0 h-full')}
+        {cellShell(3, true, 'col-span-2 min-h-0 h-full')}
+        {cellShell(4, true, 'col-span-2 min-h-0 h-full')}
+      </div>
+    );
+  }
+
+  /** Sáu ảnh trở lên: giữ lưới 2×2, ô cuối hiển thị +N. */
   const extra = n - 4;
   return (
     <div

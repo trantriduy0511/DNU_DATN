@@ -6,6 +6,7 @@ import GroupFile from '../models/GroupFile.model.js';
 import GroupInvite from '../models/GroupInvite.model.js';
 import { createNotification } from './notification.controller.js';
 import { sanitizeTextBackground } from './post.controller.js';
+import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 // @desc    Create new group
 // @route   POST /api/groups
@@ -19,10 +20,10 @@ export const createGroup = async (req, res) => {
     let coverVal = req.body.coverPhoto || null;
 
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      coverVal = `/uploads/images/${req.uploadedImages[0].filename}`;
+      coverVal = getUploadedImageUrl(req.uploadedImages[0]);
       if (
         typeof avatarVal === 'string' &&
-        (avatarVal.startsWith('/uploads') || avatarVal.startsWith('http'))
+        avatarVal.startsWith('http')
       ) {
         avatarVal = '📚';
       }
@@ -1215,7 +1216,7 @@ export const createGroupPost = async (req, res) => {
     // Xử lý ảnh từ file upload
     let images = [];
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      images = req.uploadedImages.map(file => `/uploads/images/${file.filename}`);
+      images = req.uploadedImages.map((file) => getUploadedImageUrl(file)).filter(Boolean);
     } else if (req.body.images && Array.isArray(req.body.images)) {
       images = req.body.images;
     }
@@ -1226,7 +1227,7 @@ export const createGroupPost = async (req, res) => {
         name: file.originalname,
         size: `${(file.size / 1024).toFixed(2)} KB`,
         mimeType: file.mimetype || 'application/octet-stream',
-        url: `/uploads/files/${file.filename}`
+        url: getUploadedFileUrl(file)
       }));
 
       for (const uploadedFile of req.uploadedFiles) {
@@ -1235,7 +1236,7 @@ export const createGroupPost = async (req, res) => {
           uploadedBy: req.user.id,
           name: uploadedFile.originalname,
           description: (content && String(content).trim()) || 'Đăng kèm bài viết trong nhóm',
-          filePath: `/uploads/files/${uploadedFile.filename}`,
+          filePath: getUploadedFileUrl(uploadedFile),
           fileName: uploadedFile.originalname,
           fileSize: uploadedFile.size,
           fileType: path.extname(uploadedFile.originalname).substring(1).toLowerCase(),
@@ -1246,7 +1247,7 @@ export const createGroupPost = async (req, res) => {
       }
     }
 
-    const text = content && String(content).trim();
+    const text = typeof content === 'string' ? content.trim() : '';
     const hasMedia = images.length > 0 || files.length > 0;
     if (!text && !hasMedia) {
       return res.status(400).json({
@@ -1255,7 +1256,7 @@ export const createGroupPost = async (req, res) => {
       });
     }
 
-    const postContent = text || (hasMedia ? 'Bài đăng có đính kèm' : '');
+    const postContent = text || '';
 
     const normalizedTextBackground =
       images.length === 0 && (!files || files.length === 0)
@@ -1394,7 +1395,6 @@ export const updateGroupSettings = async (req, res) => {
         req.body.avatar !== undefined &&
         typeof req.body.avatar === 'string' &&
         req.body.avatar !== '' &&
-        !req.body.avatar.startsWith('/uploads') &&
         !req.body.avatar.startsWith('http')
       ) {
         return req.body.avatar;
@@ -1403,7 +1403,7 @@ export const updateGroupSettings = async (req, res) => {
     };
 
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      updateData.coverPhoto = `/uploads/images/${req.uploadedImages[0].filename}`;
+      updateData.coverPhoto = getUploadedImageUrl(req.uploadedImages[0]);
       updateData.avatar = pickEmojiFromBody();
     } else {
       if (req.body.coverPhoto !== undefined) {
@@ -1414,7 +1414,7 @@ export const updateGroupSettings = async (req, res) => {
         updateData.avatar = req.body.avatarEmoji;
       } else if (req.body.avatar !== undefined) {
         const a = req.body.avatar;
-        if (typeof a === 'string' && !a.startsWith('/uploads') && !a.startsWith('http')) {
+        if (typeof a === 'string' && !a.startsWith('http')) {
           updateData.avatar = a;
         }
       }

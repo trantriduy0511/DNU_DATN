@@ -1,8 +1,9 @@
 import express from 'express';
-import { body } from 'express-validator';
+import { body, oneOf } from 'express-validator';
 import {
   register,
   login,
+  googleLogin,
   logout,
   getMe,
   updateProfile,
@@ -31,6 +32,19 @@ const loginValidation = [
 
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post(
+  '/google',
+  [
+    oneOf(
+      [
+        body('credential').notEmpty().withMessage('Thiếu credential Google'),
+        body('accessToken').notEmpty().withMessage('Thiếu access token Google')
+      ],
+      'Thiếu dữ liệu đăng nhập Google'
+    )
+  ],
+  googleLogin
+);
 router.post('/logout', logout);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfile);

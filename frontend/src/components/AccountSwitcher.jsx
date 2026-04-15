@@ -32,6 +32,7 @@ const AccountSwitcher = () => {
   }, [isOpen]);
 
   const sameAccountId = (a, b) => String(a ?? '') === String(b ?? '');
+  const selfUserId = user?.id || user?._id;
 
   const handleSwitchAccount = (accountId) => {
     switchAccount(accountId);
@@ -118,16 +119,16 @@ const AccountSwitcher = () => {
                 role="button"
                 tabIndex={0}
                 onClick={() => {
-                  if (!user?.id) return;
+                  if (!selfUserId) return;
                   setIsOpen(false);
-                  navigate(`/profile/${user.id}`);
+                  navigate(`/profile/${selfUserId}`);
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    if (!user?.id) return;
+                    if (!selfUserId) return;
                     setIsOpen(false);
-                    navigate(`/profile/${user.id}`);
+                    navigate(`/profile/${selfUserId}`);
                   }
                 }}
                 className="flex items-center space-x-3 p-2 bg-[var(--fb-surface)] border border-[var(--fb-divider)] rounded-lg cursor-pointer hover:bg-[var(--fb-hover)] transition-colors"
@@ -164,8 +165,8 @@ const AccountSwitcher = () => {
               <button 
                 onClick={() => {
                   setIsOpen(false);
-                  if (user?.id) {
-                    navigate(`/profile/${user.id}`);
+                  if (selfUserId) {
+                    navigate(`/profile/${selfUserId}`);
                   }
                 }}
                 className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"

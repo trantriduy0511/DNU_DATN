@@ -12,8 +12,17 @@ const postSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: [true, 'Nội dung bài viết không được để trống'],
-    trim: true
+    trim: true,
+    default: '',
+    validate: {
+      validator(value) {
+        const hasText = typeof value === 'string' && value.trim().length > 0;
+        const hasImages = Array.isArray(this.images) && this.images.length > 0;
+        const hasFiles = Array.isArray(this.files) && this.files.length > 0;
+        return hasText || hasImages || hasFiles;
+      },
+      message: 'Nội dung bài viết không được để trống'
+    }
   },
   textBackground: {
     type: String,

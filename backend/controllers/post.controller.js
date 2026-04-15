@@ -3,6 +3,7 @@ import Post from '../models/Post.model.js';
 import User from '../models/User.model.js';
 import Event from '../models/Event.model.js';
 import { createNotification } from './notification.controller.js';
+import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 export function sanitizeTextBackground(rawValue) {
   const value = String(rawValue || '').trim();
@@ -52,7 +53,7 @@ export const createPost = async (req, res) => {
     // Xử lý ảnh từ file upload
     let images = [];
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      images = req.uploadedImages.map(file => `/uploads/images/${file.filename}`);
+      images = req.uploadedImages.map((file) => getUploadedImageUrl(file)).filter(Boolean);
     } else if (req.body.images && Array.isArray(req.body.images)) {
       // Fallback: nếu gửi qua body (base64 hoặc URL)
       images = req.body.images.filter(img => img && typeof img === 'string' && img.trim().length > 0);
@@ -66,7 +67,7 @@ export const createPost = async (req, res) => {
         name: file.originalname,
         size: `${(file.size / 1024).toFixed(2)} KB`,
         mimeType: file.mimetype || 'application/octet-stream',
-        url: `/uploads/files/${file.filename}`
+        url: getUploadedFileUrl(file)
       }));
     } else if (req.body.files) {
       // Fallback: nếu gửi qua body (metadata only)
@@ -90,7 +91,7 @@ export const createPost = async (req, res) => {
       });
     }
 
-    const postBodyContent = text || (hasMedia ? 'Bài đăng có đính kèm' : '');
+    const postBodyContent = text || '';
 
     // Debug log
     console.log('Create post - Images:', images.length, 'Files:', files.length);
@@ -475,7 +476,7 @@ export const updatePost = async (req, res) => {
 
     // Add new uploaded images
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      const newImagePaths = req.uploadedImages.map(file => `/uploads/images/${file.filename}`);
+      const newImagePaths = req.uploadedImages.map((file) => getUploadedImageUrl(file)).filter(Boolean);
       images = [...images, ...newImagePaths];
     }
 
@@ -511,7 +512,7 @@ export const updatePost = async (req, res) => {
         name: file.originalname,
         size: `${(file.size / 1024).toFixed(2)} KB`,
         mimeType: file.mimetype || 'application/octet-stream',
-        url: `/uploads/files/${file.filename}`
+        url: getUploadedFileUrl(file)
       }));
       files = [...files, ...newFiles];
     }

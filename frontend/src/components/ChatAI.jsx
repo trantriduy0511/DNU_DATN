@@ -9,9 +9,13 @@ import {
   Sparkles,
   Trash2,
   RefreshCw,
+  ImagePlus,
 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import api from "../utils/api";
+
+const DEFAULT_GREETING =
+  "Chào bạn! Mình là trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay?";
 
 const ChatAI = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,23 +23,92 @@ const ChatAI = () => {
     {
       id: 1,
          type: "ai",
-         content:
-           "Chào bạn! 😊 Mình là trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay? 💪",
+         content: DEFAULT_GREETING,
          timestamp: new Date(),
        },
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isUsersChatOpen, setIsUsersChatOpen] = useState(false);
+  const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
   const messagesEndRef = useRef(null);
+  const imageInputRef = useRef(null);
   const { user } = useAuthStore();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const normalizeHistoryMessages = (historyMessages = []) => {
+    if (!Array.isArray(historyMessages) || historyMessages.length === 0) {
+      return [
+        {
+          id: 1,
+          type: "ai",
+          content: DEFAULT_GREETING,
+          ragSources: [],
+          timestamp: new Date(),
+        },
+      ];
+    }
+
+    return historyMessages.map((msg, index) => ({
+      id: Date.now() + index,
+      type: msg.type === "user" ? "user" : "ai",
+      content: String(msg.content || ""),
+      ragSources: Array.isArray(msg.ragSources) ? msg.ragSources : [],
+      timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
+    }));
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const getQuickSupportReply = (rawMessage) => {
+    const msg = String(rawMessage || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (
+      msg.includes("dang bai") &&
+      (msg.includes("lam sao") || msg.includes("cach") || msg.includes("the nao") || msg.includes("o dau"))
+    ) {
+      return "Vào trang chủ, nhấn nút Bạn đang nghĩ gì hoặc dấu cộng, nhập nội dung rồi bấm Đăng bài.";
+    }
+    if (msg.includes("doi mat khau") || msg.includes("quen mat khau")) {
+      return "Vào Cài đặt > Đổi mật khẩu. Nếu quên mật khẩu, dùng chức năng Quên mật khẩu ở màn hình đăng nhập.";
+    }
+    if (msg.includes("tham gia nhom") || msg.includes("tim nhom")) {
+      return "Mở tab Nhóm học tập, vào Khám phá, chọn nhóm phù hợp rồi nhấn Tham gia.";
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadHistory = async () => {
+      try {
+        const res = await api.get("/ai/chat/history");
+        if (!isMounted) return;
+        if (res?.data?.success) {
+          setMessages(normalizeHistoryMessages(res.data.messages));
+        }
+      } catch (error) {
+        console.error("Error loading AI chat history:", error);
+      }
+    };
+
+    loadHistory();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const generateAIResponse = (userMessage) => {
     const messageLower = userMessage.toLowerCase();
@@ -945,20 +1018,37 @@ const ChatAI = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() && !selectedImage) return;
 
     // Add user message
+    const currentMessage = inputMessage.trim();
     const userMsg = {
       id: Date.now(),
       type: "user",
-      content: inputMessage.trim(),
+      content: currentMessage || `Đã gửi ảnh${selectedImage?.fileName ? `: ${selectedImage.fileName}` : ""}`,
+      imagePreview: selectedImage?.previewUrl || null,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    const currentMessage = inputMessage.trim();
     setInputMessage("");
+    const imageToSend = selectedImage;
+    setSelectedImage(null);
     setIsTyping(true);
+
+    const quickReply = !imageToSend ? getQuickSupportReply(currentMessage) : null;
+    if (quickReply) {
+      const aiMsg = {
+        id: Date.now() + 1,
+        type: "ai",
+        content: quickReply,
+        ragSources: [],
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setIsTyping(false);
+      return;
+    }
 
     try {
       // Prepare conversation history (last 10 messages)
@@ -973,6 +1063,13 @@ const ChatAI = () => {
         message: currentMessage,
         conversationHistory: conversationHistory,
         studyMaterial: null, // Can be set when user provides study material
+        imageAttachment: imageToSend
+          ? {
+              mimeType: imageToSend.mimeType,
+              base64: imageToSend.base64,
+              fileName: imageToSend.fileName,
+            }
+          : null,
       });
 
       if (res.data.success) {
@@ -980,6 +1077,7 @@ const ChatAI = () => {
           id: Date.now() + 1,
           type: "ai",
           content: res.data.message,
+          ragSources: Array.isArray(res.data.ragSources) ? res.data.ragSources : [],
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiMsg]);
@@ -988,12 +1086,26 @@ const ChatAI = () => {
       }
     } catch (error) {
       console.error("Error calling AI API:", error);
-      // Fallback to local response if API fails
-      const aiResponse = generateAIResponse(currentMessage);
+      const fallbackQuickReply = getQuickSupportReply(currentMessage);
+      if (fallbackQuickReply) {
+        const aiMsg = {
+          id: Date.now() + 1,
+          type: "ai",
+          content: fallbackQuickReply,
+          ragSources: [],
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+        return;
+      }
+      const apiErrorMessage =
+        error?.response?.data?.message ||
+        "Không kết nối được AI server. Bạn vui lòng thử lại sau và kiểm tra backend.";
       const aiMsg = {
         id: Date.now() + 1,
         type: "ai",
-        content: aiResponse,
+        content: `Xin lỗi, mình chưa lấy được câu trả lời từ AI.\n\nChi tiết: ${apiErrorMessage}`,
+        ragSources: [],
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMsg]);
@@ -1009,16 +1121,73 @@ const ChatAI = () => {
     }
   };
 
+  const handlePickImage = () => {
+    imageInputRef.current?.click();
+  };
+
+  const processImageFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Chỉ hỗ trợ tệp ảnh.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] : "";
+      setSelectedImage({
+        fileName: file.name || `pasted-image-${Date.now()}.png`,
+        mimeType: file.type,
+        base64,
+        previewUrl: dataUrl,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageSelected = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    processImageFile(file);
+  };
+
+  const handleInputPaste = (event) => {
+    const clipboardItems = event.clipboardData?.items || [];
+    for (const item of clipboardItems) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const pastedFile = item.getAsFile();
+        if (pastedFile) {
+          event.preventDefault();
+          processImageFile(pastedFile);
+          return;
+        }
+      }
+    }
+  };
+
   const clearChat = () => {
-    setMessages([
-      {
-        id: 1,
-        type: "ai",
-        content:
-          "Chào bạn! 😊 Mình là trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay? 💪",
-        timestamp: new Date(),
-      },
-    ]);
+    (async () => {
+      try {
+        await api.delete("/ai/chat/history");
+      } catch (error) {
+        console.error("Error clearing AI chat history:", error);
+      } finally {
+        setMessages([
+          {
+            id: 1,
+            type: "ai",
+            content: DEFAULT_GREETING,
+            ragSources: [],
+            timestamp: new Date(),
+          },
+        ]);
+      }
+    })();
   };
 
   const formatTime = (date) => {
@@ -1037,6 +1206,48 @@ const ChatAI = () => {
     window.addEventListener("openChatAI", handleOpenChatAI);
     return () => window.removeEventListener("openChatAI", handleOpenChatAI);
   }, []);
+
+  useEffect(() => {
+    const handleUsersChatVisibility = (event) => {
+      setIsUsersChatOpen(Boolean(event.detail?.isOpen));
+    };
+
+    window.addEventListener("chatUsersVisibilityChange", handleUsersChatVisibility);
+    return () => window.removeEventListener("chatUsersVisibilityChange", handleUsersChatVisibility);
+  }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("chatAIVisibilityChange", {
+        detail: { isOpen },
+      })
+    );
+
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("chatAIVisibilityChange", {
+          detail: { isOpen: false },
+        })
+      );
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 900px)");
+    const syncViewport = () => setIsNarrowViewport(media.matches);
+    syncViewport();
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
+
+  const chatWindowRight = "4.75rem";
+  const chatGap = "0.5rem";
+  const aiWindowRight = isNarrowViewport
+    ? "1rem"
+    : isUsersChatOpen
+      ? `calc(${chatWindowRight} + 360px + ${chatGap})`
+      : chatWindowRight;
 
   return (
     <>
@@ -1063,11 +1274,12 @@ const ChatAI = () => {
         typeof document !== "undefined" &&
         createPortal(
           <div
-            className="chat-ai-window-fixed-absolute w-[calc(100vw-2rem)] sm:w-80 h-[500px] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-xl shadow-2xl border border-[var(--fb-divider)] flex flex-col overflow-hidden"
+            className="chat-ai-window-fixed-absolute w-[calc(100vw-2rem)] sm:w-[360px] h-[500px] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl border border-[var(--fb-divider)] flex flex-col overflow-hidden"
             style={{
+              "--chat-ai-right": aiWindowRight,
               position: "fixed",
               bottom: "1rem",
-              right: "6.5rem",
+              right: aiWindowRight,
               zIndex: 9998,
               transform: "none",
               top: "auto",
@@ -1143,6 +1355,13 @@ const ChatAI = () => {
                       <p className="text-xs whitespace-pre-wrap leading-relaxed">
                         {message.content}
                       </p>
+                      {message.imagePreview && (
+                        <img
+                          src={message.imagePreview}
+                          alt="Ảnh đã gửi"
+                          className="mt-2 max-h-32 w-full rounded-lg object-cover border border-[var(--fb-divider)]"
+                        />
+                      )}
                     </div>
                     <span className="text-xs text-[var(--fb-text-secondary)] opacity-80 mt-0.5 px-1">
                       {formatTime(message.timestamp)}
@@ -1178,18 +1397,54 @@ const ChatAI = () => {
 
             {/* Input */}
             <div className="p-3 bg-[var(--fb-surface)] border-t border-[var(--fb-divider)]">
+              {selectedImage && (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-app)] p-2">
+                  <div className="flex items-center space-x-2 min-w-0">
+                    <img
+                      src={selectedImage.previewUrl}
+                      alt="Ảnh đính kèm"
+                      className="w-10 h-10 rounded object-cover border border-[var(--fb-divider)]"
+                    />
+                    <p className="text-xs text-[var(--fb-text-secondary)] truncate">
+                      {selectedImage.fileName}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedImage(null)}
+                    className="text-xs text-red-500 hover:text-red-600"
+                  >
+                    Bỏ
+                  </button>
+                </div>
+              )}
               <div className="flex items-center space-x-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelected}
+                  className="hidden"
+                />
+                <button
+                  onClick={handlePickImage}
+                  disabled={isTyping}
+                  className="w-10 h-10 border border-[var(--fb-divider)] text-[var(--fb-text-secondary)] rounded-full hover:bg-[var(--fb-app)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  title="Thêm ảnh để hỏi AI"
+                >
+                  <ImagePlus className="w-4 h-4" />
+                </button>
                 <input
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
+                  onPaste={handleInputPaste}
                   onKeyPress={handleKeyPress}
                   placeholder="Nhập câu hỏi..."
                   className="flex-1 px-3 py-2 border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
                 />
                 <button
                   onClick={handleSendMessage}
-                  disabled={!inputMessage.trim() || isTyping}
+                  disabled={(!inputMessage.trim() && !selectedImage) || isTyping}
                   className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-full hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   <Send className="w-4 h-4" />

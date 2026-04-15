@@ -6,6 +6,7 @@ import Post from '../models/Post.model.js';
 import Comment from '../models/Comment.model.js';
 import { createNotification } from './notification.controller.js';
 import { sanitizeTextBackground } from './post.controller.js';
+import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
 const parseBool = (v, defaultVal = false) => {
   if (v === true || v === 'true' || v === '1') return true;
@@ -237,7 +238,7 @@ export const createEvent = async (req, res) => {
     // Handle image upload
     let imagePath = null;
     if (req.file) {
-      imagePath = `/uploads/images/${req.file.filename}`;
+      imagePath = getUploadedImageUrl(req.file);
     } else if (req.body.image && typeof req.body.image === 'string') {
       // Fallback: nếu gửi qua body (URL hoặc base64)
       imagePath = req.body.image;
@@ -314,6 +315,7 @@ export const getAllEvents = async (req, res) => {
       $or: [
         { visibility: 'public' },
         { visibility: { $exists: false } },
+        { visibility: null },
         { organizer: userId },
         { participants: userId },
         { interestedUsers: userId },
@@ -527,7 +529,7 @@ export const createEventPost = async (req, res) => {
 
     let images = [];
     if (req.uploadedImages && req.uploadedImages.length > 0) {
-      images = req.uploadedImages.map((file) => `/uploads/images/${file.filename}`);
+      images = req.uploadedImages.map((file) => getUploadedImageUrl(file)).filter(Boolean);
     }
 
     let files = [];
@@ -536,7 +538,7 @@ export const createEventPost = async (req, res) => {
         name: file.originalname,
         size: `${(file.size / 1024).toFixed(2)} KB`,
         mimeType: file.mimetype || 'application/octet-stream',
-        url: `/uploads/files/${file.filename}`
+        url: getUploadedFileUrl(file)
       }));
     }
 
@@ -666,7 +668,7 @@ export const updateEvent = async (req, res) => {
     // Handle image upload
     const updateData = { ...req.body };
     if (req.file) {
-      updateData.image = `/uploads/images/${req.file.filename}`;
+      updateData.image = getUploadedImageUrl(req.file);
     }
 
     // Clean up data

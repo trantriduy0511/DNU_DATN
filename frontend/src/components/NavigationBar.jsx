@@ -9,6 +9,7 @@ import AccountSwitcher from './AccountSwitcher';
 import ChatUsers from './ChatUsers';
 import ChatAI from './ChatAI';
 import { FixedChatActionButtons } from './FixedChatActionButtons';
+import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
 
 const SEARCH_HISTORY_KEY = 'dnu_nav_search_history_v1';
 const SEARCH_HISTORY_MAX = 12;
@@ -126,12 +127,12 @@ const NavigationBar = () => {
     const handleMessagesUpdated = () => {
       fetchUnreadCount();
     };
-    window.addEventListener('messagesRead', handleMessagesRead);
-    window.addEventListener('messagesUpdated', handleMessagesUpdated);
+    const offMessagesRead = onAppEvent('messagesRead', handleMessagesRead);
+    const offMessagesUpdated = onAppEvent('messagesUpdated', handleMessagesUpdated);
     
     return () => {
-      window.removeEventListener('messagesRead', handleMessagesRead);
-      window.removeEventListener('messagesUpdated', handleMessagesUpdated);
+      offMessagesRead();
+      offMessagesUpdated();
     };
   }, []);
 
@@ -357,9 +358,7 @@ const NavigationBar = () => {
       const res = await api.get(`/messages/conversation/${userId}`);
       setShowSearchResults(false);
       setSearchQuery('');
-      window.dispatchEvent(new CustomEvent('openChat', { 
-        detail: { conversationId: res.data.conversation._id } 
-      }));
+      emitAppEvent('openChat', { conversationId: res.data.conversation._id });
     } catch (error) {
       console.error('Error starting chat:', error);
       alert('Lỗi khi mở chat');
@@ -408,8 +407,8 @@ const NavigationBar = () => {
       setShowSearchResults(false);
       navigate('/saved', { replace: false });
     };
-    window.addEventListener('openSavedPosts', openSavedPage);
-    return () => window.removeEventListener('openSavedPosts', openSavedPage);
+    const offOpenSavedPosts = onAppEvent('openSavedPosts', openSavedPage);
+    return () => offOpenSavedPosts();
   }, [navigate]);
 
   return (
@@ -418,7 +417,7 @@ const NavigationBar = () => {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center gap-3 h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-3 flex-shrink-0 cursor-pointer min-w-[220px]" onClick={handleNavigateToHome}>
+          <div className="flex min-w-0 items-center space-x-2 sm:space-x-3 flex-shrink-0 cursor-pointer" onClick={handleNavigateToHome}>
             <div className="w-10 h-10 rounded-xl bg-white border border-orange-200 flex items-center justify-center shadow-sm overflow-hidden">
               <img
                 src="/dainam-logo.png"
@@ -689,7 +688,7 @@ const NavigationBar = () => {
             <NotificationBell />
             
             <button
-              onClick={() => window.dispatchEvent(new CustomEvent('openChatWindow'))}
+              onClick={() => emitAppEvent('openChatWindow')}
               className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors relative"
               title="Tin nhắn"
             >
