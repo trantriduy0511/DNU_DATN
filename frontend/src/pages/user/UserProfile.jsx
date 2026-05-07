@@ -9,6 +9,7 @@ import { formatTimeAgo } from '../../utils/formatTime';
 import ImageUploadModal from '../../components/ImageUploadModal';
 import PostImageGallery from '../../components/PostImageGallery';
 import { useProfileMediaInteractionsViewModel } from '../../domains/profile/viewmodels/useProfileMediaInteractionsViewModel';
+import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 
 function isProfilePostGalleryVideoPath(src) {
   if (!src || typeof src !== 'string') return false;
@@ -313,26 +314,15 @@ export default function UserProfile() {
   };
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
-    if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff&size=200`;
+    return resolveAvatarUrlWithFallback(avatar, name, background);
   };
 
   const resolveCoverUrl = (cover) => {
-    if (!cover) return '';
-    const c = String(cover);
-    if (c.startsWith('/uploads')) return `http://localhost:5000${c}`;
-    return c;
+    return resolveMediaUrl(cover);
   };
 
   const resolvePostImageSrc = (src) => {
-    if (!src || typeof src !== 'string') return '';
-    if (src.startsWith('/uploads')) return `http://localhost:5000${src}`;
-    if (src.startsWith('http')) return src;
-    return `http://localhost:5000${src}`;
+    return resolveMediaUrl(src);
   };
 
   const withAvatarFallback = (name, background = '1877f2') => (e) => {
@@ -586,6 +576,7 @@ export default function UserProfile() {
 
       // Remove post from state
       setUserPosts(userPosts.filter(post => post._id !== postId));
+      window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId } }));
       
       // Close post options if open
       setShowPostOptions(null);
@@ -1353,7 +1344,7 @@ export default function UserProfile() {
     <div className="min-h-screen bg-[var(--fb-app)] animate-fadeIn">
       {/* Profile Header (Facebook-like) */}
       <div className="bg-[var(--fb-surface)] border-b border-[var(--fb-divider)]">
-        <div className="max-w-6xl mx-auto px-2 sm:px-4">
+        <div className="max-w-6xl mx-auto px-0 sm:px-2 lg:px-4">
           {/* Cover */}
           <div className="relative">
             <div className="h-[220px] sm:h-[300px] rounded-b-xl overflow-hidden bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">
@@ -1567,7 +1558,7 @@ export default function UserProfile() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-4">
+      <div className="max-w-6xl mx-auto px-0 sm:px-2 lg:px-4 py-4">
         {activeTab === 'posts' ? (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             {/* Left column */}
@@ -2475,6 +2466,13 @@ export default function UserProfile() {
               e.stopPropagation();
               setProfilePostTheaterZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100));
             };
+            const onProfilePostWheelZoom = (e) => {
+              if (curIsVideo) return;
+              if (e.cancelable) e.preventDefault();
+              e.stopPropagation();
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setProfilePostTheaterZoom((z) => Math.max(1, Math.min(4, Math.round((z + delta) * 100) / 100)));
+            };
             const endProfilePostPan = (e, doTapZoom) => {
               const g = profilePostTheaterPanGestureRef.current;
               const el = profilePostTheaterPanRef.current;
@@ -2664,6 +2662,7 @@ export default function UserProfile() {
                       <div
                         ref={profilePostTheaterPanRef}
                         onPointerDown={onProfilePostPanPointerDown}
+                        onWheel={onProfilePostWheelZoom}
                         onClick={(ev) => ev.stopPropagation()}
                         className={`box-border flex min-h-0 min-w-0 w-full flex-1 overflow-auto overscroll-contain p-4 sm:p-8 ${
                           profilePostTheaterZoom > 1
@@ -2684,8 +2683,9 @@ export default function UserProfile() {
                             profilePostTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
                           style={{
-                            maxWidth: `${100 * profilePostTheaterZoom}%`,
-                            maxHeight: `${72 * profilePostTheaterZoom}dvh`,
+                            width: `${100 * profilePostTheaterZoom}%`,
+                            maxWidth: 'none',
+                            maxHeight: 'none',
                           }}
                           onClick={
                             profilePostTheaterZoom <= 1

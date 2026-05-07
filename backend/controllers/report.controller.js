@@ -109,6 +109,8 @@ export const createReport = async (req, res) => {
 export const getAllReports = async (req, res) => {
   try {
     const { status, category, page = 1, limit = 20 } = req.query;
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 20;
 
     let query = {};
     if (status) {
@@ -118,16 +120,27 @@ export const getAllReports = async (req, res) => {
       query.category = category;
     }
 
-    const reports = await Report.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .populate('reporter', 'name email avatar')
-      .populate('reportedUser', 'name email avatar')
-      .populate('reportedPost', 'content category')
-      .populate('reportedComment', 'content')
-      .populate('reportedEvent', 'title date location')
-      .populate('reviewedBy', 'name');
+    let reports;
+    try {
+      reports = await Report.find(query)
+        .sort({ createdAt: -1 })
+        .limit(parsedLimit)
+        .skip((parsedPage - 1) * parsedLimit)
+        .populate('reporter', 'name email avatar')
+        .populate('reportedUser', 'name email avatar')
+        .populate('reportedPost', 'content category')
+        .populate('reportedComment', 'content')
+        .populate('reportedEvent', 'title date location')
+        .populate('reviewedBy', 'name');
+    } catch (populateError) {
+      // Fallback for legacy/corrupted references: return core report data instead of failing 500.
+      console.warn('Populate reports failed, fallback to raw reports:', populateError?.message);
+      reports = await Report.find(query)
+        .sort({ createdAt: -1 })
+        .limit(parsedLimit)
+        .skip((parsedPage - 1) * parsedLimit)
+        .lean();
+    }
 
     const total = await Report.countDocuments(query);
 
@@ -135,8 +148,8 @@ export const getAllReports = async (req, res) => {
       success: true,
       reports,
       total,
-      page: parseInt(page),
-      pages: Math.ceil(total / parseInt(limit))
+      page: parsedPage,
+      pages: Math.ceil(total / parsedLimit)
     });
   } catch (error) {
     console.error('Error fetching reports:', error);

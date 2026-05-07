@@ -1,0 +1,149 @@
+# DANH SÁCH CODE SƠ ĐỒ CHO ĐỒ ÁN
+Các đoạn code dưới đây được viết bằng ngôn ngữ Markdown/Mermaid. 
+Bạn hãy copy đoạn code ở giữa các khối (không copy ký hiệu ```mermaid) và dán vào trang web tạo sơ đồ nhé.
+
+## 1. Sơ đồ Kiến trúc hệ thống (System Architecture) -> [Vị trí chèn: Đầu chương 2 (Cơ sở lý thuyết) hoặc đầu chương Thiết kế hệ thống]
+Đây là sơ đồ thể hiện luồng giao tiếp giữa Frontend, Backend và Cơ sở dữ liệu.
+
+```mermaid
+graph TD
+    Client[Trình duyệt Sinh Viên / ReactJS Vite]
+    Server[Backend Server / Node.js Express]
+    DB[(MongoDB Atlas)]
+    Socket[Socket.IO Server]
+    Redis[(Redis Cache / BullMQ)]
+    AI[Gemini AI API]
+
+    Client <-->|HTTP / RESTful API| Server
+    Client <-->|WebSocket Real-time| Socket
+    Server <-->|Mongoose queries| DB
+    Server <-->|Queue & Cache| Redis
+    Server <-->|HTTP Request| AI
+    Socket <-->|Emit / On| Server
+
+    classDef client fill:#d4edda,stroke:#28a745,stroke-width:2px;
+    classDef server fill:#cce5ff,stroke:#007bff,stroke-width:2px;
+    classDef db fill:#f8d7da,stroke:#dc3545,stroke-width:2px;
+    
+    class Client client;
+    class Server,Socket server;
+    class DB,Redis,AI db;
+```
+
+---
+
+## 2. Sơ đồ Use Case tổng quát (Chức năng người dùng) -> [Vị trí chèn: Phần Phân tích yêu cầu hệ thống / Mô hình Use Case]
+Thể hiện các chức năng mà Sinh viên và Admin có thể làm trên hệ thống.
+
+```mermaid
+flowchart LR
+    SV((Sinh Viên))
+    AD((Quản Trị Viên))
+
+    subgraph DNU_Social_Network[Hệ thống mạng xã hội học tập DNU]
+        direction TB
+        UC1([Đăng ký / Đăng nhập])
+        UC2([Đăng bài viết & Bình luận])
+        UC3([Tạo & Tham gia nhóm học tập])
+        UC4([Nhắn tin thời gian thực])
+        UC5([Tra cứu tài liệu bằng AI])
+        UC6([Quản lý người dùng])
+        UC7([Kiểm duyệt bài viết & Nhóm])
+        UC8([Xem thống kê hệ thống])
+    end
+
+    SV --> UC1
+    SV --> UC2
+    SV --> UC3
+    SV --> UC4
+    SV --> UC5
+
+    AD --> UC1
+    AD --> UC6
+    AD --> UC7
+    AD --> UC8
+
+    style SV fill:#f9f,stroke:#333,stroke-width:2px
+    style AD fill:#bbf,stroke:#333,stroke-width:2px
+```
+
+---
+
+## 3. Sơ đồ Cơ sở dữ liệu (ERD - Entity Relationship Diagram) -> [Vị trí chèn: Phần Thiết kế cơ sở dữ liệu]
+Thể hiện các bảng (collections) chính và mối quan hệ giữa chúng trong MongoDB.
+
+```mermaid
+erDiagram
+    USER ||--o{ POST : "tạo"
+    USER ||--o{ COMMENT : "viết"
+    USER ||--o{ MESSAGE : "gửi"
+    USER ||--o{ GROUP_MEMBER : "tham gia"
+    
+    POST ||--o{ COMMENT : "có"
+    GROUP ||--o{ GROUP_MEMBER : "chứa"
+    GROUP ||--o{ POST : "lưu trữ"
+    CONVERSATION ||--o{ MESSAGE : "chứa"
+    
+    USER {
+        ObjectId _id PK
+        string name
+        string email
+        string password
+        string role
+        string studentId
+    }
+    POST {
+        ObjectId _id PK
+        string title
+        string content
+        ObjectId author FK
+        string status
+    }
+    COMMENT {
+        ObjectId _id PK
+        string content
+        ObjectId author FK
+        ObjectId post FK
+    }
+    GROUP {
+        ObjectId _id PK
+        string name
+        string description
+        ObjectId creator FK
+        string status
+    }
+    MESSAGE {
+        ObjectId _id PK
+        string content
+        ObjectId sender FK
+        ObjectId conversation FK
+    }
+```
+
+---
+
+## 4. Sơ đồ Tuần tự (Sequence Diagram) - Chức năng Chat Real-time -> [Vị trí chèn: Phần Thiết kế luồng xử lý / Thiết kế chi tiết module]
+Thể hiện luồng xử lý thời gian thực khi sinh viên A nhắn tin cho sinh viên B.
+
+```mermaid
+sequenceDiagram
+    actor UserA as Người gửi (User A)
+    participant ClientA as Trình duyệt (User A)
+    participant Server as Node.js Server (Socket.IO)
+    participant DB as MongoDB Database
+    participant ClientB as Trình duyệt (User B)
+    actor UserB as Người nhận (User B)
+
+    UserA->>ClientA: Nhập tin nhắn và nhấn Gửi
+    ClientA->>Server: Bắn sự kiện "message:send" (Kèm nội dung)
+    Server->>DB: Lưu tin nhắn mới vào bảng Message
+    DB-->>Server: Trả về kết quả lưu thành công
+    
+    par Gửi đến người nhận
+        Server->>ClientB: Bắn sự kiện "message:receive" (Tin nhắn mới)
+        ClientB->>UserB: Hiển thị tin nhắn mới trên màn hình
+    and Phản hồi người gửi
+        Server-->>ClientA: Trả về kết quả Callback
+        ClientA->>UserA: Hiển thị tin nhắn đã gửi thành công
+    end
+```

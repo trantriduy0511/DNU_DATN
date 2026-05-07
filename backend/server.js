@@ -139,7 +139,9 @@ const apiLimiter = createLimiter({
   max: parseInt(process.env.RATE_LIMIT_MAX || '', 10) || 300,
   message: 'Quá nhiều yêu cầu, vui lòng thử lại sau.',
   // Auth và AI đã có logic riêng; skip tại limiter tổng để tránh double-throttling.
+  // Cho phép GET/HEAD/OPTIONS để tránh khóa các request polling realtime của UI.
   skip: (req) =>
+    ['GET', 'HEAD', 'OPTIONS'].includes(String(req.method || '').toUpperCase()) ||
     req.originalUrl?.startsWith('/api/auth/') ||
     req.originalUrl?.startsWith('/api/ai/')
 });
@@ -161,14 +163,59 @@ const aiLimiter = createLimiter({
     req.originalUrl?.startsWith('/api/ai/chat/history')
 });
 
-// Connect to MongoDB (non-blocking - server will start even if MongoDB fails)
-connectDB().then(connected => {
-  if (!connected) {
-    console.log(`⚠️  Server will start but database operations will fail until MongoDB is connected`);
+const requireDatabaseConnection = (req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    return next();
   }
-}).catch(err => {
-  console.error('Failed to connect to MongoDB:', err);
+
+  return res.status(503).json({
+    success: false,
+    message: 'Database chưa sẵn sàng. Vui lòng thử lại sau vài giây.'
+  });
+};
+
+const requireDatabaseUnlessAIChat = (req, res, next) => {
+  const url = String(req.originalUrl || '');
+  // Allow AI chat endpoints to run in degraded mode when DB is unstable.
+  if (url.startsWith('/api/ai/chat')) {
+    return next();
+  }
+  return requireDatabaseConnection(req, res, next);
+};
+
+let isConnectingDb = false;
+const DB_RETRY_INTERVAL_MS = 15000;
+
+const ensureDatabaseConnection = async () => {
+  if (isConnectingDb) return;
+  if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
+
+  isConnectingDb = true;
+  try {
+    const connected = await connectDB();
+    if (!connected) {
+      console.log(`⚠️  Server will start but database operations will fail until MongoDB is connected`);
+      setTimeout(ensureDatabaseConnection, DB_RETRY_INTERVAL_MS);
+    }
+  } catch (err) {
+    console.error('Failed to connect to MongoDB:', err);
+    setTimeout(ensureDatabaseConnection, DB_RETRY_INTERVAL_MS);
+  } finally {
+    isConnectingDb = false;
+  }
+};
+
+mongoose.connection.on('disconnected', () => {
+  console.log('⚠️  MongoDB disconnected. Retrying connection...');
+  setTimeout(ensureDatabaseConnection, DB_RETRY_INTERVAL_MS);
 });
+
+mongoose.connection.on('error', (error) => {
+  console.error('❌ MongoDB connection error:', error.message);
+});
+
+// Connect to MongoDB (non-blocking with auto-retry)
+ensureDatabaseConnection();
 
 // Verify email configuration
 verifyEmailConfig().then(configured => {
@@ -214,19 +261,19 @@ app.use('/api/ai', aiLimiter);
 
 // Routes (with error handling)
 try {
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/comments', commentRoutes);
-app.use('/api/groups', groupRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/friends', friendRoutes);
-app.use('/api/files', fileRoutes);
-app.use('/api/ai', aiRoutes);
+app.use('/api/auth', requireDatabaseConnection, authRoutes);
+app.use('/api/users', requireDatabaseConnection, userRoutes);
+app.use('/api/posts', requireDatabaseConnection, postRoutes);
+app.use('/api/comments', requireDatabaseConnection, commentRoutes);
+app.use('/api/groups', requireDatabaseConnection, groupRoutes);
+app.use('/api/events', requireDatabaseConnection, eventRoutes);
+app.use('/api/admin', requireDatabaseConnection, adminRoutes);
+app.use('/api/notifications', requireDatabaseConnection, notificationRoutes);
+app.use('/api/reports', requireDatabaseConnection, reportRoutes);
+app.use('/api/messages', requireDatabaseConnection, messageRoutes);
+app.use('/api/friends', requireDatabaseConnection, friendRoutes);
+app.use('/api/files', requireDatabaseConnection, fileRoutes);
+app.use('/api/ai', requireDatabaseUnlessAIChat, aiRoutes);
   console.log('✅ All routes loaded');
 } catch (error) {
   console.error('❌ Error loading routes:', error);

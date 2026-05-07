@@ -33,6 +33,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { buildEventShareMessageContent } from '../../utils/eventShareMessage.js';
 import { formatTimeAgo } from '../../utils/formatTime';
+import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 import { PostCommentSection } from '../../components/PostCommentSection';
 import PostImageGallery from '../../components/PostImageGallery';
 
@@ -102,8 +103,7 @@ function formatFbEventDateLine(iso) {
 const EVENT_POST_PLACEHOLDER_CONTENT = 'Đính kèm';
 
 function eventPostAttachmentUrl(file) {
-  const raw = file?.url || '';
-  return raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+  return resolveMediaUrl(file?.url);
 }
 
 function isEventPostAttachmentVideo(file) {
@@ -208,12 +208,7 @@ const EventDetailPage = () => {
   const [eventCoverUploading, setEventCoverUploading] = useState(false);
 
   const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
-    if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
+    return resolveAvatarUrlWithFallback(avatar, name, background);
   };
 
   const withAvatarFallback = (name, background = '1877f2') => (e) => {
@@ -363,10 +358,7 @@ const EventDetailPage = () => {
   };
 
   const resolvePostImageSrc = useCallback((src) => {
-    if (!src || typeof src !== 'string') return '';
-    if (src.startsWith('/uploads')) return `http://localhost:5000${src}`;
-    if (src.startsWith('http')) return src;
-    return `http://localhost:5000${src}`;
+    return resolveMediaUrl(src);
   }, []);
 
   useEffect(() => {
@@ -775,6 +767,33 @@ const EventDetailPage = () => {
     }
   };
 
+  const handleDeleteEventPost = async (post) => {
+    const postId = post?._id;
+    if (!postId) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) return;
+
+    try {
+      await api.delete(`/posts/${postId}`);
+      setEventDiscussionPosts((prev) =>
+        prev.filter((p) => String(p._id) !== String(postId))
+      );
+      setShowEventPostComments((prev) => {
+        const next = new Set(prev);
+        next.delete(String(postId));
+        return next;
+      });
+      setEventPostOptionsId(null);
+      setImageTheater((current) => {
+        if (!current?.post?._id) return current;
+        return String(current.post._id) === String(postId) ? null : current;
+      });
+      alert('Đã xóa bài viết.');
+    } catch (e) {
+      console.error(e);
+      alert(e.response?.data?.message || 'Không thể xóa bài viết');
+    }
+  };
+
   const toggleShareFriendSelect = (friendId) => {
     const id = String(friendId);
     setShareSelectedFriendIds((prev) => {
@@ -1037,9 +1056,7 @@ const EventDetailPage = () => {
             .toLocaleDateString('vi-VN', { month: 'short' })
             .replace(/\./g, '')
             .toUpperCase();
-          const coverSrc = ev.image
-            ? `http://localhost:5000/${String(ev.image).replace(/^\//, '')}`
-            : null;
+          const coverSrc = ev.image ? resolvePostImageSrc(String(ev.image)) : null;
           const detailRsvp = getUserEventRsvp(ev, user?.id);
           const org = ev.organizer;
           const orgId = org && (org._id || org.id || org);
@@ -1055,7 +1072,7 @@ const EventDetailPage = () => {
       {/* Hero — một thẻ lớn (bìa + tiêu đề), giống khối đầu trang Nhóm */}
       <div className="mx-auto max-w-7xl px-4 pt-4">
         <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm">
-          <div className="relative aspect-[21/9] min-h-[200px] w-full max-h-[min(420px,44vh)] overflow-hidden rounded-t-xl bg-gradient-to-r from-[#F2DEB8] via-[#FAF3E8] to-[#DFEEF9] sm:min-h-[220px] md:min-h-[260px]">
+          <div className="relative aspect-[21/9] min-h-[200px] w-full max-h-[min(420px,44vh)] overflow-hidden rounded-t-xl bg-[var(--fb-surface)] sm:min-h-[220px] md:min-h-[260px]">
             <input
               ref={eventCoverFileInputRef}
               type="file"
@@ -1068,7 +1085,7 @@ const EventDetailPage = () => {
               <img
                 src={coverSrc}
                 alt=""
-                className="pointer-events-none h-full w-full object-cover"
+                className="pointer-events-none h-full w-full object-contain object-center"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
@@ -1765,6 +1782,23 @@ const EventDetailPage = () => {
                                                 </button>
                                                 {String(eventPostOptionsId) === String(post._id) ? (
                                                   <div className="absolute right-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-lg border border-[#E4E6EB] bg-white shadow-xl">
+                                                    {(() => {
+                                                      const authorId =
+                                                        post.author?._id || post.author?.id || post.author;
+                                                      const currentUserId = user?.id || user?._id;
+                                                      const canDeletePost =
+                                                        String(authorId || '') === String(currentUserId || '') ||
+                                                        user?.role === 'admin';
+                                                      return canDeletePost ? (
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => handleDeleteEventPost(post)}
+                                                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                                                        >
+                                                          Xóa bài viết
+                                                        </button>
+                                                      ) : null;
+                                                    })()}
                                                     <button
                                                       type="button"
                                                       onClick={() => {
@@ -2020,6 +2054,13 @@ const EventDetailPage = () => {
               e.stopPropagation();
               setEventPostTheaterZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100));
             };
+            const onEventPostWheelZoom = (e) => {
+              if (curIsVideo) return;
+              if (e.cancelable) e.preventDefault();
+              e.stopPropagation();
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setEventPostTheaterZoom((z) => Math.max(1, Math.min(4, Math.round((z + delta) * 100) / 100)));
+            };
             const endEventPostPan = (e, doTapZoom) => {
               const g = eventPostTheaterPanGestureRef.current;
               const el = eventPostTheaterPanRef.current;
@@ -2209,6 +2250,7 @@ const EventDetailPage = () => {
                       <div
                         ref={eventPostTheaterPanRef}
                         onPointerDown={onEventPostPanPointerDown}
+                        onWheel={onEventPostWheelZoom}
                         onClick={(ev) => ev.stopPropagation()}
                         className={`box-border flex min-h-0 min-w-0 w-full flex-1 overflow-auto overscroll-contain p-4 sm:p-8 ${
                           eventPostTheaterZoom > 1
@@ -2229,8 +2271,9 @@ const EventDetailPage = () => {
                             eventPostTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
                           style={{
-                            maxWidth: `${100 * eventPostTheaterZoom}%`,
-                            maxHeight: `${72 * eventPostTheaterZoom}dvh`,
+                            width: `${100 * eventPostTheaterZoom}%`,
+                            maxWidth: 'none',
+                            maxHeight: 'none',
                           }}
                           onClick={
                             eventPostTheaterZoom <= 1

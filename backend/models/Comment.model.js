@@ -11,6 +11,11 @@ const commentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  authorNameSnapshot: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   content: {
     type: String,
     default: '',
@@ -36,6 +41,11 @@ const commentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  status: {
+    type: String,
+    enum: ['approved', 'rejected'],
+    default: 'approved'
+  },
   replies: [{
     author: {
       type: mongoose.Schema.Types.ObjectId,

@@ -32,6 +32,7 @@ const ChatAI = () => {
   const [isUsersChatOpen, setIsUsersChatOpen] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
   const { user } = useAuthStore();
@@ -70,6 +71,8 @@ const ChatAI = () => {
     const msg = String(rawMessage || "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
       .replace(/\s+/g, " ")
@@ -199,7 +202,7 @@ const ChatAI = () => {
       messageLower.includes("duyệt bài") ||
       messageLower.includes("bài viết hiện lên")
     ) {
-      return "Về việc duyệt bài viết:\n\n✅ Có, tất cả bài viết cần Admin duyệt\n⏰ Thời gian duyệt: Thường trong vòng 24h\n📧 Bạn sẽ nhận thông báo khi:\n   • Bài viết được duyệt → Hiển thị công khai\n   • Bài viết bị từ chối → Có lý do cụ thể\n\n💡 Mẹo: Viết nội dung rõ ràng, phù hợp để được duyệt nhanh hơn.\n\nBạn đang chờ duyệt bài viết nào?";
+      return "Bài viết hiện hiển thị ngay sau khi bạn đăng, không cần chờ admin duyệt.\n\nNếu bạn chưa thấy bài viết:\n1️⃣ Tải lại trang\n2️⃣ Kiểm tra kết nối mạng\n3️⃣ Kiểm tra xem bài có vi phạm quy định và bị ẩn không\n\nBạn gửi mình nội dung lỗi cụ thể để mình hỗ trợ nhanh hơn nhé.";
     }
 
     if (
@@ -268,7 +271,7 @@ const ChatAI = () => {
       messageLower.includes("post") ||
       messageLower.includes("viết bài")
     ) {
-      return 'Để đăng bài viết:\n\n1️⃣ Vào trang chủ, nhấn nút "Bạn đang nghĩ gì?" hoặc nút "+"\n2️⃣ Chọn danh mục: Học tập, Tài liệu, Thảo luận, Sự kiện, Khác\n3️⃣ Nhập nội dung bài viết\n4️⃣ Có thể đính kèm hình ảnh (tối đa 10 ảnh, mỗi ảnh ≤ 5MB)\n5️⃣ Thêm hashtag nếu muốn\n6️⃣ Nhấn "Đăng bài"\n\n⚠️ Lưu ý: Bài viết cần được Admin duyệt trước khi hiển thị công khai (thường trong vòng 24h).\n\nBạn có cần hướng dẫn chi tiết hơn không?';
+      return 'Để đăng bài viết:\n\n1️⃣ Vào trang chủ, nhấn nút "Bạn đang nghĩ gì?" hoặc nút "+"\n2️⃣ Chọn danh mục: Học tập, Tài liệu, Thảo luận, Sự kiện, Khác\n3️⃣ Nhập nội dung bài viết\n4️⃣ Có thể đính kèm hình ảnh (tối đa 10 ảnh, mỗi ảnh ≤ 5MB)\n5️⃣ Thêm hashtag nếu muốn\n6️⃣ Nhấn "Đăng bài"\n\n✅ Bài viết sẽ hiển thị ngay sau khi đăng.\n\nBạn có cần hướng dẫn chi tiết hơn không?';
     }
 
     // Câu hỏi về tài liệu
@@ -351,7 +354,7 @@ const ChatAI = () => {
         messageLower.includes("quản trị") ||
         messageLower.includes("dashboard"))
     ) {
-      return "Với tư cách Admin, bạn có quyền:\n\n✅ Duyệt/từ chối bài viết chờ duyệt\n👥 Quản lý người dùng: Xem, khóa/mở khóa tài khoản\n🔐 Phân quyền: Admin/User, Sinh viên/Giảng viên\n📢 Xử lý báo cáo từ người dùng\n📊 Xem thống kê hệ thống (Dashboard)\n👥 Quản lý nhóm, sự kiện\n\nTruy cập Dashboard: Vào menu Admin ở header.\n\nBạn cần hỗ trợ gì về quản trị hệ thống?";
+      return "Với tư cách Admin, bạn có quyền:\n\n👥 Quản lý người dùng: Xem, khóa/mở khóa tài khoản\n🔐 Phân quyền: Admin/User, Sinh viên/Giảng viên\n📢 Xử lý báo cáo từ người dùng\n📊 Xem thống kê hệ thống (Dashboard)\n👥 Quản lý nhóm, sự kiện\n\nTruy cập Dashboard: Vào menu Admin ở header.\n\nBạn cần hỗ trợ gì về quản trị hệ thống?";
     }
 
     // Lời chào
@@ -1359,7 +1362,8 @@ const ChatAI = () => {
                         <img
                           src={message.imagePreview}
                           alt="Ảnh đã gửi"
-                          className="mt-2 max-h-32 w-full rounded-lg object-cover border border-[var(--fb-divider)]"
+                          className="mt-2 max-h-32 w-full rounded-lg object-cover border border-[var(--fb-divider)] cursor-zoom-in"
+                          onClick={() => setPreviewImageUrl(message.imagePreview)}
                         />
                       )}
                     </div>
@@ -1403,7 +1407,8 @@ const ChatAI = () => {
                     <img
                       src={selectedImage.previewUrl}
                       alt="Ảnh đính kèm"
-                      className="w-10 h-10 rounded object-cover border border-[var(--fb-divider)]"
+                      className="w-10 h-10 rounded object-cover border border-[var(--fb-divider)] cursor-zoom-in"
+                      onClick={() => setPreviewImageUrl(selectedImage.previewUrl)}
                     />
                     <p className="text-xs text-[var(--fb-text-secondary)] truncate">
                       {selectedImage.fileName}
@@ -1450,10 +1455,27 @@ const ChatAI = () => {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-[var(--fb-text-secondary)] opacity-80 mt-1.5 text-center">
-                AI có thể mắc lỗi. Hãy kiểm tra thông tin quan trọng.
-              </p>
             </div>
+            {previewImageUrl && (
+              <div
+                className="absolute inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+                onClick={() => setPreviewImageUrl("")}
+              >
+                <button
+                  type="button"
+                  className="absolute top-3 right-3 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
+                  onClick={() => setPreviewImageUrl("")}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <img
+                  src={previewImageUrl}
+                  alt="Xem ảnh lớn"
+                  className="max-w-full max-h-full rounded-lg shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
           </div>,
           document.body
         )}

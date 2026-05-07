@@ -14,6 +14,19 @@ const cleanupStaleJobs = async () => {
   await AIAnalysisJob.deleteMany({ expiresAt: { $lte: new Date() } });
 };
 
+const normalizeUploadedFileName = (name) => {
+  const raw = String(name || '').trim();
+  if (!raw) return 'unknown';
+  // Sửa lỗi mojibake phổ biến khi UTF-8 bị đọc thành latin1/win1252
+  try {
+    const recovered = Buffer.from(raw, 'latin1').toString('utf8');
+    if (recovered && recovered !== raw) return recovered;
+  } catch {
+    // ignore
+  }
+  return raw;
+};
+
 /**
  * Đọc nội dung từ file PDF
  */
@@ -26,6 +39,20 @@ const readPDF = async (filePath) => {
     return data.text;
   } catch (error) {
     console.error('Error reading PDF:', error);
+    throw new Error('Không thể đọc file PDF. Vui lòng kiểm tra file có hợp lệ không.');
+  }
+};
+
+/**
+ * Đọc nội dung từ buffer PDF
+ */
+const readPDFBuffer = async (buffer) => {
+  try {
+    const pdfParse = (await import('pdf-parse')).default;
+    const data = await pdfParse(buffer);
+    return data.text;
+  } catch (error) {
+    console.error('Error reading PDF buffer:', error);
     throw new Error('Không thể đọc file PDF. Vui lòng kiểm tra file có hợp lệ không.');
   }
 };
@@ -44,6 +71,19 @@ const readDOCX = async (filePath) => {
 };
 
 /**
+ * Đọc nội dung từ buffer DOCX
+ */
+const readDOCXBuffer = async (buffer) => {
+  try {
+    const result = await mammoth.extractRawText({ buffer });
+    return result.value;
+  } catch (error) {
+    console.error('Error reading DOCX buffer:', error);
+    throw new Error('Không thể đọc file DOCX. Vui lòng kiểm tra file có hợp lệ không.');
+  }
+};
+
+/**
  * Đọc nội dung từ file TXT
  */
 const readTXT = async (filePath) => {
@@ -57,20 +97,47 @@ const readTXT = async (filePath) => {
 };
 
 /**
+ * Đọc nội dung từ buffer TXT
+ */
+const readTXTBuffer = async (buffer) => {
+  try {
+    return Buffer.isBuffer(buffer) ? buffer.toString('utf-8') : String(buffer || '');
+  } catch (error) {
+    console.error('Error reading TXT buffer:', error);
+    throw new Error('Không thể đọc file TXT. Vui lòng kiểm tra file có hợp lệ không.');
+  }
+};
+
+/**
  * Xác định loại file và đọc nội dung
  */
-const extractTextFromFile = async (filePath, fileType) => {
-  const ext = path.extname(filePath).toLowerCase();
-  
-  if (ext === '.pdf') {
-    return await readPDF(filePath);
-  } else if (ext === '.docx' || ext === '.doc') {
-    return await readDOCX(filePath);
-  } else if (ext === '.txt') {
-    return await readTXT(filePath);
-  } else {
+const extractTextFromUploadedFile = async (file) => {
+  const originalName = String(file?.originalname || '').trim();
+  const ext = path.extname(originalName).toLowerCase();
+
+  // Multer memoryStorage -> use buffer (default for this project)
+  if (file?.buffer && Buffer.isBuffer(file.buffer)) {
+    if (ext === '.pdf') return await readPDFBuffer(file.buffer);
+    if (ext === '.docx') return await readDOCXBuffer(file.buffer);
+    if (ext === '.txt') return await readTXTBuffer(file.buffer);
+    if (ext === '.doc') {
+      // mammoth không hỗ trợ .doc (binary Word). Yêu cầu user dùng .docx
+      throw new Error('File .DOC không được hỗ trợ. Vui lòng chuyển sang .DOCX hoặc .PDF/.TXT.');
+    }
     throw new Error(`Định dạng file không được hỗ trợ: ${ext}. Chỉ hỗ trợ PDF, DOCX, TXT.`);
   }
+
+  // Fallback: disk storage (nếu sau này đổi storage)
+  if (file?.path && typeof file.path === 'string') {
+    const filePath = file.path;
+    const diskExt = path.extname(filePath).toLowerCase();
+    if (diskExt === '.pdf') return await readPDF(filePath);
+    if (diskExt === '.docx' || diskExt === '.doc') return await readDOCX(filePath);
+    if (diskExt === '.txt') return await readTXT(filePath);
+    throw new Error(`Định dạng file không được hỗ trợ: ${diskExt}. Chỉ hỗ trợ PDF, DOCX, TXT.`);
+  }
+
+  throw new Error('Không thể đọc file upload. Thiếu dữ liệu buffer/path.');
 };
 
 /**
@@ -115,8 +182,7 @@ export const analyzeDocumentUpload = async (req, res) => {
 
     // Lấy file đầu tiên
     const file = req.uploadedFiles[0];
-    const filePath = file.path;
-    const fileName = file.originalname;
+    const fileName = normalizeUploadedFileName(file.originalname);
     const userId = req.user?._id?.toString();
     if (!userId) {
       return res.status(401).json({
@@ -126,9 +192,8 @@ export const analyzeDocumentUpload = async (req, res) => {
     }
     const jobId = crypto.randomUUID();
     // Đọc nội dung tài liệu trước khi enqueue, tránh phụ thuộc file tạm khi worker xử lý async
-    let documentText = await extractTextFromFile(filePath);
+    let documentText = await extractTextFromUploadedFile(file);
     if (!documentText || documentText.trim().length === 0) {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       return res.status(400).json({
         success: false,
         message: 'File không có nội dung hoặc không thể đọc được'
@@ -138,8 +203,6 @@ export const analyzeDocumentUpload = async (req, res) => {
     if (documentText.length > maxLength) {
       documentText = documentText.substring(0, maxLength) + '\n\n[... Nội dung đã được cắt ngắn do file quá dài ...]';
     }
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-
     const now = new Date();
     const expiresAt = new Date(now.getTime() + JOB_RETENTION_MS);
     await AIAnalysisJob.create({
@@ -240,7 +303,10 @@ export const getDocumentAnalysisStatus = async (req, res) => {
         status: job.status,
         progress: job.progress,
         message: job.message,
-        metadata: job.metadata,
+        metadata: {
+          ...job.metadata,
+          fileName: normalizeUploadedFileName(job.metadata?.fileName || 'unknown')
+        },
         result: job.result,
         error: job.error
       }
@@ -272,9 +338,17 @@ export const getDocumentAnalysisJobs = async (req, res) => {
       .select('jobId status progress message metadata error createdAt updatedAt')
       .lean();
 
+    const normalizedJobs = jobs.map((job) => ({
+      ...job,
+      metadata: {
+        ...job.metadata,
+        fileName: normalizeUploadedFileName(job.metadata?.fileName || 'unknown')
+      }
+    }));
+
     return res.json({
       success: true,
-      data: jobs
+      data: normalizedJobs
     });
   } catch (error) {
     return res.status(500).json({
@@ -326,7 +400,7 @@ export const retryDocumentAnalysisJob = async (req, res) => {
       progress: 5,
       message: 'Đã nhận yêu cầu thử lại',
       metadata: {
-        fileName: sourceJob.metadata?.fileName || 'unknown',
+        fileName: normalizeUploadedFileName(sourceJob.metadata?.fileName || 'unknown'),
         fileType: sourceJob.metadata?.fileType || '.txt'
       },
       sourceText: sourceJob.sourceText,

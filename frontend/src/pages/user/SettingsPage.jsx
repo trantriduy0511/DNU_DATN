@@ -1,22 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Moon, Sun, Bell, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Moon, Sun, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 
 const THEME_KEY = 'dnu_theme';
-const NOTI_KEY = 'dnu_notification_settings';
 
 const SettingsPage = () => {
   const { user } = useAuthStore();
   const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'system';
+    if (typeof window === 'undefined') return 'light';
     const saved = window.localStorage?.getItem(THEME_KEY);
-    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
-  }); // 'light' | 'dark' | 'system'
-  const [notificationSettings, setNotificationSettings] = useState({
-    inApp: true,
-    email: true
-  });
+    return saved === 'light' || saved === 'dark' ? saved : 'light';
+  }); // 'light' | 'dark'
 
   // Change password (moved from "Edit profile" modal)
   const [pwForm, setPwForm] = useState({
@@ -26,20 +21,24 @@ const SettingsPage = () => {
   });
   const [pwError, setPwError] = useState('');
   const [pwSaving, setPwSaving] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false
+  });
 
   const themeOptions = useMemo(
     () => ([
       { value: 'light', label: 'Sáng', icon: <Sun className="w-4 h-4" /> },
-      { value: 'dark', label: 'Tối', icon: <Moon className="w-4 h-4" /> },
-      { value: 'system', label: 'Theo hệ thống', icon: <Sun className="w-4 h-4" /> }
+      { value: 'dark', label: 'Tối', icon: <Moon className="w-4 h-4" /> }
     ]),
     []
   );
 
   useEffect(() => {
     const savedTheme = localStorage.getItem(THEME_KEY);
-    const hasSaved = savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system';
-    const userThemeOk = user?.settings?.theme && ['light', 'dark', 'system'].includes(user.settings.theme);
+    const hasSaved = savedTheme === 'light' || savedTheme === 'dark';
+    const userThemeOk = user?.settings?.theme && ['light', 'dark'].includes(user.settings.theme);
 
     // Only fallback to user.settings.theme when there is no local selection yet
     if (!hasSaved && userThemeOk) {
@@ -47,62 +46,20 @@ const SettingsPage = () => {
       setTheme(user.settings.theme);
     }
 
-    const savedNoti = localStorage.getItem(NOTI_KEY);
-    if (savedNoti) {
-      try {
-        const parsed = JSON.parse(savedNoti);
-        setNotificationSettings(prev => ({ ...prev, ...parsed }));
-      } catch {
-        // ignore parse error
-      }
-    }
   }, [user?.settings?.theme]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
 
     const root = document.documentElement;
-    const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
-
-    const apply = (value) => {
-      if (value === 'dark') root.classList.add('dark');
-      else if (value === 'light') root.classList.remove('dark');
-      else if (mq) {
-        if (mq.matches) root.classList.add('dark');
-        else root.classList.remove('dark');
-      }
-    };
-
-    const onSystemChange = (e) => {
-      if (theme !== 'system') return;
-      if (e?.matches) root.classList.add('dark');
-      else root.classList.remove('dark');
-    };
-
-    apply(theme);
-
-    if (theme === 'system' && mq?.addEventListener) {
-      mq.addEventListener('change', onSystemChange);
-      return () => mq.removeEventListener('change', onSystemChange);
-    }
-    if (theme === 'system' && mq?.addListener) {
-      mq.addListener(onSystemChange);
-      return () => mq.removeListener(onSystemChange);
-    }
+    if (theme === 'dark') root.classList.add('dark');
+    else root.classList.remove('dark');
     return undefined;
   }, [theme]);
 
   const handleThemeChange = (value) => {
     localStorage.setItem(THEME_KEY, value);
     setTheme(value);
-  };
-
-  const handleNotiChange = (field) => {
-    setNotificationSettings(prev => {
-      const next = { ...prev, [field]: !prev[field] };
-      localStorage.setItem(NOTI_KEY, JSON.stringify(next));
-      return next;
-    });
   };
 
   const handlePwChange = (e) => {
@@ -145,6 +102,10 @@ const SettingsPage = () => {
     } finally {
       setPwSaving(false);
     }
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   return (
@@ -200,77 +161,6 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4">
-          <h2 className="text-lg font-semibold text-[var(--fb-text-primary)] flex items-center gap-2 mb-3">
-            <Bell className="w-5 h-5 text-indigo-500" />
-            Thông báo
-          </h2>
-
-          <div className="space-y-3">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-3">
-                <Bell className="w-5 h-5 text-blue-500" />
-                <div>
-                  <p className="font-medium text-[var(--fb-text-primary)]">
-                    Thông báo trong ứng dụng
-                  </p>
-                  <p className="text-sm text-[var(--fb-text-secondary)]">
-                    Hiển thị thông báo ở biểu tượng chuông.
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={notificationSettings.inApp}
-                onChange={() => handleNotiChange('inApp')}
-              />
-              <div
-                className={`w-10 h-5 flex items-center rounded-full p-1 transition ${
-                  notificationSettings.inApp ? 'bg-blue-500' : 'bg-[var(--fb-divider)]'
-                }`}
-              >
-                <div
-                  className={`bg-[var(--fb-surface)] w-4 h-4 rounded-full shadow transform transition ${
-                    notificationSettings.inApp ? 'translate-x-4' : ''
-                  }`}
-                />
-              </div>
-            </label>
-
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-green-500" />
-                <div>
-                  <p className="font-medium text-[var(--fb-text-primary)]">
-                    Thông báo qua email
-                  </p>
-                  <p className="text-sm text-[var(--fb-text-secondary)]">
-                    Gửi email khi có hoạt động quan trọng.
-                  </p>
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                className="sr-only"
-                checked={notificationSettings.email}
-                onChange={() => handleNotiChange('email')}
-              />
-              <div
-                className={`w-10 h-5 flex items-center rounded-full p-1 transition ${
-                  notificationSettings.email ? 'bg-green-500' : 'bg-[var(--fb-divider)]'
-                }`}
-              >
-                <div
-                  className={`bg-[var(--fb-surface)] w-4 h-4 rounded-full shadow transform transition ${
-                    notificationSettings.email ? 'translate-x-4' : ''
-                  }`}
-                />
-              </div>
-            </label>
-          </div>
-        </div>
-
         <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mt-6">
           <h2 className="text-lg font-semibold text-[var(--fb-text-primary)] flex items-center gap-2 mb-3">
             <Lock className="w-5 h-5 text-indigo-500" />
@@ -292,28 +182,48 @@ const SettingsPage = () => {
               <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
                 Mật khẩu hiện tại
               </label>
-              <input
-                type="password"
-                name="currentPassword"
-                value={pwForm.currentPassword}
-                onChange={handlePwChange}
-                className="w-full px-4 py-3 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.currentPassword ? 'text' : 'password'}
+                  name="currentPassword"
+                  value={pwForm.currentPassword}
+                  onChange={handlePwChange}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('currentPassword')}
+                  className="absolute inset-y-0 right-0 px-3 text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]"
+                  aria-label={showPasswords.currentPassword ? 'Ẩn mật khẩu hiện tại' : 'Hiện mật khẩu hiện tại'}
+                >
+                  {showPasswords.currentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
                 Mật khẩu mới
               </label>
-              <input
-                type="password"
-                name="newPassword"
-                value={pwForm.newPassword}
-                onChange={handlePwChange}
-                className="w-full px-4 py-3 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.newPassword ? 'text' : 'password'}
+                  name="newPassword"
+                  value={pwForm.newPassword}
+                  onChange={handlePwChange}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('newPassword')}
+                  className="absolute inset-y-0 right-0 px-3 text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]"
+                  aria-label={showPasswords.newPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                >
+                  {showPasswords.newPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
               {pwForm.newPassword && (
                 <p className="text-xs text-[var(--fb-text-secondary)] mt-2">
                   Yêu cầu: 6+ ký tự, chữ hoa, chữ thường, số, ký tự đặc biệt
@@ -325,14 +235,24 @@ const SettingsPage = () => {
               <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
                 Xác nhận mật khẩu mới
               </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={pwForm.confirmPassword}
-                onChange={handlePwChange}
-                className="w-full px-4 py-3 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  type={showPasswords.confirmPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  value={pwForm.confirmPassword}
+                  onChange={handlePwChange}
+                  className="w-full px-4 py-3 pr-12 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => togglePasswordVisibility('confirmPassword')}
+                  className="absolute inset-y-0 right-0 px-3 text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]"
+                  aria-label={showPasswords.confirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+                >
+                  {showPasswords.confirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
           </div>
 

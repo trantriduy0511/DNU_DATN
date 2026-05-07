@@ -355,11 +355,20 @@ export const getFriendRequests = async (req, res) => {
         select: 'name avatar email studentRole major'
       });
 
-    const pendingRequests = user.friendRequests.filter(req => req.status === 'pending');
+    const pendingRequests = (user.friendRequests || []).filter((reqItem) => reqItem.status === 'pending');
+    const validPendingRequests = pendingRequests.filter((reqItem) => reqItem.from);
+
+    // Cleanup orphan requests caused by deleted users.
+    if (validPendingRequests.length !== pendingRequests.length) {
+      user.friendRequests = (user.friendRequests || []).filter(
+        (reqItem) => reqItem.status !== 'pending' || reqItem.from
+      );
+      await user.save();
+    }
 
     res.status(200).json({
       success: true,
-      requests: pendingRequests
+      requests: validPendingRequests
     });
   } catch (error) {
     console.error('Error getting friend requests:', error);

@@ -5,6 +5,11 @@ import { emitToConversation, emitToUser } from '../socket/socketServer.js';
 import Notification from '../models/Notification.model.js';
 import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
+const normalizeObjectId = (value) => {
+  if (!value) return '';
+  return String(value._id || value.id || value);
+};
+
 // @desc    Get or create conversation between two users
 // @route   GET /api/messages/conversation/:userId
 // @access  Private
@@ -86,22 +91,30 @@ export const getConversations = async (req, res) => {
     // Mark conversations with blocked users (but don't filter them out)
     const conversationsWithBlockedInfo = conversations.map(conv => {
       const convObj = conv.toObject ? conv.toObject() : conv;
+      const participants = Array.isArray(convObj.participants)
+        ? convObj.participants.filter((p) => normalizeObjectId(p))
+        : [];
+      convObj.participants = participants;
+
       if (convObj.type === 'direct') {
-        const otherParticipant = convObj.participants?.find(
-          p => (p._id?.toString() || p.toString()) !== req.user.id
+        const otherParticipant = participants.find(
+          (p) => normalizeObjectId(p) !== req.user.id
         );
-        if (otherParticipant) {
-          const otherParticipantId = otherParticipant._id?.toString() || otherParticipant.toString();
-          if (blockedUserIds.some(
-            blockedId => blockedId.toString() === otherParticipantId
-          )) {
-            // Add blocked flag to conversation
-            convObj.isBlocked = true;
-          }
+        if (!otherParticipant) {
+          // Direct conversation orphaned by deleted account.
+          return null;
+        }
+
+        const otherParticipantId = normalizeObjectId(otherParticipant);
+        if (blockedUserIds.some(
+          blockedId => blockedId.toString() === otherParticipantId
+        )) {
+          // Add blocked flag to conversation
+          convObj.isBlocked = true;
         }
       }
       return convObj;
-    });
+    }).filter(Boolean);
 
     res.status(200).json({
       success: true,
@@ -951,15 +964,6 @@ export const recallMessage = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Tin nhắn này đã được thu hồi'
-      });
-    }
-
-    // Optional: Limit recall time (e.g., 15 minutes)
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    if (message.createdAt < fifteenMinutesAgo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chỉ có thể thu hồi tin nhắn trong vòng 15 phút sau khi gửi'
       });
     }
 

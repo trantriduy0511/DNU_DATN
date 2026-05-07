@@ -14,6 +14,7 @@ import api from '../../utils/api';
 import { buildGroupShareMessageContent } from '../../utils/groupShareMessage.js';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { getSocket } from '../../utils/socket';
+import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 import { PostCommentSection } from '../../components/PostCommentSection';
 import PostImageGallery from '../../components/PostImageGallery';
 
@@ -136,18 +137,7 @@ const GroupDetail = () => {
   const { user } = useAuthStore();
 
   const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
-    if (avatar != null && String(avatar).trim() !== '') {
-      const a = String(avatar).trim();
-      if (a.startsWith('http://') || a.startsWith('https://')) return a;
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      if (a.startsWith('uploads/')) return `http://localhost:5000/${a}`;
-      if (a.includes('uploads') && !a.includes('://')) {
-        const path = a.startsWith('/') ? a : `/${a}`;
-        return `http://localhost:5000${path}`;
-      }
-      return a;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
+    return resolveAvatarUrlWithFallback(avatar, name, background);
   };
 
   const withAvatarFallback = (name, background = '1877f2') => (e) => {
@@ -576,6 +566,7 @@ const GroupDetail = () => {
     try {
       await api.delete(`/posts/${post._id}`);
       setGroupPosts((prev) => prev.filter((p) => String(p._id) !== String(post._id)));
+      window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId: post._id } }));
       setShowComments((prev) => {
         const next = new Set(prev);
         next.delete(post._id);
@@ -604,6 +595,7 @@ const GroupDetail = () => {
     try {
       await api.delete(`/posts/${deletingPost._id}`);
       setGroupPosts((prev) => prev.filter((p) => String(p._id) !== String(deletingPost._id)));
+      window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId: deletingPost._id } }));
       setShowComments((prev) => {
         const next = new Set(prev);
         next.delete(deletingPost._id);
@@ -681,14 +673,10 @@ const GroupDetail = () => {
   const groupHeroImageUrl = useMemo(() => {
     if (!group) return null;
     if (group.coverPhoto) {
-      const p = group.coverPhoto;
-      return p.startsWith('http') ? p : `http://localhost:5000${p}`;
+      return resolveMediaUrl(group.coverPhoto);
     }
     const av = group.avatar;
-    if (av && (String(av).startsWith('http') || String(av).startsWith('/uploads'))) {
-      return String(av).startsWith('http') ? av : `http://localhost:5000${av}`;
-    }
-    return null;
+    return resolveMediaUrl(av);
   }, [group]);
 
   const groupEmojiOnly = useMemo(() => {
@@ -864,10 +852,7 @@ const GroupDetail = () => {
   }, [searchParams, groupPosts, filteredPosts, activeTab, postSearchQuery, id, loading]);
 
   const resolvePostImageSrc = (src) => {
-    if (!src || typeof src !== 'string') return '';
-    if (src.startsWith('/uploads')) return `http://localhost:5000${src}`;
-    if (src.startsWith('http')) return src;
-    return `http://localhost:5000${src}`;
+    return resolveMediaUrl(src);
   };
 
   const isGroupPostGalleryVideoPath = (src) => {
@@ -1145,8 +1130,7 @@ const GroupDetail = () => {
   };
 
   const postAttachmentUrl = (file) => {
-    const raw = file.url || '';
-    return raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+    return resolveMediaUrl(file?.url);
   };
 
   const videoPreviewSrc = (src) => {
@@ -1939,7 +1923,8 @@ const GroupDetail = () => {
       if (!Array.isArray(images) || images.length === 0) continue;
       images.forEach((img, idx) => {
         if (typeof img !== 'string') return;
-        const url = img.startsWith('http') ? img : `http://localhost:5000${img}`;
+        const url = resolvePostImageSrc(img);
+        if (!url) return;
         items.push({ key: `${post._id}-${idx}`, url, postId: post._id, post, imageIndex: idx });
       });
     }
@@ -2053,7 +2038,7 @@ const GroupDetail = () => {
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)] animate-fadeIn">
       {/* Ảnh bìa + header — một khung căn max-w-7xl, kiểu Facebook */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 pt-4">
         <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm">
           <div className="relative aspect-[21/9] min-h-[180px] w-full max-h-[360px] overflow-hidden rounded-t-xl bg-gradient-to-r from-blue-400 to-purple-500 sm:min-h-[200px] md:min-h-[240px]">
             {groupHeroImageUrl ? (
@@ -2298,7 +2283,7 @@ const GroupDetail = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-6">
         {inviteFromUrl && user && !isMember && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-[var(--fb-text-primary)]">
@@ -2924,7 +2909,7 @@ const GroupDetail = () => {
                     {post.images && post.images.length > 0 && (
                       <PostImageGallery
                         images={post.images}
-                        resolveUrl={(img) => (img.startsWith('http') ? img : `http://localhost:5000${img}`)}
+                        resolveUrl={resolvePostImageSrc}
                         isVideo={isGroupPostGalleryVideoPath}
                         videoPreviewSrc={videoPreviewSrc}
                         onCellClick={(idx) => openImageTheater(post, idx)}
@@ -4621,9 +4606,10 @@ const GroupDetail = () => {
                           groupCoverZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                         }`}
                         style={{
-                          /* % theo khung ảnh bên trái — không dùng vw để không “ăn” sang cột bình luận */
-                          maxWidth: `${100 * groupCoverZoom}%`,
-                          maxHeight: `${72 * groupCoverZoom}dvh`,
+                          /* Dùng width thay vì maxWidth để zoom luôn có hiệu lực cả với ảnh nhỏ */
+                          width: `${100 * groupCoverZoom}%`,
+                          maxWidth: 'none',
+                          maxHeight: 'none',
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -4912,7 +4898,14 @@ const GroupDetail = () => {
               e.stopPropagation();
               setGroupPostTheaterZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100));
             };
-            const endGroupPostPan = (e, doTapZoom) => {
+            const onGroupPostWheelZoom = (e) => {
+              if (curIsVideo) return;
+              if (e.cancelable) e.preventDefault();
+              e.stopPropagation();
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setGroupPostTheaterZoom((z) => Math.max(1, Math.min(4, Math.round((z + delta) * 100) / 100)));
+            };
+            const endGroupPostPan = (e) => {
               const g = groupPostTheaterPanGestureRef.current;
               const el = groupPostTheaterPanRef.current;
               if (!g.active || e.pointerId !== g.pointerId) return;
@@ -4928,20 +4921,8 @@ const GroupDetail = () => {
                 }
               }
               el?.classList.remove('cursor-grabbing');
-              const tappedImg =
-                doTapZoom &&
-                !g.moved &&
-                g.downTarget &&
-                typeof g.downTarget.tagName === 'string' &&
-                g.downTarget.tagName === 'IMG';
               g.active = false;
               g.pointerId = null;
-              if (tappedImg) {
-                setGroupPostTheaterZoom((z) => {
-                  if (z >= 4) return 1;
-                  return Math.min(4, Math.round((z + 0.25) * 100) / 100);
-                });
-              }
             };
             const onGroupPostPanPointerDown = (e) => {
               if (groupPostTheaterZoom <= 1 || curIsVideo) return;
@@ -4991,7 +4972,7 @@ const GroupDetail = () => {
               const onWinUp = (ev) => {
                 const ge = groupPostTheaterPanGestureRef.current;
                 if (!ge.active || ev.pointerId !== ge.pointerId) return;
-                endGroupPostPan(ev, !curIsVideo);
+                endGroupPostPan(ev);
               };
               const detachWindowPan = () => {
                 window.removeEventListener('pointermove', onWinMove, true);
@@ -5101,11 +5082,12 @@ const GroupDetail = () => {
                       <div
                         ref={groupPostTheaterPanRef}
                         onPointerDown={onGroupPostPanPointerDown}
+                        onWheel={onGroupPostWheelZoom}
                         onClick={(ev) => ev.stopPropagation()}
-                        className={`box-border flex min-h-0 min-w-0 w-full flex-1 overflow-auto overscroll-contain p-4 sm:p-8 ${
+                        className={`box-border flex min-h-0 min-w-0 w-full flex-1 items-center justify-center overscroll-contain p-4 sm:p-8 ${
                           groupPostTheaterZoom > 1
-                            ? 'cursor-grab select-none touch-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
-                            : ''
+                            ? 'overflow-auto cursor-grab select-none touch-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'
+                            : 'overflow-hidden'
                         }`}
                       >
                         <img
@@ -5117,24 +5099,16 @@ const GroupDetail = () => {
                               ? 'Kéo để xem vùng khác; chạm nhẹ vào ảnh để phóng thêm'
                               : 'Bấm để phóng thêm; khi tối đa bấm lại để vừa khung'
                           }
-                          className={`m-auto block max-w-none object-contain transition-[max-height,max-width] duration-200 ease-out ${
-                            groupPostTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
+                          className={`m-auto block object-contain transition-[max-height,max-width] duration-200 ease-out ${
+                            groupPostTheaterZoom > 1 ? 'cursor-grab' : 'cursor-default'
                           }`}
                           style={{
-                            maxWidth: `${100 * groupPostTheaterZoom}%`,
-                            maxHeight: `${72 * groupPostTheaterZoom}dvh`,
+                            width: groupPostTheaterZoom > 1 ? `${100 * groupPostTheaterZoom}%` : 'auto',
+                            height: 'auto',
+                            maxWidth: groupPostTheaterZoom > 1 ? 'none' : '100%',
+                            maxHeight: groupPostTheaterZoom > 1 ? 'none' : 'calc(100dvh - 2rem)',
                           }}
-                          onClick={
-                            groupPostTheaterZoom <= 1
-                              ? (ev) => {
-                                  ev.stopPropagation();
-                                  setGroupPostTheaterZoom((z) => {
-                                    if (z >= 4) return 1;
-                                    return Math.min(4, Math.round((z + 0.25) * 100) / 100);
-                                  });
-                                }
-                              : undefined
-                          }
+                          onClick={(ev) => ev.stopPropagation()}
                         />
                       </div>
                     )

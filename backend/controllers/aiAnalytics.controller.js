@@ -15,6 +15,109 @@ const getGenAIClient = () => {
   return new GoogleGenerativeAI(apiKey);
 };
 
+const getAnalyticsModelName = () => process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
+const getFallbackModelNames = () =>
+  String(process.env.GEMINI_ANALYTICS_FALLBACK_MODELS || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const cleanAIText = (input) => {
+  const text = String(input || '');
+  if (!text) return '';
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/[*#_~>|[\]]/g, ' ')
+    .replace(/^\s*[-+]\s+/gm, '- ')
+    .replace(/[^\p{L}\p{N}\s.,;:!?()/%\-–—\n]/gu, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const isLikelyTruncated = (text) => {
+  const value = String(text || '').trim();
+  if (!value) return false;
+  if (/[.!?…]$/.test(value)) return false;
+  const tail = value.slice(-250).toLowerCase();
+  return (
+    tail.includes('1.') ||
+    tail.includes('2.') ||
+    tail.includes('3.') ||
+    tail.includes('**') ||
+    tail.endsWith(':') ||
+    tail.endsWith(',') ||
+    tail.endsWith('-')
+  );
+};
+
+const isRetriableAIError = (error) => {
+  const status = Number(error?.status || error?.statusCode || 0);
+  if ([408, 409, 425, 429, 500, 502, 503, 504].includes(status)) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('service unavailable') ||
+    message.includes('high demand') ||
+    message.includes('quota') ||
+    message.includes('limit') ||
+    message.includes('timeout') ||
+    message.includes('temporarily unavailable')
+  );
+};
+
+const generateContentWithRetry = async ({ prompt, maxAttempts = 3 }) => {
+  const genAI = getGenAIClient();
+  const models = [...new Set([getAnalyticsModelName(), ...getFallbackModelNames()])];
+  let lastError = null;
+
+  for (const modelName of models) {
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 6144
+      }
+    });
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+      } catch (error) {
+        lastError = error;
+        const shouldRetry = isRetriableAIError(error) && attempt < maxAttempts;
+        if (!shouldRetry) break;
+        const delayMs = 1000 * 2 ** (attempt - 1);
+        await sleep(delayMs);
+      }
+    }
+  }
+
+  throw lastError || new Error('All analytics AI model attempts failed');
+};
+
+const generateStructuredLongContent = async ({ prompt, maxContinuationRounds = 2 }) => {
+  let fullText = await generateContentWithRetry({ prompt, maxAttempts: 3 });
+  for (let i = 0; i < maxContinuationRounds; i += 1) {
+    if (!isLikelyTruncated(fullText)) break;
+    const continuationPrompt = `
+Tiếp tục phần trả lời trước đó theo đúng ngữ cảnh, KHÔNG lặp lại nội dung đã viết.
+Viết tiếp từ ý còn dang dở đến khi hoàn chỉnh.
+Chỉ trả lời nội dung tiếp theo.
+`;
+    const nextPart = await generateContentWithRetry({ prompt: continuationPrompt, maxAttempts: 2 });
+    if (!nextPart) break;
+    fullText = `${fullText}\n${nextPart}`;
+  }
+  return cleanAIText(fullText);
+};
+
 /**
  * Thu thập dữ liệu thống kê từ database
  */
@@ -33,7 +136,7 @@ const collectAnalyticsData = async (timeRange = 30) => {
     { $group: { _id: '$status', count: { $sum: 1 } } }
   ]);
   const avgLikesPerPost = await Post.aggregate([
-    { $project: { likesCount: { $size: '$likes' } } },
+    { $project: { likesCount: { $size: { $ifNull: ['$likes', []] } } } },
     { $group: { _id: null, avg: { $avg: '$likesCount' } } }
   ]);
 
@@ -332,7 +435,10 @@ Bạn là chuyên gia phân tích dữ liệu cho hệ thống mạng xã hội 
    - Các tính năng nên phát triển
    - Các vấn đề cần giải quyết ngay
 
-Hãy trả lời bằng tiếng Việt, rõ ràng, có cấu trúc và dễ hiểu. Sử dụng emoji phù hợp để làm nổi bật các điểm quan trọng.
+Yêu cầu định dạng:
+- Trả lời bằng tiếng Việt, rõ ràng, có cấu trúc và đầy đủ ý.
+- KHÔNG dùng markdown (không dùng ký hiệu tiêu đề, in đậm, gạch đầu dòng kiểu markdown), không dùng emoji, không ký tự trang trí.
+- Trả lời thành đoạn văn + tiêu đề số thứ tự dạng "1.", "2.", "3." bằng văn bản thuần.
 
 DỮ LIỆU:
 ${dataSummary}
@@ -347,21 +453,7 @@ ${dataSummary}
         throw new Error('API key không hợp lệ hoặc quá ngắn. Vui lòng kiểm tra lại GEMINI_API_KEY trong file .env');
       }
 
-      const genAI = getGenAIClient();
-      const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
-      const model = genAI.getGenerativeModel({ 
-        model: modelName,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 4096,
-        },
-      });
-
-      const result = await model.generateContent(aiPrompt);
-      const response = await result.response;
-      aiInsights = response.text();
+      aiInsights = await generateStructuredLongContent({ prompt: aiPrompt, maxContinuationRounds: 2 });
     } catch (aiError) {
       console.error('Error calling Gemini API:', aiError);
       
@@ -449,18 +541,15 @@ Hãy dự báo:
 Trả lời bằng tiếng Việt, có cấu trúc rõ ràng.
 `;
 
-    const genAI = getGenAIClient();
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash', // Updated to latest model
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2048,
-      },
-    });
+    const prediction = await generateStructuredLongContent({
+      prompt: `${prompt}
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const prediction = response.text();
+Yêu cầu định dạng:
+- Không markdown, không emoji, không ký tự đặc biệt trang trí.
+- Viết rõ từng mục dự báo, giải thích lý do và kết luận đầy đủ.
+`,
+      maxContinuationRounds: 2
+    });
 
     res.json({
       success: true,
@@ -472,9 +561,14 @@ Trả lời bằng tiếng Việt, có cấu trúc rõ ràng.
 
   } catch (error) {
     console.error('Error in Trend Prediction:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi dự báo xu hướng',
+    const status = isRetriableAIError(error) ? 200 : 500;
+    return res.status(status).json({
+      success: status === 200,
+      degraded: status === 200,
+      message:
+        status === 200
+          ? 'AI đang quá tải tạm thời, chưa tạo được dự báo mới. Vui lòng thử lại sau ít phút.'
+          : 'Lỗi khi dự báo xu hướng',
       error: error.message
     });
   }
@@ -485,6 +579,8 @@ Trả lời bằng tiếng Việt, có cấu trúc rõ ràng.
  */
 export const getRecommendations = async (req, res) => {
   try {
+    const { timeRange = 30 } = req.query;
+    const selectedRange = Math.min(365, Math.max(1, parseInt(timeRange, 10) || 30));
     const user = req.user;
 
     if (user.role !== 'admin') {
@@ -494,7 +590,7 @@ export const getRecommendations = async (req, res) => {
       });
     }
 
-    const analyticsData = await collectAnalyticsData(30);
+    const analyticsData = await collectAnalyticsData(selectedRange);
 
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({
@@ -503,15 +599,20 @@ export const getRecommendations = async (req, res) => {
       });
     }
 
+    const engagementRate =
+      analyticsData.overview.postsLast30Days > 0
+        ? ((analyticsData.overview.commentsLast30Days / analyticsData.overview.postsLast30Days) * 100).toFixed(2)
+        : '0.00';
+
     const prompt = `
-Dựa trên dữ liệu hệ thống DNU Social dưới đây, hãy đưa ra các khuyến nghị cụ thể để cải thiện hệ thống:
+Dựa trên dữ liệu hệ thống DNU Social trong ${selectedRange} ngày gần nhất dưới đây, hãy đưa ra các khuyến nghị cụ thể để cải thiện hệ thống:
 
 DỮ LIỆU:
 - Tổng bài viết: ${analyticsData.overview.totalPosts}
 - Bài viết chờ duyệt: ${analyticsData.posts.byStatus.find(s => s._id === 'pending')?.count || 0}
 - Tổng người dùng: ${analyticsData.overview.totalUsers}
 - Trung bình lượt thích/bài: ${analyticsData.overview.avgLikesPerPost.toFixed(2)}
-- Tỷ lệ engagement: ${((analyticsData.overview.commentsLast30Days / analyticsData.overview.postsLast30Days) * 100).toFixed(2)}%
+- Tỷ lệ engagement: ${engagementRate}%
 
 Hãy đưa ra:
 1. **Khuyến nghị ngắn hạn** (1-2 tuần): Các việc cần làm ngay
@@ -522,30 +623,34 @@ Hãy đưa ra:
 Trả lời bằng tiếng Việt, cụ thể và có thể thực hiện được.
 `;
 
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash', // Updated to latest model
-      generationConfig: {
-        temperature: 0.8,
-        maxOutputTokens: 2048,
-      },
-    });
+    const recommendations = await generateStructuredLongContent({
+      prompt: `${prompt}
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const recommendations = response.text();
+Yêu cầu định dạng:
+- Không markdown, không emoji, không ký tự đặc biệt trang trí.
+- Viết đầy đủ cho từng nhóm khuyến nghị và ưu tiên hành động.
+`,
+      maxContinuationRounds: 2
+    });
 
     res.json({
       success: true,
       recommendations,
       analyticsData: analyticsData.overview,
+      timeRange: selectedRange,
       generatedAt: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('Error in Recommendations:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi tạo khuyến nghị',
+    const status = isRetriableAIError(error) ? 200 : 500;
+    return res.status(status).json({
+      success: status === 200,
+      degraded: status === 200,
+      message:
+        status === 200
+          ? 'AI đang quá tải tạm thời, chưa tạo được khuyến nghị mới. Vui lòng thử lại sau ít phút.'
+          : 'Lỗi khi tạo khuyến nghị',
       error: error.message
     });
   }

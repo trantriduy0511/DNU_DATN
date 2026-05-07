@@ -61,6 +61,7 @@ export const createComment = async (req, res) => {
     const comment = await Comment.create({
       post: postId,
       author: req.user.id,
+      authorNameSnapshot: String(req.user?.name || '').trim(),
       content: text,
       images,
       ...(replyToId ? { replyTo: replyToId } : {}),
@@ -120,7 +121,7 @@ export const createComment = async (req, res) => {
 // @access  Private
 export const getCommentsByPost = async (req, res) => {
   try {
-    const comments = await Comment.find({ post: req.params.postId })
+    const comments = await Comment.find({ post: req.params.postId, status: { $ne: 'rejected' } })
       .populate('author', 'name avatar studentRole')
       .populate('replies.author', 'name avatar')
       .sort({ createdAt: -1 });

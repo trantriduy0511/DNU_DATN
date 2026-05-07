@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, FileText, MessageSquare, TrendingUp, Search, Bell, Settings, LogOut, Shield, BookOpen, Calendar, Flag, X, AlertCircle, RefreshCw, MapPin, Navigation, ExternalLink, Upload, Image as ImageIcon, Clock, Eye, ThumbsUp, UserCheck, UserX, CheckCircle, XCircle, Clock as ClockIcon, Activity, Menu, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { formatTimeAgo, formatDate } from '../../utils/formatTime';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 import ChatAI from '../../components/ChatAI';
 import AIAnalytics from './AIAnalytics';
+import MainLayout from '../../components/MainLayout';
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user, logout } = useAuthStore();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -43,9 +48,24 @@ const AdminDashboard = () => {
   const [headerNotificationsLoading, setHeaderNotificationsLoading] = useState(false);
   const [showPostDetailModal, setShowPostDetailModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [pendingPostsCount, setPendingPostsCount] = useState(0);
-  const [pendingGroupsCount, setPendingGroupsCount] = useState(0);
   const [showGroupDetailModal, setShowGroupDetailModal] = useState(false);
+
+  // Sync tab with URL
+  useEffect(() => {
+    const path = location.pathname.split('/').filter(Boolean).pop();
+    const validTabs = ['dashboard', 'users', 'posts', 'comments', 'events', 'groups', 'notifications', 'reports', 'ai-analytics', 'permissions', 'settings'];
+    if (path && validTabs.includes(path)) {
+      setActiveTab(path);
+    } else if (location.pathname === '/admin' || location.pathname === '/admin/') {
+      setActiveTab('dashboard');
+    }
+  }, [location.pathname]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(`/admin/${tab}`);
+    setSidebarOpen(false);
+  };
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [showRejectGroupModal, setShowRejectGroupModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -55,17 +75,6 @@ const AdminDashboard = () => {
   const [showSendNotificationModal, setShowSendNotificationModal] = useState(false);
   const [showNotificationDetailModal, setShowNotificationDetailModal] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
-  const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-  const [userForm, setUserForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    studentRole: 'Sinh viên',
-    major: '',
-    studentId: '',
-    role: 'user',
-    bio: ''
-  });
   const [notificationForm, setNotificationForm] = useState({
     recipientIds: [],
     message: '',
@@ -80,6 +89,7 @@ const AdminDashboard = () => {
     endDate: ''
   });
   const [notificationSort, setNotificationSort] = useState('newest'); // newest, oldest, unread-first
+  const [permissionsStudentRoleFilter, setPermissionsStudentRoleFilter] = useState('all');
   const [postFilters, setPostFilters] = useState({
     status: '',
     category: '',
@@ -133,9 +143,6 @@ const AdminDashboard = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
 
-  const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
-
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
@@ -151,6 +158,163 @@ const AdminDashboard = () => {
     if (e.currentTarget?.dataset?.fallbackApplied) return;
     if (e.currentTarget?.dataset) e.currentTarget.dataset.fallbackApplied = '1';
     e.currentTarget.src = resolveAvatarUrl('', name, background);
+  };
+
+  const getGroupImageUrl = (group) => {
+    const pickMediaUrl = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw || raw === '📚') return '';
+      if (
+        raw.startsWith('http://') ||
+        raw.startsWith('https://') ||
+        raw.startsWith('/uploads') ||
+        raw.startsWith('uploads/') ||
+        raw.startsWith('/') ||
+        raw.startsWith('data:image/')
+      ) {
+        return resolveMediaUrl(raw);
+      }
+      return '';
+    };
+
+    return pickMediaUrl(group?.avatar) || pickMediaUrl(group?.coverPhoto) || '';
+  };
+
+  const getAdminPostDisplayTitle = (post) => {
+    const title = String(post?.title || '').trim();
+    const content = String(post?.content || '').trim();
+    const normalize = (value) =>
+      String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    const normalizedTitle = normalize(title);
+    const normalizedContent = normalize(content);
+    const isPlaceholderText = (value) =>
+      value.includes('dinh kem') ||
+      value.includes('bai dang co dinh kem') ||
+      value.includes('tep dinh kem') ||
+      value.includes('tap tin dinh kem');
+    const isPlaceholderTitle = isPlaceholderText(normalizedTitle);
+    const isPlaceholderContent = isPlaceholderText(normalizedContent);
+
+    // Yêu cầu nghiệp vụ: nếu tiêu đề có "đính kèm" thì luôn hiển thị "..."
+    if (isPlaceholderTitle) {
+      return '...';
+    }
+
+    const hasMeaningfulContent = Boolean(content) && !isPlaceholderContent;
+
+    // Nếu bài không có nội dung chữ thật, luôn hiển thị "..." theo yêu cầu.
+    if (!hasMeaningfulContent) {
+      return '...';
+    }
+
+    if (!title || isPlaceholderTitle) {
+      return `${content.substring(0, 50)}...`;
+    }
+
+    return title;
+  };
+
+  const resolvePostImageEntry = (entry, index = 0) => {
+    const rawUrl =
+      typeof entry === 'string'
+        ? entry
+        : entry?.url || entry?.secure_url || entry?.src || entry?.path || entry?.image || '';
+    const imageUrl = resolveMediaUrl(rawUrl);
+    const imageName =
+      (typeof entry === 'object' && (entry?.name || entry?.filename || entry?.originalname)) ||
+      String(rawUrl || '').split('/').pop() ||
+      `image-${index + 1}.jpg`;
+
+    return { imageUrl, imageName };
+  };
+
+  const getPostAuthorName = (post) => {
+    const author = post?.author;
+    if (author && typeof author === 'object') {
+      const name = String(author?.name || '').trim();
+      if (name) return name;
+    }
+    const fallbackName =
+      post?.authorNameSnapshot ||
+      post?.authorName ||
+      post?.author_name ||
+      post?.user?.name ||
+      post?.createdBy?.name ||
+      post?.postedBy?.name ||
+      '';
+    if (String(fallbackName).trim()) return String(fallbackName).trim();
+    return 'Người dùng đã xóa';
+  };
+
+  const getPostStatusMeta = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus !== 'approved') {
+      return {
+        label: 'Đã xóa',
+        className: 'bg-red-100 text-red-800',
+        textClassName: 'text-red-800'
+      };
+    }
+    return {
+      label: 'Còn',
+      className: 'bg-green-100 text-green-800',
+      textClassName: 'text-green-800'
+    };
+  };
+
+  const getCommentStatusMeta = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus === 'rejected') {
+      return {
+        label: 'Đã xóa',
+        className: 'bg-red-100 text-red-800'
+      };
+    }
+    return {
+      label: 'Còn',
+      className: 'bg-green-100 text-green-800'
+    };
+  };
+
+  const getGroupStatusMeta = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    if (normalizedStatus === 'approved' || normalizedStatus === 'pending') {
+      return { label: 'Còn', className: 'bg-green-100 text-green-800' };
+    }
+    return { label: 'Đã xóa', className: 'bg-red-100 text-red-800' };
+  };
+
+  const loadAdminPosts = async (filters = postFilters) => {
+    const params = {};
+    if (filters.status) params.status = filters.status;
+    if (filters.category) params.category = filters.category;
+    if (filters.search) params.search = filters.search;
+    if (filters.startDate) params.startDate = filters.startDate;
+    if (filters.endDate) params.endDate = filters.endDate;
+
+    const res = await api.get('/admin/posts', { params });
+    const rawPosts = Array.isArray(res.data.posts) ? res.data.posts : [];
+    const normalizedPosts = rawPosts.map((post) => {
+      const cleanedTitle = getAdminPostDisplayTitle(post);
+      const normalizedStatus = String(post?.status || '').trim().toLowerCase();
+      return {
+        ...post,
+        title: cleanedTitle,
+        status: normalizedStatus || 'approved'
+      };
+    });
+
+    // Enforce client-side status filter to avoid stale/incorrect API responses.
+    const normalizedByStatus = filters.status
+      ? normalizedPosts.filter(
+          (post) => String(post?.status || '').toLowerCase() === String(filters.status).toLowerCase()
+        )
+      : normalizedPosts;
+
+    setPosts(normalizedByStatus);
   };
 
   useEffect(() => {
@@ -201,12 +365,7 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Bài viết đã chuyển sang tự duyệt: không còn hàng chờ duyệt
-      setPendingPostsCount(0);
-      
-      // Nhóm đã chuyển sang tự duyệt: không còn hàng chờ duyệt
-      setPendingGroupsCount(0);
-
+      // Fetch main dashboard data based on active tab
       if (activeTab === 'dashboard') {
         const [statsRes, activitiesRes] = await Promise.all([
           api.get('/admin/statistics'),
@@ -222,14 +381,7 @@ const AdminDashboard = () => {
         const res = await api.get('/admin/users', { params: { limit: 500 } });
         setUsers(res.data.users || []);
       } else if (activeTab === 'posts') {
-        const params = { status: postFilters.status || 'approved' };
-        if (postFilters.category) params.category = postFilters.category;
-        if (postFilters.search) params.search = postFilters.search;
-        if (postFilters.startDate) params.startDate = postFilters.startDate;
-        if (postFilters.endDate) params.endDate = postFilters.endDate;
-        
-        const res = await api.get('/admin/posts', { params });
-        setPosts(res.data.posts || []);
+        await loadAdminPosts(postFilters);
       } else if (activeTab === 'comments') {
         const params = {
           page: commentsPagination.page,
@@ -251,28 +403,17 @@ const AdminDashboard = () => {
         const res = await api.get('/admin/events');
         setEvents(res.data.events);
       } else if (activeTab === 'groups') {
-        const [approvedRes, rejectedRes, pendingRes] = await Promise.all([
-          api.get('/groups', { params: { status: 'approved' } }),
-          api.get('/groups', { params: { status: 'rejected' } }),
-          api.get('/groups', { params: { status: 'pending' } })
-        ]);
-        const normalizedGroups = [
-          ...(pendingRes.data.groups || []),
-          ...(approvedRes.data.groups || []),
-          ...(rejectedRes.data.groups || [])
-        ].map((group) => ({
-          ...group,
-          // Dữ liệu cũ "pending" được xem là đang còn hoạt động theo chính sách mới.
-          status: group.status === 'pending' ? 'approved' : group.status
-        }));
-        setGroups(normalizedGroups);
+        const res = await api.get('/admin/groups');
+        setGroups(res.data.groups || []);
       } else if (activeTab === 'notifications') {
         const params = {
           page: notificationsPagination.page,
           limit: 50
         };
         if (notificationFilters.type) params.type = notificationFilters.type;
-        if (notificationFilters.isRead !== '') params.isRead = notificationFilters.isRead;
+        if (notificationFilters.isRead === 'true' || notificationFilters.isRead === 'false') {
+          params.isRead = notificationFilters.isRead;
+        }
         if (notificationFilters.recipient) params.recipient = notificationFilters.recipient;
         if (notificationFilters.startDate) params.startDate = notificationFilters.startDate;
         if (notificationFilters.endDate) params.endDate = notificationFilters.endDate;
@@ -328,7 +469,7 @@ const AdminDashboard = () => {
   const fetchHeaderNotifications = async () => {
     setHeaderNotificationsLoading(true);
     try {
-      const res = await api.get('/notifications', { params: { page: 1, limit: 8 } });
+      const res = await api.get('/notifications', { params: { page: 1, limit: 20, unreadOnly: true } });
       setHeaderNotifications(res.data.notifications || []);
       setHeaderUnreadCount(res.data.unreadCount || 0);
     } catch (error) {
@@ -355,24 +496,74 @@ const AdminDashboard = () => {
     }
   };
 
+  const resolveAdminNotificationDestination = (notification) => {
+    const rawLink = String(notification?.link || '').trim();
+    if (rawLink) return rawLink;
+
+    const postId = notification?.post?._id || notification?.post;
+    const eventId = notification?.event?._id || notification?.event;
+    const groupId = notification?.group?._id || notification?.group;
+    const senderId = notification?.sender?._id || notification?.sender?.id;
+
+    switch (notification?.type) {
+      case 'event':
+      case 'event_cohost_invite':
+        return eventId ? `/events/${eventId}` : '/admin/events';
+      case 'group':
+      case 'group_invite':
+        return groupId ? `/groups/${groupId}` : '/admin/groups';
+      case 'friend_request':
+      case 'follow':
+        return senderId ? `/profile/${senderId}` : '/admin/users';
+      case 'comment':
+      case 'like':
+      case 'post':
+        return postId ? '/admin/posts' : '/admin/posts';
+      case 'admin':
+        return '/admin/dashboard';
+      default:
+        return '/admin/notifications';
+    }
+  };
+
   const handleHeaderNotificationClick = async (notification) => {
     try {
       if (!notification.isRead) {
         await api.put(`/notifications/${notification._id}/read`);
       }
-      await fetchHeaderNotifications();
+
+      setHeaderNotifications((prev) => prev.filter((n) => n._id !== notification._id));
+      setHeaderUnreadCount((prev) => Math.max(0, prev - (notification.isRead ? 0 : 1)));
+      setShowHeaderNotifications(false);
+
+      const destination = resolveAdminNotificationDestination(notification);
+      navigate(destination);
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('Error handling notification click:', error);
     }
   };
 
   const handleHeaderMarkAllAsRead = async () => {
     try {
       await api.put('/notifications/read-all');
-      await fetchHeaderNotifications();
+      setHeaderNotifications([]);
+      setHeaderUnreadCount(0);
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
     }
+  };
+
+  const handleOpenAllHeaderNotifications = () => {
+    setNotificationFilters((prev) => ({
+      ...prev,
+      isRead: 'false'
+    }));
+    setNotificationsPagination((prev) => ({
+      ...prev,
+      page: 1
+    }));
+    setShowHeaderNotifications(false);
+    navigate('/admin/notifications');
   };
 
   useEffect(() => {
@@ -395,6 +586,32 @@ const AdminDashboard = () => {
 
   const handleSearch = async (query) => {
     setSearchQuery(query);
+
+    // In "Quản lý nhóm", "Người dùng", "Bình luận", và "Phân quyền", header search filters the table directly.
+    if (activeTab === 'groups' || activeTab === 'users' || activeTab === 'comments' || activeTab === 'permissions') {
+      const q = query.trim();
+      try {
+        setSearchLoading(true);
+        const params = q.length >= 2 ? { search: q, limit: 200 } : { limit: 200 };
+        if (activeTab === 'groups') {
+          const res = await api.get('/admin/groups', { params });
+          setGroups(res.data.groups || []);
+        } else if (activeTab === 'comments') {
+          const res = await api.get('/admin/comments', { params });
+          setComments(res.data.comments || []);
+        } else {
+          const res = await api.get('/admin/users', { params });
+          setUsers(res.data.users || []);
+        }
+        setShowSearchResults(false);
+        setSearchResults([]);
+      } catch (error) {
+        console.error('Error searching records:', error);
+      } finally {
+        setSearchLoading(false);
+      }
+      return;
+    }
     
     if (query.trim().length < 2) {
       setShowSearchResults(false);
@@ -405,40 +622,43 @@ const AdminDashboard = () => {
     setSearchLoading(true);
     setShowSearchResults(true);
 
-    let allResults = [];
+    let tabResults = [];
+    const q = query.trim();
 
     try {
-      // Search users
-      try {
-        const usersRes = await api.get('/admin/users', { params: { search: query, limit: 5 } });
-        if (usersRes.data.users) {
-          allResults.push(...usersRes.data.users.map(u => ({ ...u, type: 'user' })));
-        }
-      } catch (error) {
-        console.error('Error searching users:', error);
+      if (activeTab === 'posts') {
+        const postsRes = await api.get('/admin/posts', { params: { search: q, limit: 8 } });
+        tabResults = (postsRes.data.posts || []).map((p) => ({ ...p, type: 'post' }));
+      } else if (activeTab === 'events') {
+        const eventsRes = await api.get('/admin/events', { params: { search: q, limit: 8 } });
+        tabResults = (eventsRes.data.events || []).map((e) => ({ ...e, type: 'event' }));
+      } else if (activeTab === 'notifications') {
+        const lowered = q.toLowerCase();
+        tabResults = (notifications || [])
+          .filter((n) => {
+            const senderName = String(n.sender?.name || '').toLowerCase();
+            const recipientName = String(n.recipient?.name || '').toLowerCase();
+            const message = String(n.message || '').toLowerCase();
+            return senderName.includes(lowered) || recipientName.includes(lowered) || message.includes(lowered);
+          })
+          .slice(0, 12)
+          .map((n) => ({ ...n, type: 'notification', name: n.message }));
+      } else if (activeTab === 'reports') {
+        const lowered = q.toLowerCase();
+        tabResults = (reports || [])
+          .filter((r) => {
+            const reason = String(r.reason || '').toLowerCase();
+            const reporter = String(r.reporter?.name || '').toLowerCase();
+            const reported = String(r.reportedUser?.name || '').toLowerCase();
+            return reason.includes(lowered) || reporter.includes(lowered) || reported.includes(lowered);
+          })
+          .slice(0, 12)
+          .map((r) => ({ ...r, type: 'report', name: r.reason || 'Báo cáo' }));
+      } else {
+        tabResults = [];
       }
 
-      // Search posts
-      try {
-        const postsRes = await api.get('/admin/posts', { params: { search: query, limit: 5 } });
-        if (postsRes.data.posts) {
-          allResults.push(...postsRes.data.posts.map(p => ({ ...p, type: 'post' })));
-        }
-      } catch (error) {
-        console.error('Error searching posts:', error);
-      }
-
-      // Search comments
-      try {
-        const commentsRes = await api.get('/admin/comments', { params: { search: query, limit: 5 } });
-        if (commentsRes.data.comments) {
-          allResults.push(...commentsRes.data.comments.map(c => ({ ...c, type: 'comment' })));
-        }
-      } catch (error) {
-        console.error('Error searching comments:', error);
-      }
-
-      setSearchResults(allResults);
+      setSearchResults(tabResults);
     } catch (error) {
       console.error('Error in search:', error);
       setSearchResults([]);
@@ -447,51 +667,58 @@ const AdminDashboard = () => {
     setSearchLoading(false);
   };
 
-  const handleSearchResultClick = (result) => {
+  const handleSearchResultClick = async (result) => {
     setShowSearchResults(false);
     setSearchQuery('');
     
     if (result.type === 'user') {
-      setActiveTab('users');
-    } else if (result.type === 'post') {
-      setActiveTab('posts');
-    } else if (result.type === 'comment') {
-      setActiveTab('comments');
+      const userId = result._id || result.id;
+      if (!userId) return;
+      navigate(`/profile/${userId}`);
+      return;
+    }
+
+    if (result.type === 'group') {
+      handleTabChange('groups');
+      await handleOpenGroupDetail(result);
+      return;
+    }
+
+    if (result.type === 'event') {
+      handleTabChange('events');
+      handleOpenEventModal(result);
+      return;
+    }
+
+    if (result.type === 'comment') {
+      handleTabChange('comments');
+      handleOpenCommentDetail(result);
+      return;
+    }
+
+    if (result.type === 'post') {
+      handleTabChange('posts');
+      handleOpenPostDetail(result);
+      return;
+    }
+
+    if (result.type === 'notification') {
+      handleTabChange('notifications');
+      handleViewNotification(result);
+      return;
+    }
+
+    if (result.type === 'report') {
+      handleTabChange('reports');
+      handleOpenReportDetail(result);
     }
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    
-    // Validate
-    if (!userForm.name || !userForm.email || !userForm.password) {
-      alert('Vui lòng điền đầy đủ thông tin: Tên, Email và Mật khẩu');
-      return;
-    }
-
-    if (userForm.password.length < 6) {
-      alert('Mật khẩu phải có ít nhất 6 ký tự');
-      return;
-    }
-
-    try {
-      await api.post('/admin/users', userForm);
-      alert('✅ Đã tạo người dùng thành công!');
-      setShowCreateUserModal(false);
-      setUserForm({
-        name: '',
-        email: '',
-        password: '',
-        studentRole: 'Sinh viên',
-        major: '',
-        studentId: '',
-        role: 'user',
-        bio: ''
-      });
-      fetchData();
-    } catch (error) {
-      alert('❌ Lỗi tạo người dùng: ' + (error.response?.data?.message || error.message));
-    }
+  const getSearchResultTitle = (result) => {
+    if (result?.type === 'event') return result?.title || 'Sự kiện';
+    if (result?.type === 'post') return result?.title || result?.content || 'Bài viết';
+    if (result?.type === 'comment') return result?.content || 'Bình luận';
+    return result?.name || result?.content || 'Kết quả';
   };
 
   const handleDeleteUser = async (userId) => {
@@ -534,7 +761,17 @@ const AdminDashboard = () => {
   const handleDeletePost = async (postId) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
       try {
-        await api.delete(`/admin/posts/${postId}`);
+        // Single delete = soft delete: keep row, mark as rejected.
+        await api.put(`/admin/posts/${postId}/reject`);
+        // Cập nhật ngay UI để phân biệt rõ bài đã xóa.
+        setPosts((prev) =>
+          (prev || []).map((post) =>
+            String(post._id) === String(postId) ? { ...post, status: 'rejected' } : post
+          )
+        );
+        setSelectedPost((prev) =>
+          prev && String(prev._id) === String(postId) ? { ...prev, status: 'rejected' } : prev
+        );
         fetchData();
       } catch (error) {
         alert('Lỗi xóa bài viết');
@@ -569,15 +806,7 @@ const AdminDashboard = () => {
   const handleFilterPosts = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (postFilters.status) params.status = postFilters.status;
-      if (postFilters.category) params.category = postFilters.category;
-      if (postFilters.search) params.search = postFilters.search;
-      if (postFilters.startDate) params.startDate = postFilters.startDate;
-      if (postFilters.endDate) params.endDate = postFilters.endDate;
-      
-      const res = await api.get('/admin/posts', { params });
-      setPosts(res.data.posts || []);
+      await loadAdminPosts(postFilters);
     } catch (error) {
       console.error('Error filtering posts:', error);
       alert('Lỗi lọc bài viết');
@@ -713,7 +942,9 @@ const AdminDashboard = () => {
         limit: 50
       };
       if (notificationFilters.type) params.type = notificationFilters.type;
-      if (notificationFilters.isRead !== '') params.isRead = notificationFilters.isRead;
+      if (notificationFilters.isRead === 'true' || notificationFilters.isRead === 'false') {
+        params.isRead = notificationFilters.isRead;
+      }
       if (notificationFilters.recipient) params.recipient = notificationFilters.recipient;
       if (notificationFilters.startDate) params.startDate = notificationFilters.startDate;
       if (notificationFilters.endDate) params.endDate = notificationFilters.endDate;
@@ -747,6 +978,14 @@ const AdminDashboard = () => {
     if (window.confirm('Bạn có chắc chắn muốn xóa bình luận này?')) {
       try {
         await api.delete(`/admin/comments/${commentId}`);
+        setComments((prev) =>
+          (prev || []).map((comment) =>
+            String(comment._id) === String(commentId) ? { ...comment, status: 'rejected' } : comment
+          )
+        );
+        setSelectedComment((prev) =>
+          prev && String(prev._id) === String(commentId) ? { ...prev, status: 'rejected' } : prev
+        );
         fetchData();
       } catch (error) {
         alert('Lỗi xóa bình luận');
@@ -768,7 +1007,7 @@ const AdminDashboard = () => {
         maxParticipants: event.maxParticipants || '',
         image: null
       });
-      setEventImagePreview(event.image ? `http://localhost:5000${event.image}` : null);
+      setEventImagePreview(resolveMediaUrl(event.image));
     } else {
       setEditingEvent(null);
       setEventForm({
@@ -942,14 +1181,14 @@ const AdminDashboard = () => {
     return (
       <div className="space-y-4 sm:space-y-6">
         {/* Main Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-4">
           <StatCard 
             icon={Users} 
             title="Tổng người dùng" 
             value={statistics.totalUsers} 
             change={statistics.userGrowthPercent || 0} 
             color="bg-blue-500"
-            onClick={() => setActiveTab('users')}
+            onClick={() => handleTabChange('users')}
           />
           <StatCard 
             icon={FileText} 
@@ -957,7 +1196,7 @@ const AdminDashboard = () => {
             value={statistics.totalPosts} 
             change={statistics.postGrowthPercent || 0} 
             color="bg-green-500"
-            onClick={() => setActiveTab('posts')}
+            onClick={() => handleTabChange('posts')}
           />
           <StatCard 
             icon={MessageSquare} 
@@ -965,7 +1204,7 @@ const AdminDashboard = () => {
             value={statistics.totalComments} 
             change={statistics.commentGrowthPercent || 0} 
             color="bg-yellow-500"
-            onClick={() => setActiveTab('comments')}
+            onClick={() => handleTabChange('comments')}
           />
           <StatCard 
             icon={BookOpen} 
@@ -973,38 +1212,15 @@ const AdminDashboard = () => {
             value={statistics.totalGroups} 
             change={statistics.groupGrowthPercent || 0} 
             color="bg-purple-500"
-            onClick={() => setActiveTab('groups')}
+            onClick={() => handleTabChange('groups')}
           />
-        </div>
-
-        {/* Secondary Statistics Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <StatCard 
             icon={Calendar} 
             title="Sự kiện" 
             value={statistics.totalEvents} 
             change={statistics.eventGrowthPercent || 0} 
             color="bg-indigo-500"
-            onClick={() => setActiveTab('events')}
-          />
-          <StatCard 
-            icon={ClockIcon} 
-            title="Bài viết chờ duyệt" 
-            value={statistics.pendingPosts || 0} 
-            change={0} 
-            color="bg-orange-500"
-            onClick={() => {
-              setActiveTab('posts');
-              setPostFilters({ ...postFilters, status: 'pending' });
-            }}
-          />
-          <StatCard 
-            icon={ClockIcon} 
-            title="Nhóm chờ duyệt" 
-            value={statistics.pendingGroups || 0} 
-            change={0} 
-            color="bg-yellow-600"
-            onClick={() => setActiveTab('groups')}
+            onClick={() => handleTabChange('events')}
           />
           <StatCard 
             icon={UserCheck} 
@@ -1012,12 +1228,12 @@ const AdminDashboard = () => {
             value={statistics.activeUsers || 0} 
             change={0} 
             color="bg-green-600"
-            onClick={() => setActiveTab('users')}
+            onClick={() => handleTabChange('users')}
           />
         </div>
 
         {/* Status Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center">
               <Users className="w-5 h-5 mr-2 text-blue-600" />
@@ -1038,13 +1254,6 @@ const AdminDashboard = () => {
                 </div>
                 <span className="font-semibold text-gray-800">{statistics.bannedUsers || 0}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <AlertCircle className="w-4 h-4 text-gray-500 mr-2" />
-                  <span className="text-gray-700">Không hoạt động</span>
-                </div>
-                <span className="font-semibold text-gray-800">{statistics.inactiveUsers || 0}</span>
-              </div>
             </div>
           </div>
 
@@ -1057,21 +1266,16 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
-                  <span className="text-gray-700">Đã duyệt</span>
+                  <span className="text-gray-700">Còn</span>
                 </div>
-                <span className="font-semibold text-gray-800">{statistics.approvedPosts || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <ClockIcon className="w-4 h-4 text-orange-500 mr-2" />
-                  <span className="text-gray-700">Chờ duyệt</span>
-                </div>
-                <span className="font-semibold text-gray-800">{statistics.pendingPosts || 0}</span>
+                <span className="font-semibold text-gray-800">
+                  {(statistics.approvedPosts || 0) + (statistics.pendingPosts || 0)}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <XCircle className="w-4 h-4 text-red-500 mr-2" />
-                  <span className="text-gray-700">Đã từ chối</span>
+                  <span className="text-gray-700">Đã xóa</span>
                 </div>
                 <span className="font-semibold text-gray-800">{statistics.rejectedPosts || 0}</span>
               </div>
@@ -1087,21 +1291,16 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
-                  <span className="text-gray-700">Đã duyệt</span>
+                  <span className="text-gray-700">Còn</span>
                 </div>
-                <span className="font-semibold text-gray-800">{statistics.approvedGroups || 0}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <ClockIcon className="w-4 h-4 text-orange-500 mr-2" />
-                  <span className="text-gray-700">Chờ duyệt</span>
-                </div>
-                <span className="font-semibold text-gray-800">{statistics.pendingGroups || 0}</span>
+                <span className="font-semibold text-gray-800">
+                  {(statistics.approvedGroups || 0) + (statistics.pendingGroups || 0)}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <XCircle className="w-4 h-4 text-red-500 mr-2" />
-                  <span className="text-gray-700">Đã từ chối</span>
+                  <span className="text-gray-700">Đã xóa</span>
                 </div>
                 <span className="font-semibold text-gray-800">{statistics.rejectedGroups || 0}</span>
               </div>
@@ -1110,7 +1309,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Charts Row 1 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4">Người dùng mới theo tháng</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -1141,7 +1340,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4">Sự kiện theo tháng</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -1172,7 +1371,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Charts Row 3 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4">Phân loại bài viết</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -1233,7 +1432,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Top Users and Top Posts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center">
               <TrendingUp className="w-5 h-5 mr-2 text-blue-600" />
@@ -1319,7 +1518,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-4">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <h3 className="text-lg font-semibold mb-4 flex items-center">
               <Users className="w-5 h-5 mr-2 text-blue-600" />
@@ -1431,18 +1630,12 @@ const AdminDashboard = () => {
                 <FileText className="w-4 h-4" />
                 Xuất CSV
               </button>
-          <button 
-            onClick={() => setShowCreateUserModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            + Thêm người dùng
-          </button>
             </div>
+          </div>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]">
-          <thead className="bg-gray-50">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
+            <thead className="bg-gray-50">
             <tr>
                 <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">
                   <input
@@ -1498,6 +1691,12 @@ const AdminDashboard = () => {
                   </span>
                 </td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
+                  <button
+                    onClick={() => navigate(`/profile/${user._id}`)}
+                    className="mr-3 text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    👁️ Xem
+                  </button>
                   {user.role !== 'admin' ? (
                     <button
                       onClick={() => handleUpdateUserStatus(user._id, user.status === 'active' ? 'banned' : 'active')}
@@ -1601,10 +1800,22 @@ const AdminDashboard = () => {
 
             <select
               value={postFilters.status}
-              onChange={(e) => setPostFilters({ ...postFilters, status: e.target.value })}
+              onChange={async (e) => {
+                const nextFilters = { ...postFilters, status: e.target.value };
+                setPostFilters(nextFilters);
+                setLoading(true);
+                try {
+                  await loadAdminPosts(nextFilters);
+                } catch (error) {
+                  console.error('Error filtering posts by status:', error);
+                  alert('Lỗi lọc trạng thái bài viết');
+                } finally {
+                  setLoading(false);
+                }
+              }}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
-              <option value="">Còn</option>
+              <option value="">Tất cả trạng thái</option>
               <option value="approved">Còn</option>
               <option value="rejected">Đã xóa</option>
             </select>
@@ -1683,11 +1894,11 @@ const AdminDashboard = () => {
                 </td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 font-medium max-w-xs truncate">
                   <div>
-                    <p className="font-medium text-gray-800">{post.title || post.content.substring(0, 50) + '...'}</p>
-                    <p className="text-xs text-gray-500 md:hidden mt-1">{post.author?.name}</p>
+                    <p className="font-medium text-gray-800">{post.title || '...'}</p>
+                    <p className="text-xs text-gray-500 md:hidden mt-1">{getPostAuthorName(post)}</p>
                   </div>
                 </td>
-                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-600 hidden md:table-cell">{post.author?.name}</td>
+                <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-600 hidden md:table-cell">{getPostAuthorName(post)}</td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap hidden lg:table-cell">
                   <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                     {post.category}
@@ -1697,8 +1908,8 @@ const AdminDashboard = () => {
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-600 hidden md:table-cell">{post.comments?.length || 0}</td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-gray-600 hidden lg:table-cell">{formatDate(post.createdAt)}</td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded-full text-xs ${post.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {post.status === 'approved' ? 'Còn' : 'Đã xóa'}
+                  <span className={`px-2 py-1 rounded-full text-xs ${getPostStatusMeta(post.status).className}`}>
+                    {getPostStatusMeta(post.status).label}
                   </span>
                 </td>
                 <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
@@ -1766,13 +1977,15 @@ const AdminDashboard = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {events.map((event) => (
+            {events.map((event) => {
+              const eventStatus = event.computedStatus || event.status || 'upcoming';
+              return (
               <tr key={event._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-3">
                     {event.image ? (
                       <img 
-                        src={`http://localhost:5000${event.image}`} 
+                        src={resolveMediaUrl(event.image)} 
                         alt={event.title}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
@@ -1834,13 +2047,15 @@ const AdminDashboard = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 rounded-full text-xs ${
-                    event.status === 'upcoming' ? 'bg-blue-100 text-blue-800' : 
-                    event.status === 'ongoing' ? 'bg-green-100 text-green-800' : 
+                    eventStatus === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                    eventStatus === 'ongoing' ? 'bg-green-100 text-green-800' :
+                    eventStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
+                    eventStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {event.status === 'upcoming' ? 'Sắp diễn ra' : 
-                     event.status === 'ongoing' ? 'Đang diễn ra' : 
-                     event.status === 'completed' ? 'Đã kết thúc' : 'Đã hủy'}
+                    {eventStatus === 'upcoming' ? 'Sắp diễn ra' :
+                     eventStatus === 'ongoing' ? 'Đang diễn ra' :
+                     eventStatus === 'completed' ? 'Đã kết thúc' : 'Đã hủy'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1858,7 +2073,8 @@ const AdminDashboard = () => {
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1892,12 +2108,24 @@ const AdminDashboard = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {groups.map((group) => (
+            {groups.map((group) => {
+              const groupImageUrl = getGroupImageUrl(group);
+              return (
               <tr key={group._id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-xl">
-                      {group.avatar || '📚'}
+                    {groupImageUrl ? (
+                      <img
+                        src={groupImageUrl}
+                        alt={group.name}
+                        className="w-10 h-10 rounded-lg object-cover bg-purple-100"
+                      />
+                    ) : null}
+                    <div
+                      className="w-10 h-10 bg-purple-100 rounded-lg items-center justify-center text-xl"
+                      style={{ display: groupImageUrl ? 'none' : 'flex' }}
+                    >
+                      {group.avatar && String(group.avatar) === '📚' ? '📚' : '👥'}
                     </div>
                     <div>
                       <p className="font-medium text-gray-800">{group.name}</p>
@@ -1916,10 +2144,8 @@ const AdminDashboard = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600">{formatDate(group.createdAt)}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    group.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {group.status === 'approved' ? 'Còn' : 'Đã xóa'}
+                  <span className={`px-2 py-1 rounded-full text-xs ${getGroupStatusMeta(group.status).className}`}>
+                    {getGroupStatusMeta(group.status).label}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -1937,7 +2163,7 @@ const AdminDashboard = () => {
                   </button>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
@@ -2123,24 +2349,57 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleViewNotification = async (notification) => {
+    if (!notification) return;
+    try {
+      if (!notification.isRead) {
+        await api.put(`/admin/notifications/${notification._id}/read`);
+      }
+      const nextNotification = {
+        ...notification,
+        isRead: true
+      };
+      setNotifications((prev) =>
+        prev.map((item) => (item._id === notification._id ? { ...item, isRead: true } : item))
+      );
+      setSelectedNotification(nextNotification);
+      setShowNotificationDetailModal(true);
+      setNotificationStats((prev) => {
+        if (!prev || notification.isRead) return prev;
+        const nextUnread = Math.max(0, (prev.unread || 0) - 1);
+        const nextRead = (prev.read || 0) + 1;
+        return {
+          ...prev,
+          unread: nextUnread,
+          read: nextRead
+        };
+      });
+      fetchHeaderUnreadCount();
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      alert(error.response?.data?.message || 'Không thể cập nhật trạng thái thông báo');
+    }
+  };
+
   const handleMarkAllNotificationsAsRead = async () => {
     try {
-      // Mark all unread notifications as read
-      const unreadNotifications = notifications.filter(n => !n.isRead);
+      const unreadNotifications = notifications.filter((n) => !n.isRead);
       if (unreadNotifications.length === 0) {
         alert('Không có thông báo chưa đọc nào');
         return;
       }
 
-      // Call API to mark all as read (need to implement this endpoint)
-      for (const notification of unreadNotifications) {
-        try {
-          await api.put(`/notifications/${notification._id}/read`);
-        } catch (error) {
-          console.error('Error marking notification as read:', error);
-        }
-      }
-      
+      await api.put('/admin/notifications/read-all');
+
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setNotificationStats((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          unread: 0,
+          read: (prev.read || 0) + unreadNotifications.length
+        };
+      });
       alert(`✅ Đã đánh dấu ${unreadNotifications.length} thông báo là đã đọc`);
       fetchData();
     } catch (error) {
@@ -2159,10 +2418,17 @@ const AdminDashboard = () => {
     }
 
     try {
+      const deletingIds = [...selectedItems.posts];
       await Promise.all(
-        selectedItems.posts.map(postId => api.delete(`/admin/posts/${postId}`))
+        deletingIds.map((postId) =>
+          // Bulk delete = hard delete: remove rows from admin tab.
+          api.delete(`/admin/posts/${postId}`, { params: { permanent: true } })
+        )
       );
-      alert(`✅ Đã xóa ${selectedItems.posts.length} bài viết thành công`);
+      setPosts((prev) => (prev || []).filter((post) => !deletingIds.includes(post._id)));
+      setSelectedPost((prev) => (prev && deletingIds.includes(prev._id) ? null : prev));
+      setShowPostDetailModal((prev) => (selectedPost && deletingIds.includes(selectedPost._id) ? false : prev));
+      alert(`✅ Đã xóa ${deletingIds.length} bài viết thành công`);
       setSelectedItems({ ...selectedItems, posts: [] });
       fetchData();
     } catch (error) {
@@ -2199,10 +2465,16 @@ const AdminDashboard = () => {
     }
 
     try {
+      const deletingIds = [...selectedItems.comments];
       await Promise.all(
-        selectedItems.comments.map(commentId => api.delete(`/admin/comments/${commentId}`))
+        deletingIds.map((commentId) =>
+          api.delete(`/admin/comments/${commentId}`, { params: { permanent: true } })
+        )
       );
-      alert(`✅ Đã xóa ${selectedItems.comments.length} bình luận thành công`);
+      setComments((prev) => (prev || []).filter((comment) => !deletingIds.includes(comment._id)));
+      setSelectedComment((prev) => (prev && deletingIds.includes(prev._id) ? null : prev));
+      setShowCommentDetailModal((prev) => (selectedComment && deletingIds.includes(selectedComment._id) ? false : prev));
+      alert(`✅ Đã xóa ${deletingIds.length} bình luận thành công`);
       setSelectedItems({ ...selectedItems, comments: [] });
       fetchData();
     } catch (error) {
@@ -2322,19 +2594,23 @@ const AdminDashboard = () => {
     setShowCommentDetailModal(true);
   };
 
-  const handleFilterNotifications = async () => {
+  const handleFilterNotifications = async (overrideFilters = notificationFilters) => {
     setLoading(true);
     try {
+      const safeFilters =
+        overrideFilters && typeof overrideFilters === 'object' && !('preventDefault' in overrideFilters)
+          ? overrideFilters
+          : notificationFilters;
       const params = {};
-      if (notificationFilters.type) params.type = notificationFilters.type;
-      if (notificationFilters.isRead !== '') params.isRead = notificationFilters.isRead;
-      if (notificationFilters.recipient) params.recipient = notificationFilters.recipient;
-      if (notificationFilters.startDate) params.startDate = notificationFilters.startDate;
-      if (notificationFilters.endDate) params.endDate = notificationFilters.endDate;
+      if (safeFilters.type) params.type = safeFilters.type;
+      if (safeFilters.isRead === 'true' || safeFilters.isRead === 'false') params.isRead = safeFilters.isRead;
+      if ((safeFilters.recipient || '').trim()) params.recipient = safeFilters.recipient.trim();
+      if (safeFilters.startDate) params.startDate = safeFilters.startDate;
+      if (safeFilters.endDate) params.endDate = safeFilters.endDate;
 
       const [notificationsRes, statsRes] = await Promise.all([
         api.get('/admin/notifications', { params: { ...params, limit: 100 } }),
-        api.get('/admin/notifications/statistics', { params: { startDate: notificationFilters.startDate, endDate: notificationFilters.endDate } })
+        api.get('/admin/notifications/statistics', { params: { startDate: safeFilters.startDate, endDate: safeFilters.endDate } })
       ]);
       setNotifications(notificationsRes.data.notifications || []);
       setNotificationStats(statsRes.data.statistics || null);
@@ -2344,13 +2620,32 @@ const AdminDashboard = () => {
     setLoading(false);
   };
 
+  const handleQuickStatusFilter = (isReadValue) => {
+    const nextFilters = {
+      ...notificationFilters,
+      isRead: isReadValue
+    };
+    setNotificationFilters(nextFilters);
+    setNotificationsPagination((prev) => ({ ...prev, page: 1 }));
+    handleFilterNotifications(nextFilters);
+  };
+
   const renderNotifications = () => (
     // Dùng cùng khung max-w-7xl bên ngoài như các tab khác để thống nhất layout
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Statistics Cards */}
       {notificationStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button
+            type="button"
+            onClick={() => handleQuickStatusFilter('')}
+            className={`bg-white rounded-lg shadow-sm p-4 md:p-5 text-left border-2 transition-all ${
+              notificationFilters.isRead === ''
+                ? 'border-blue-400 ring-2 ring-blue-100'
+                : 'border-transparent hover:border-blue-200'
+            }`}
+            title="Hiển thị tất cả thông báo"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Tổng thông báo</p>
@@ -2358,8 +2653,17 @@ const AdminDashboard = () => {
               </div>
               <Bell className="w-8 h-8 md:w-10 md:h-10 text-blue-500 flex-shrink-0" />
             </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickStatusFilter('false')}
+            className={`bg-white rounded-lg shadow-sm p-4 md:p-5 text-left border-2 transition-all ${
+              notificationFilters.isRead === 'false'
+                ? 'border-orange-400 ring-2 ring-orange-100'
+                : 'border-transparent hover:border-orange-200'
+            }`}
+            title="Hiển thị thông báo chưa đọc"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Chưa đọc</p>
@@ -2367,8 +2671,17 @@ const AdminDashboard = () => {
               </div>
               <AlertCircle className="w-8 h-8 md:w-10 md:h-10 text-orange-500 flex-shrink-0" />
             </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickStatusFilter('true')}
+            className={`bg-white rounded-lg shadow-sm p-4 md:p-5 text-left border-2 transition-all ${
+              notificationFilters.isRead === 'true'
+                ? 'border-green-400 ring-2 ring-green-100'
+                : 'border-transparent hover:border-green-200'
+            }`}
+            title="Hiển thị thông báo đã đọc"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Đã đọc</p>
@@ -2376,8 +2689,17 @@ const AdminDashboard = () => {
               </div>
               <Bell className="w-8 h-8 md:w-10 md:h-10 text-green-500 flex-shrink-0" />
             </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickStatusFilter('true')}
+            className={`bg-white rounded-lg shadow-sm p-4 md:p-5 text-left border-2 transition-all ${
+              notificationFilters.isRead === 'true'
+                ? 'border-purple-400 ring-2 ring-purple-100'
+                : 'border-transparent hover:border-purple-200'
+            }`}
+            title="Hiển thị thông báo đã đọc"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-500 text-sm font-medium">Tỷ lệ đọc</p>
@@ -2389,13 +2711,13 @@ const AdminDashboard = () => {
               </div>
               <TrendingUp className="w-8 h-8 md:w-10 md:h-10 text-purple-500 flex-shrink-0" />
             </div>
-          </div>
+          </button>
         </div>
       )}
 
       {/* Actions Bar */}
-      <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+      <div className="bg-white rounded-lg shadow-sm p-4 md:p-5">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-3">
           <div>
             <h3 className="text-xl font-semibold">Quản lý thông báo</h3>
             {notificationStats && (
@@ -2424,7 +2746,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           <select
             value={notificationFilters.type}
             onChange={(e) => setNotificationFilters({ ...notificationFilters, type: e.target.value })}
@@ -2433,7 +2755,6 @@ const AdminDashboard = () => {
             <option value="">Tất cả loại</option>
             <option value="comment">Bình luận</option>
             <option value="like">Thích</option>
-            <option value="message">Tin nhắn</option>
             <option value="friend_request">Bạn bè</option>
             <option value="group">Nhóm</option>
             <option value="event">Sự kiện</option>
@@ -2475,7 +2796,7 @@ const AdminDashboard = () => {
           />
 
           <button
-            onClick={handleFilterNotifications}
+            onClick={() => handleFilterNotifications()}
             className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
           >
             Lọc
@@ -2555,7 +2876,7 @@ const AdminDashboard = () => {
                   </td>
                   <td className="px-4 md:px-5 py-4">
                     <div className="max-w-[250px]">
-                      <p className="text-sm text-gray-700 line-clamp-2 break-words">{notification.message}</p>
+                      <p className="text-sm text-gray-700 line-clamp-2 break-all">{notification.message}</p>
                       {/* Show recipient on mobile */}
                       <div className="lg:hidden mt-2 flex items-center text-xs text-gray-500">
                         <span className="truncate">→ {notification.recipient?.name || 'User'}</span>
@@ -2597,10 +2918,7 @@ const AdminDashboard = () => {
                   <td className="px-4 md:px-5 py-4 sticky right-0 bg-white z-[1] shadow-[-6px_0_8px_-8px_rgba(0,0,0,0.25)]">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
-                          setSelectedNotification(notification);
-                          setShowNotificationDetailModal(true);
-                        }}
+                        onClick={() => handleViewNotification(notification)}
                         className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium whitespace-nowrap"
                         title="Xem chi tiết"
                       >
@@ -3004,12 +3322,23 @@ const AdminDashboard = () => {
   };
 
   const handleUpdateStudentRole = async (userId, newStudentRole) => {
+    const preservePermissionsScroll = async () => {
+      const mainScroller = document.querySelector('main.flex-1.overflow-y-auto');
+      const mainScrollTop = mainScroller ? mainScroller.scrollTop : 0;
+      const windowScrollTop = window.scrollY;
+      await fetchData();
+      requestAnimationFrame(() => {
+        if (mainScroller) mainScroller.scrollTop = mainScrollTop;
+        window.scrollTo({ top: windowScrollTop, behavior: 'auto' });
+      });
+    };
+
     const user = users.find(u => u._id === userId);
     
     // Confirm when promoting to Lecturer
     if (newStudentRole === 'Giảng viên') {
       if (!confirm(`⚠️ Bạn có chắc muốn thay đổi vai trò của "${user?.name}" thành Giảng viên? Họ sẽ có quyền đăng tài liệu trong phần Tài liệu học tập.`)) {
-        fetchData(); // Refresh to reset dropdown
+        preservePermissionsScroll(); // Refresh to reset dropdown without jumping
         return;
       }
     }
@@ -3017,7 +3346,7 @@ const AdminDashboard = () => {
     // Confirm when demoting to Student
     if (user && user.studentRole === 'Giảng viên' && newStudentRole === 'Sinh viên') {
       if (!confirm(`⚠️ Bạn có chắc muốn thay đổi "${user?.name}" từ Giảng viên xuống Sinh viên?`)) {
-        fetchData(); // Refresh to reset dropdown
+        preservePermissionsScroll(); // Refresh to reset dropdown without jumping
         return;
       }
     }
@@ -3025,19 +3354,19 @@ const AdminDashboard = () => {
     try {
       await api.put(`/admin/users/${userId}/student-role`, { studentRole: newStudentRole });
       alert(`✅ Đã cập nhật vai trò học tập thành ${newStudentRole}`);
-      fetchData();
+      preservePermissionsScroll();
     } catch (error) {
       console.error('Error updating student role:', error);
       alert(error.response?.data?.message || '❌ Lỗi cập nhật vai trò học tập');
-      fetchData(); // Refresh to reset dropdown
+      preservePermissionsScroll(); // Refresh to reset dropdown without jumping
     }
   };
 
   const renderPermissions = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Role Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-5 text-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-100 text-sm font-medium">Quản trị viên</p>
@@ -3047,7 +3376,7 @@ const AdminDashboard = () => {
             <Shield className="w-12 h-12 text-purple-200" />
           </div>
         </div>
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md p-5 text-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">Người dùng</p>
@@ -3057,7 +3386,7 @@ const AdminDashboard = () => {
             <Users className="w-12 h-12 text-blue-200" />
           </div>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-md p-5 text-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm font-medium">Giảng viên</p>
@@ -3067,7 +3396,7 @@ const AdminDashboard = () => {
             <BookOpen className="w-12 h-12 text-green-200" />
           </div>
         </div>
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-md p-5 text-white">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-orange-100 text-sm font-medium">Sinh viên</p>
@@ -3079,88 +3408,26 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Permissions Info */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Shield className="w-6 h-6 text-purple-600 mr-2" />
-            Vai trò Admin
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Quản lý toàn bộ hệ thống</p>
-                <p className="text-sm text-gray-600">Truy cập dashboard admin, xem thống kê</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Quản lý người dùng</p>
-                <p className="text-sm text-gray-600">Thêm, sửa, xóa, khóa tài khoản người dùng</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Kiểm duyệt nội dung</p>
-                <p className="text-sm text-gray-600">Duyệt, xóa bài viết và bình luận</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Quản lý sự kiện</p>
-                <p className="text-sm text-gray-600">Tạo, sửa, xóa sự kiện</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
-            <Users className="w-6 h-6 text-blue-600 mr-2" />
-            Vai trò User
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Đăng bài viết</p>
-                <p className="text-sm text-gray-600">Tạo và chia sẻ bài viết lên hệ thống</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Bình luận & tương tác</p>
-                <p className="text-sm text-gray-600">Like, comment, share bài viết</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Tham gia nhóm & sự kiện</p>
-                <p className="text-sm text-gray-600">Tham gia các nhóm học tập và sự kiện</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="mt-1 w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="font-medium text-gray-800">Quản lý profile</p>
-                <p className="text-sm text-gray-600">Cập nhật thông tin cá nhân</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Users Table with Role Management */}
-      <div className="bg-white rounded-lg shadow-md">
+      <div className="bg-white rounded-lg shadow-sm">
         <div className="p-4 sm:p-6 border-b">
-          <h3 className="text-xl font-semibold">Quản lý phân quyền người dùng</h3>
-          <p className="text-sm text-gray-500 mt-1">Thay đổi vai trò và quyền hạn của người dùng</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold">Quản lý phân quyền người dùng</h3>
+              <p className="text-sm text-gray-500 mt-1">Thay đổi vai trò và quyền hạn của người dùng</p>
+            </div>
+            <div className="w-full sm:w-auto">
+              <select
+                value={permissionsStudentRoleFilter}
+                onChange={(e) => setPermissionsStudentRoleFilter(e.target.value)}
+                className="w-full sm:w-[180px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="all">Tất cả vai trò học tập</option>
+                <option value="Giảng viên">Giảng viên</option>
+                <option value="Sinh viên">Sinh viên</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px]">
@@ -3175,7 +3442,19 @@ const AdminDashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {users.map((u) => (
+              {users
+                .filter((u) =>
+                  permissionsStudentRoleFilter === 'all'
+                    ? true
+                    : String(u.studentRole || '') === permissionsStudentRoleFilter
+                )
+                .sort((a, b) => {
+                  if (a.role === b.role) return 0;
+                  if (a.role === 'admin') return -1;
+                  if (b.role === 'admin') return 1;
+                  return 0;
+                })
+                .map((u) => (
                 <tr key={u._id} className="hover:bg-gray-50">
                   <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -3296,9 +3575,9 @@ const AdminDashboard = () => {
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-800 flex items-center">
@@ -3307,7 +3586,7 @@ const AdminDashboard = () => {
               </h2>
               <p className="text-gray-600 mt-1">Quản lý các cài đặt chung của hệ thống</p>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-2.5">
               <button
                 onClick={handleResetSettings}
                 disabled={settingsSaving}
@@ -3334,7 +3613,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* General Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <Settings className="w-6 h-6 mr-2 text-blue-600" />
             Cài đặt chung
@@ -3380,7 +3659,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Registration Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <Users className="w-6 h-6 mr-2 text-green-600" />
             Cài đặt đăng ký
@@ -3420,28 +3699,11 @@ const AdminDashboard = () => {
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Yêu cầu duyệt bởi Admin
-                </label>
-                <p className="text-xs text-gray-500 mt-1">Tài khoản mới cần được admin duyệt trước khi hoạt động</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={systemSettings.requireAdminApproval || false}
-                  onChange={(e) => setSystemSettings({ ...systemSettings, requireAdminApproval: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
           </div>
         </div>
 
         {/* Post Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <FileText className="w-6 h-6 mr-2 text-purple-600" />
             Cài đặt bài viết
@@ -3468,9 +3730,9 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-gray-700">
-                  Yêu cầu duyệt bài viết
+                  Duyệt thủ công bài viết
                 </label>
-                <p className="text-xs text-gray-500 mt-1">Bài viết cần được admin duyệt trước khi hiển thị</p>
+                <p className="text-xs text-gray-500 mt-1">Đã tắt cố định: bài viết luôn hiển thị ngay sau khi người dùng đăng</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -3521,7 +3783,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Group Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <BookOpen className="w-6 h-6 mr-2 text-orange-600" />
             Cài đặt nhóm
@@ -3548,9 +3810,9 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-sm font-medium text-gray-700">
-                  Yêu cầu duyệt nhóm
+                  Duyệt thủ công nhóm
                 </label>
-                <p className="text-xs text-gray-500 mt-1">Nhóm cần được admin duyệt trước khi hoạt động</p>
+                <p className="text-xs text-gray-500 mt-1">Đã tắt cố định: nhóm mới tạo hoạt động ngay, không cần admin duyệt</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -3583,7 +3845,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Comment Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <MessageSquare className="w-6 h-6 mr-2 text-indigo-600" />
             Cài đặt bình luận
@@ -3640,7 +3902,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Security Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <Shield className="w-6 h-6 mr-2 text-red-600" />
             Cài đặt bảo mật
@@ -3708,7 +3970,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Maintenance Settings */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <h3 className="text-xl font-semibold mb-4 flex items-center">
             <AlertCircle className="w-6 h-6 mr-2 text-yellow-600" />
             Chế độ bảo trì
@@ -3749,7 +4011,7 @@ const AdminDashboard = () => {
         </div>
 
         {/* Save Button at Bottom */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white rounded-lg shadow-sm p-5">
           <div className="flex justify-end space-x-3">
             <button
               onClick={handleResetSettings}
@@ -3893,6 +4155,7 @@ const AdminDashboard = () => {
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nội dung</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[200px]">Bài viết</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[140px]">Ngày tạo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[100px]">Trạng thái</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-[120px]">Thao tác</th>
             </tr>
           </thead>
@@ -3916,22 +4179,22 @@ const AdminDashboard = () => {
                       onError={withAvatarFallback(comment.author?.name)}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-800 text-sm truncate">{comment.author?.name || 'Người dùng'}</p>
+                      <p className="font-medium text-gray-800 text-sm truncate">{comment.author?.name || 'Người dùng đã xóa'}</p>
                       <p className="text-xs text-gray-500 truncate">{comment.author?.email || ''}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="inline-block max-w-full">
-                    <div className="bg-gray-100 rounded-2xl px-3 py-2 border border-gray-200">
-                      <p className="text-sm text-gray-800 line-clamp-3 break-words whitespace-pre-wrap">
+                <td className="px-4 py-3 max-w-[300px] xl:max-w-[500px]">
+                  <div className="max-w-full">
+                    <div className="bg-gray-100 rounded-2xl px-3 py-2 border border-gray-200 inline-block max-w-full">
+                      <p className="text-sm text-gray-800 line-clamp-3 break-all whitespace-pre-wrap">
                         {comment.content}
                       </p>
                     </div>
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <p className="text-sm text-gray-600 line-clamp-2 break-words">
+                  <p className="text-sm text-gray-600 line-clamp-2 break-all">
                     {comment.post?.title || (comment.post?.content ? comment.post.content.substring(0, 80) + '...' : 'N/A')}
                   </p>
                 </td>
@@ -3942,7 +4205,12 @@ const AdminDashboard = () => {
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
+                  <span className={`px-2 py-1 rounded-full text-xs ${getCommentStatusMeta(comment.status).className}`}>
+                    {getCommentStatusMeta(comment.status).label}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleOpenCommentDetail(comment)}
                       className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors font-medium"
@@ -3987,7 +4255,7 @@ const AdminDashboard = () => {
                       onError={withAvatarFallback(comment.author?.name)}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-800 text-sm truncate">{comment.author?.name || 'Người dùng'}</p>
+                      <p className="font-medium text-gray-800 text-sm truncate">{comment.author?.name || 'Người dùng đã xóa'}</p>
                       <p className="text-xs text-gray-500 truncate">{comment.author?.email || ''}</p>
                     </div>
                     <div className="text-xs text-gray-500 flex-shrink-0 text-right">
@@ -3998,9 +4266,9 @@ const AdminDashboard = () => {
 
                   {/* Comment Content */}
                   <div className="mb-2">
-                    <div className="inline-block max-w-full">
-                      <div className="bg-gray-100 rounded-2xl px-3 py-2 border border-gray-200">
-                        <p className="text-sm text-gray-800 break-words line-clamp-3 whitespace-pre-wrap">
+                    <div className="max-w-full">
+                      <div className="bg-gray-100 rounded-2xl px-3 py-2 border border-gray-200 inline-block max-w-full">
+                        <p className="text-sm text-gray-800 break-all line-clamp-3 whitespace-pre-wrap">
                           {comment.content}
                         </p>
                       </div>
@@ -4010,9 +4278,14 @@ const AdminDashboard = () => {
                   {/* Post Info */}
                   <div className="mb-2 p-2 bg-gray-50 rounded text-xs sm:text-sm">
                     <p className="text-gray-600 font-medium mb-1">Bài viết:</p>
-                    <p className="text-gray-700 line-clamp-2 break-words">
+                    <p className="text-gray-700 line-clamp-2 break-all">
                       {comment.post?.title || (comment.post?.content ? comment.post.content.substring(0, 100) + '...' : 'N/A')}
                     </p>
+                  </div>
+                  <div className="mb-2">
+                    <span className={`px-2 py-1 rounded-full text-xs ${getCommentStatusMeta(comment.status).className}`}>
+                      {getCommentStatusMeta(comment.status).label}
+                    </span>
                   </div>
 
                   {/* Actions */}
@@ -4079,459 +4352,203 @@ const AdminDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-20">
-        <div className="flex items-center justify-between px-4 sm:px-6 lg:pl-72 py-3 sm:py-4">
-          <div className="flex items-center space-x-3 sm:space-x-4">
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <Menu className="w-6 h-6 text-gray-600" />
-            </button>
-            <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 p-2 rounded-lg shadow-sm">
-              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-800">DNU Workspace Admin</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Quản trị hệ thống học tập Đại học Đại Nam</p>
-            </div>
+    <>
+      <MainLayout
+      headerActions={
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="relative search-container hidden md:block">
+            <input
+              type="text"
+              placeholder="Tìm kiếm..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => setShowSearchResults(true)}
+              className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 w-64 lg:w-80 transition-all shadow-sm"
+            />
+            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+            
+            {showSearchResults && searchResults.length > 0 && (
+              <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-2xl border border-gray-100 z-50 max-h-96 overflow-y-auto">
+                <div className="divide-y divide-gray-50">
+                  {searchResults.map((result, index) => (
+                    <div
+                      key={index}
+                      onClick={() => handleSearchResultClick(result)}
+                      className="p-3 hover:bg-orange-50 cursor-pointer transition-colors flex items-center space-x-3"
+                    >
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        {result.type === 'user' ? (
+                          <Users className="w-4 h-4 text-orange-600" />
+                        ) : result.type === 'group' ? (
+                          <Users className="w-4 h-4 text-purple-600" />
+                        ) : result.type === 'event' ? (
+                          <Calendar className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <FileText className="w-4 h-4 text-blue-600" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{getSearchResultTitle(result)}</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-wider">{result.type}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <div className="relative search-container hidden md:block">
-              <input
-                type="text"
-                placeholder="Tìm kiếm người dùng, bài viết, bình luận..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 lg:w-80"
-              />
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
-              
-              {/* Search Results Dropdown */}
-              {showSearchResults && (
-                <div className="absolute top-full mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
-                  {searchLoading ? (
-                    <div className="p-4 text-center">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500">
-                      Không tìm thấy kết quả
-                    </div>
-                  ) : (
-                    <div className="divide-y">
-                      {searchResults.map((result, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleSearchResultClick(result)}
-                          className="p-3 hover:bg-gray-50 cursor-pointer transition-colors"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              {result.type === 'user' && (
-                                <div className="flex items-center space-x-2">
-                                  <Users className="w-4 h-4 text-blue-600" />
-                                  <div>
-                                    <p className="font-medium text-gray-800">{result.name}</p>
-                                    <p className="text-xs text-gray-500">{result.email}</p>
-                                  </div>
-                                </div>
-                              )}
-                              {result.type === 'post' && (
-                                <div className="flex items-center space-x-2">
-                                  <FileText className="w-4 h-4 text-green-600" />
-                                  <div>
-                                    <p className="font-medium text-gray-800 truncate">{result.content?.substring(0, 50)}...</p>
-                                    <p className="text-xs text-gray-500">Bài viết bởi {result.author?.name}</p>
-                                  </div>
-                                </div>
-                              )}
-                              {result.type === 'comment' && (
-                                <div className="flex items-center space-x-2">
-                                  <MessageSquare className="w-4 h-4 text-purple-600" />
-                                  <div>
-                                    <p className="font-medium text-gray-800 truncate">{result.content?.substring(0, 50)}...</p>
-                                    <p className="text-xs text-gray-500">Bình luận bởi {result.author?.name}</p>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <span className="ml-2 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                              {result.type === 'user' ? 'Người dùng' : result.type === 'post' ? 'Bài viết' : 'Bình luận'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {/* Refresh Button */}
-            <button 
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="p-2 hover:bg-gray-100 rounded-lg relative group"
-              title="Làm mới dữ liệu"
-            >
-              <RefreshCw className={`w-6 h-6 text-gray-600 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {!isRefreshing && (
-                <span className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Làm mới • Tự động sau {Math.floor((30000 - (Date.now() - lastRefreshTime)) / 1000)}s
-                </span>
-              )}
-            </button>
-            
-            <div className="relative notification-dropdown-container">
-              <button
-                onClick={handleToggleHeaderNotifications}
-                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                title="Thông báo"
-              >
-                <Bell className="w-6 h-6 text-gray-600" />
-                {headerUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {headerUnreadCount > 99 ? '99+' : headerUnreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showHeaderNotifications && (
-                <div className="absolute right-0 mt-2 w-[360px] max-w-[92vw] bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                    <p className="font-semibold text-gray-800">Thông báo</p>
-                    <button
-                      onClick={handleHeaderMarkAllAsRead}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      Đánh dấu tất cả đã đọc
-                    </button>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto">
-                    {headerNotificationsLoading ? (
-                      <div className="p-6 text-center text-gray-500">
-                        <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                        <p className="text-sm mt-2">Đang tải thông báo...</p>
-                      </div>
-                    ) : headerNotifications.length === 0 ? (
-                      <div className="p-6 text-center text-gray-500">
-                        <Bell className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Chưa có thông báo</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-100">
-                        {headerNotifications.map((notification) => (
-                          <button
-                            key={notification._id}
-                            onClick={() => handleHeaderNotificationClick(notification)}
-                            className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                              notification.isRead ? 'bg-white' : 'bg-blue-50/60'
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <img
-                                src={resolveAvatarUrl(notification.sender?.avatar, notification.sender?.name)}
-                                alt={notification.sender?.name || 'System'}
-                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                                onError={withAvatarFallback(notification.sender?.name)}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-800 line-clamp-2">{notification.message}</p>
-                                <p className="text-xs text-gray-500 mt-1">{formatTimeAgo(notification.createdAt)}</p>
-                              </div>
-                              {!notification.isRead && <span className="w-2 h-2 mt-2 bg-blue-600 rounded-full flex-shrink-0"></span>}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
-                    <button
-                      onClick={() => {
-                        setActiveTab('notifications');
-                        setShowHeaderNotifications(false);
-                      }}
-                      className="w-full text-sm text-blue-600 hover:text-blue-800 font-medium py-1"
-                    >
-                      Xem tất cả thông báo
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="relative settings-dropdown-container">
-              <button 
-                onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Settings className="w-6 h-6 text-gray-600" />
-              </button>
-
-              {/* Settings Dropdown */}
-              {showSettingsDropdown && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                  <div className="p-2">
-                    <button 
-                      onClick={() => navigate('/user')}
-                      className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <BookOpen className="w-5 h-5 text-blue-600" />
-                      <span className="text-gray-700">Về trang chủ</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setActiveTab('settings');
-                        setShowSettingsDropdown(false);
-                      }}
-                      className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <Settings className="w-5 h-5 text-gray-600" />
-                      <span className="text-gray-700">Cài đặt hệ thống</span>
-                    </button>
-                  </div>
-                  
-                  <div className="p-2 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setShowSettingsDropdown(false);
-                      }}
-                      className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-left"
-                    >
-                      <LogOut className="w-5 h-5 text-red-600" />
-                      <span className="text-red-600 font-medium">Đăng xuất</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <img
-                src="https://workspace.dainam.edu.vn/icons/favicon.svg"
-                alt="DNU Workspace"
-                className="w-10 h-10 rounded-lg shadow-sm border border-orange-100"
-              />
-              <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-800">{user?.name || 'Admin'}</p>
-                <p className="text-xs text-gray-500">Quản trị viên</p>
-              </div>
-            </div>
-          </div>
+          <button 
+            onClick={handleManualRefresh}
+            className="p-2.5 text-gray-500 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all"
+            title="Làm mới"
+          >
+            <RefreshCw size={20} />
+          </button>
+          
         </div>
-      </header>
-
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <div className="flex relative">
-        {/* Sidebar - Fixed */}
-        <aside className={`
-          w-64 bg-white shadow-md fixed left-0 top-16 bottom-0 overflow-y-auto z-30
-          transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}>
-          <nav className="p-3 sm:p-4 space-y-2">
-            <button
-              onClick={() => {
-                setActiveTab('dashboard');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'dashboard' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Dashboard</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('users');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'users' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Người dùng</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('posts');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'posts' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium">Bài viết</span>
-              </div>
-              {pendingPostsCount > 0 && (
-                <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                  {pendingPostsCount}
-                </span>
-              )}
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('comments');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'comments' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Bình luận</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('events');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'events' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Sự kiện</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('groups');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'groups' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium">Nhóm</span>
-              </div>
-              {pendingGroupsCount > 0 && (
-                <span className="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full animate-pulse">
-                  {pendingGroupsCount}
-                </span>
-              )}
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('notifications');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'notifications' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Thông báo</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('reports');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'reports' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Flag className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Báo cáo</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('ai-analytics');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'ai-analytics' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">AI Phân Tích</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('permissions');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'permissions' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Phân quyền</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                setActiveTab('settings');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center space-x-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-colors text-sm sm:text-base ${
-                activeTab === 'settings' ? 'bg-orange-50 text-orange-600' : 'text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="font-medium">Cài đặt hệ thống</span>
-            </button>
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 w-full lg:pl-72 transition-all duration-300">
-          <div className="max-w-full xl:max-w-7xl mx-auto">
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'dashboard' && renderDashboard()}
-              {activeTab === 'users' && renderUsers()}
-              {activeTab === 'posts' && renderPosts()}
-              {activeTab === 'comments' && renderComments()}
-              {activeTab === 'events' && renderEvents()}
-              {activeTab === 'groups' && renderGroups()}
-              {activeTab === 'notifications' && renderNotifications()}
-              {activeTab === 'reports' && renderReports()}
-              {activeTab === 'ai-analytics' && <AIAnalytics />}
-              {activeTab === 'permissions' && renderPermissions()}
-              {activeTab === 'settings' && renderSettings()}
-            </>
-          )}
+      }
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+      sidebarContent={
+        <>
+          <button
+            onClick={() => handleTabChange('dashboard')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'dashboard' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <TrendingUp className="w-5 h-5" />
+            <span className="font-semibold">Dashboard</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('users')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'users' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Users className="w-5 h-5" />
+            <span className="font-semibold">Người dùng</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('posts')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'posts' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span className="font-semibold">Bài viết</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('comments')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'comments' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="font-semibold">Bình luận</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('events')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'events' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Calendar className="w-5 h-5" />
+            <span className="font-semibold">Sự kiện</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('groups')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'groups' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <BookOpen className="w-5 h-5" />
+            <span className="font-semibold">Nhóm</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('notifications')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'notifications' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Bell className="w-5 h-5" />
+            <span className="font-semibold">Thông báo</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('reports')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'reports' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Flag className="w-5 h-5" />
+            <span className="font-semibold">Báo cáo</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('ai-analytics')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'ai-analytics' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Sparkles className="w-5 h-5" />
+            <span className="font-semibold">AI Phân Tích</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('permissions')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'permissions' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Shield className="w-5 h-5" />
+            <span className="font-semibold">Phân quyền</span>
+          </button>
+          
+          <button
+            onClick={() => handleTabChange('settings')}
+            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              activeTab === 'settings' ? 'bg-orange-600 text-white shadow-lg shadow-orange-200' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600'
+            }`}
+          >
+            <Settings className="w-5 h-5" />
+            <span className="font-semibold">Cài đặt hệ thống</span>
+          </button>
+        </>
+      }
+    >
+      <div className="relative">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+            <p className="mt-4 text-gray-500 font-medium animate-pulse">Đang tải dữ liệu hệ thống...</p>
           </div>
-        </main>
+        ) : (
+          <div className="space-y-6">
+            {activeTab === 'dashboard' && renderDashboard()}
+            {activeTab === 'users' && renderUsers()}
+            {activeTab === 'posts' && renderPosts()}
+            {activeTab === 'comments' && renderComments()}
+            {activeTab === 'events' && renderEvents()}
+            {activeTab === 'groups' && renderGroups()}
+            {activeTab === 'notifications' && renderNotifications()}
+            {activeTab === 'reports' && renderReports()}
+            {activeTab === 'ai-analytics' && <AIAnalytics />}
+            {activeTab === 'permissions' && renderPermissions()}
+            {activeTab === 'settings' && renderSettings()}
+          </div>
+        )}
       </div>
-
+    </MainLayout>
       {/* Event Modal */}
       {showEventModal && (
         <div 
@@ -4773,8 +4790,8 @@ const AdminDashboard = () => {
                 </div>
                 <div className="bg-yellow-50 p-4 rounded-lg">
                   <p className="text-sm text-gray-600">Trạng thái</p>
-                  <p className={`font-semibold ${selectedPost.status === 'approved' ? 'text-green-800' : 'text-red-800'}`}>
-                    {selectedPost.status === 'approved' ? 'Còn' : 'Đã xóa'}
+                  <p className={`font-semibold ${getPostStatusMeta(selectedPost.status).textClassName}`}>
+                    {getPostStatusMeta(selectedPost.status).label}
                   </p>
                 </div>
               </div>
@@ -4801,11 +4818,8 @@ const AdminDashboard = () => {
                   <h5 className="text-sm font-medium text-gray-500 mb-3">Hình ảnh ({selectedPost.images.length})</h5>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {selectedPost.images.map((img, index) => {
-                      // Xử lý URL: thêm baseURL nếu là relative path
-                      const imageUrl = img.startsWith('/uploads')
-                        ? `http://localhost:5000${img}`
-                        : img;
-                      const imageName = img.split('/').pop() || `image-${index + 1}.jpg`;
+                      const { imageUrl, imageName } = resolvePostImageEntry(img, index);
+                      if (!imageUrl) return null;
                       const downloadHref = `/api/files/download-url?url=${encodeURIComponent(imageUrl)}&name=${encodeURIComponent(imageName)}`;
                       
                       return (
@@ -5006,9 +5020,17 @@ const AdminDashboard = () => {
               <div className="p-6 space-y-6">
                 {/* Group Info */}
                 <div className="flex items-start space-x-4 bg-gradient-to-r from-purple-50 to-blue-50 p-6 rounded-lg">
-                  <div className="w-20 h-20 bg-purple-200 rounded-lg flex items-center justify-center text-4xl flex-shrink-0">
-                    {selectedGroup.avatar || '📚'}
-                  </div>
+                  {getGroupImageUrl(selectedGroup) ? (
+                    <img
+                      src={getGroupImageUrl(selectedGroup)}
+                      alt={selectedGroup.name}
+                      className="w-20 h-20 rounded-lg object-cover bg-purple-200 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-purple-200 rounded-lg flex items-center justify-center text-4xl flex-shrink-0">
+                      {selectedGroup.avatar || '📚'}
+                    </div>
+                  )}
                   <div className="flex-1">
                     <h4 className="text-2xl font-bold text-gray-800">{selectedGroup.name}</h4>
                     <p className="text-gray-600 mt-2">{selectedGroup.description}</p>
@@ -5105,7 +5127,7 @@ const AdminDashboard = () => {
                                post.status === 'pending' ? 'Chờ duyệt' : 'Bị từ chối'}
                             </span>
                           </div>
-                          <p className="text-gray-800 mt-3 line-clamp-3">{post.content}</p>
+                          <p className="text-gray-800 mt-3 line-clamp-3 break-all">{post.content}</p>
                           <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                             <span>❤️ {post.likes?.length || 0}</span>
                             <span>💬 {post.comments?.length || 0}</span>
@@ -5514,7 +5536,6 @@ const AdminDashboard = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="admin">Admin</option>
-                  <option value="message">Tin nhắn</option>
                   <option value="event">Sự kiện</option>
                   <option value="group">Nhóm</option>
                 </select>
@@ -5769,191 +5790,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Create User Modal */}
-      {showCreateUserModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold">Tạo người dùng mới</h3>
-                  <p className="text-sm text-gray-500 mt-1">Thêm người dùng mới vào hệ thống</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowCreateUserModal(false);
-                    setUserForm({
-                      name: '',
-                      email: '',
-                      password: '',
-                      studentRole: 'Sinh viên',
-                      major: '',
-                      studentId: '',
-                      role: 'user',
-                      bio: ''
-                    });
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-            
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Họ và tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={userForm.name}
-                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nhập họ và tên"
-                  required
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={userForm.email}
-                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="example@dnu.edu.vn"
-                  required
-                />
-              </div>
-
-              {/* Password */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mật khẩu <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="password"
-                  value={userForm.password}
-                  onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Tối thiểu 6 ký tự"
-                  required
-                  minLength={6}
-                />
-                <p className="text-xs text-gray-500 mt-1">Mật khẩu phải có ít nhất 6 ký tự</p>
-              </div>
-
-              {/* Role & Student Role */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vai trò hệ thống
-                  </label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vai trò học tập
-                  </label>
-                  <select
-                    value={userForm.studentRole}
-                    onChange={(e) => setUserForm({ ...userForm, studentRole: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Sinh viên">Sinh viên</option>
-                    <option value="Giảng viên">Giảng viên</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Major */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chuyên ngành
-                </label>
-                <input
-                  type="text"
-                  value={userForm.major}
-                  onChange={(e) => setUserForm({ ...userForm, major: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="VD: Công nghệ thông tin"
-                />
-              </div>
-
-              {/* Student ID */}
-              {userForm.studentRole === 'Sinh viên' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mã sinh viên
-                  </label>
-                  <input
-                    type="text"
-                    value={userForm.studentId}
-                    onChange={(e) => setUserForm({ ...userForm, studentId: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="VD: K17CNTT001"
-                  />
-                </div>
-              )}
-
-              {/* Bio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Giới thiệu
-                </label>
-                <textarea
-                  value={userForm.bio}
-                  onChange={(e) => setUserForm({ ...userForm, bio: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Giới thiệu về người dùng..."
-                />
-              </div>
-
-              <div className="p-6 border-t flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateUserModal(false);
-                    setUserForm({
-                      name: '',
-                      email: '',
-                      password: '',
-                      studentRole: 'Sinh viên',
-                      major: '',
-                      studentId: '',
-                      role: 'user',
-                      bio: ''
-                    });
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Tạo người dùng
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Reject Group Modal */}
       {showRejectGroupModal && selectedGroup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -6112,7 +5948,7 @@ const AdminDashboard = () => {
 
       {/* Chat AI */}
       <ChatAI />
-    </div>
+    </>
   );
 };
 

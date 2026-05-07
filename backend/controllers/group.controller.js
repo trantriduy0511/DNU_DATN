@@ -1,4 +1,5 @@
 import path from 'path';
+import mongoose from 'mongoose';
 import Group from '../models/Group.model.js';
 import User from '../models/User.model.js';
 import Post from '../models/Post.model.js';
@@ -104,12 +105,13 @@ export const getAllGroups = async (req, res) => {
       ? { 'members.user': req.user.id }
       : { isPublic: true };
 
-    // Nếu không có status trong query, chỉ hiển thị nhóm đã được duyệt
-    // Nếu có status, cho phép filter theo status (dành cho admin)
+    // Chính sách mới: chỉ 2 trạng thái hiển thị
+    // - Còn: approved + pending
+    // - Đã xóa: rejected
     if (status) {
       query.status = status;
     } else {
-      query.status = 'approved'; // Chỉ hiển thị nhóm đã được duyệt
+      query.status = { $ne: 'rejected' };
     }
 
     if (search) {
@@ -172,8 +174,7 @@ export const discoverGroups = async (req, res) => {
     // Build query for groups user hasn't joined
     let query = {
       _id: { $nin: userGroupIds }, // Not in user's groups
-      isPublic: true, // Only public groups
-      status: 'approved' // Chỉ hiển thị nhóm đã được duyệt
+      status: { $ne: 'rejected' } // Hiển thị toàn bộ nhóm chưa bị xóa
     };
 
     if (search) {
@@ -238,9 +239,16 @@ export const discoverGroups = async (req, res) => {
 // @access  Private
 export const getGroupById = async (req, res) => {
   try {
-    const group = await Group.findById(req.params.id)
+    const groupId = String(req.params.id || '');
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID nhóm không hợp lệ'
+      });
+    }
+
+    const group = await Group.findById(groupId)
       .populate('creator', 'name avatar')
-      .populate('members.user', 'name avatar studentRole major')
       .populate('reviewedBy', 'name avatar');
 
     if (!group) {
@@ -251,31 +259,52 @@ export const getGroupById = async (req, res) => {
     }
 
     // Kiểm tra quyền xem nhóm
-    const isCreator = String(group.creator._id) === String(req.user.id);
+    const creatorId = group?.creator?._id || group?.creator;
+    const isCreator = creatorId ? String(creatorId) === String(req.user.id) : false;
     const isAdmin = req.user.role === 'admin';
     
-    // Chỉ creator hoặc admin mới có thể xem nhóm chưa được duyệt
-    if (group.status !== 'approved' && !isCreator && !isAdmin) {
+    // Chỉ chặn nhóm đã xóa.
+    if (group.status === 'rejected' && !isCreator && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Nhóm này đang chờ admin duyệt hoặc đã bị từ chối'
+        message: 'Nhóm này đã bị xóa'
       });
     }
 
     // Fetch posts separately from Post model to get latest posts
     // This ensures new posts are included even if group.posts array isn't updated
     const accessType = group.settings?.accessType || (group.isPublic ? 'public' : 'private');
-    const isMember = group.members.some(
-      member => {
-        const memberId = member.user._id ? member.user._id.toString() : member.user.toString();
-        return memberId === req.user.id;
-      }
-    );
+    const rawMembers = Array.isArray(group.members) ? group.members : [];
+    const validMemberUserIds = rawMembers
+      .map((member) => member?.user)
+      .filter((userId) => mongoose.Types.ObjectId.isValid(String(userId)))
+      .map((userId) => String(userId));
+
+    const memberUsers = validMemberUserIds.length
+      ? await User.find({ _id: { $in: validMemberUserIds } }).select('name avatar studentRole major')
+      : [];
+    const memberUserMap = new Map(memberUsers.map((u) => [String(u._id), u]));
+
+    const visibleMembers = rawMembers
+      .map((member) => {
+        const memberUserId = String(member?.user || '');
+        const userDoc = memberUserMap.get(memberUserId);
+        if (!userDoc) return null;
+        return {
+          ...(member?.toObject ? member.toObject() : member),
+          user: userDoc
+        };
+      })
+      .filter(Boolean);
+    const isMember = visibleMembers.some((member) => {
+      const memberId = member?.user?._id || member?.user;
+      return String(memberId) === String(req.user.id);
+    });
 
     // Only fetch posts if group is public or user is a member
     let posts = [];
     if (isMember || accessType === 'public') {
-      posts = await Post.find({ group: req.params.id, status: 'approved' })
+      posts = await Post.find({ group: groupId, status: 'approved' })
         .sort({ createdAt: -1 })
         .limit(50) // Limit to recent 50 posts
         .populate('author', 'name avatar studentRole major')
@@ -283,15 +312,17 @@ export const getGroupById = async (req, res) => {
           path: 'comments',
           populate: { path: 'author', select: 'name avatar' }
         });
+      posts = posts.filter((post) => post.author);
     }
 
     // Convert group to object and add posts
     const groupObject = group.toObject();
+    groupObject.members = visibleMembers;
     groupObject.posts = posts;
 
     const me = await User.findById(req.user.id).select('groupsHiddenFromHomeFeed');
     const hiddenList = me?.groupsHiddenFromHomeFeed || [];
-    const homeFeedHiddenFromHome = hiddenList.some((gid) => String(gid) === String(req.params.id));
+    const homeFeedHiddenFromHome = hiddenList.some((gid) => String(gid) === groupId);
 
     res.status(200).json({
       success: true,
@@ -321,15 +352,15 @@ export const joinGroup = async (req, res) => {
       });
     }
 
-    // Check if group is approved
-    if (group.status !== 'approved') {
+    // Check if group is deleted
+    if (group.status === 'rejected') {
       const isCreator = group.creator.toString() === req.user.id;
       const isAdmin = req.user.role === 'admin';
       
       if (!isCreator && !isAdmin) {
         return res.status(403).json({
           success: false,
-          message: 'Nhóm này chưa được duyệt hoặc đã bị từ chối. Bạn không thể tham gia.'
+          message: 'Nhóm này đã bị xóa. Bạn không thể tham gia.'
         });
       }
     }
@@ -613,9 +644,14 @@ export const getGroupMembers = async (req, res) => {
       });
     }
 
+    const members = (group.members || []).filter((member) => {
+      const memberId = member?.user?._id || member?.user;
+      return Boolean(memberId);
+    });
+
     res.status(200).json({
       success: true,
-      members: group.members,
+      members,
       isCreator: group.creator.toString() === req.user.id
     });
   } catch (error) {
@@ -839,7 +875,7 @@ export const acceptGroupInvite = async (req, res) => {
       });
     }
 
-    if (group.status !== 'approved') {
+    if (group.status === 'rejected') {
       return res.status(403).json({
         success: false,
         message: 'Nhóm không khả dụng để tham gia'
@@ -934,7 +970,15 @@ export const declineGroupInvite = async (req, res) => {
 export const removeMember = async (req, res) => {
   try {
     const { memberId } = req.params;
-    const group = await Group.findById(req.params.id);
+    const { id: groupId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(groupId) || !mongoose.Types.ObjectId.isValid(memberId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID nhóm hoặc thành viên không hợp lệ'
+      });
+    }
+    const group = await Group.findById(groupId);
 
     if (!group) {
       return res.status(404).json({
@@ -948,7 +992,10 @@ export const removeMember = async (req, res) => {
       m => m.user.toString() === req.user.id
     );
 
-    if (!member || (member.role !== 'admin' && group.creator.toString() !== req.user.id)) {
+    const isCreator = group.creator.toString() === req.user.id;
+    const canManageMembers = isCreator || member?.role === 'admin' || member?.role === 'moderator';
+
+    if (!canManageMembers) {
       return res.status(403).json({
         success: false,
         message: 'Chỉ người tạo nhóm, admin hoặc moderator mới có quyền xóa thành viên'
@@ -963,6 +1010,14 @@ export const removeMember = async (req, res) => {
       });
     }
 
+    const targetMember = group.members.find((m) => m.user.toString() === memberId);
+    if (!targetMember) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy thành viên trong nhóm'
+      });
+    }
+
     group.members = group.members.filter(
       member => member.user.toString() !== memberId
     );
@@ -973,7 +1028,7 @@ export const removeMember = async (req, res) => {
       $pull: { groups: group._id, groupsHiddenFromHomeFeed: group._id }
     });
 
-    const updatedGroup = await Group.findById(req.params.id)
+    const updatedGroup = await Group.findById(groupId)
       .populate('members.user', 'name avatar email studentRole major');
 
     res.status(200).json({
@@ -982,6 +1037,7 @@ export const removeMember = async (req, res) => {
       members: updatedGroup.members
     });
   } catch (error) {
+    console.error('removeMember error:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi xóa thành viên',
@@ -1075,14 +1131,14 @@ export const getGroupPosts = async (req, res) => {
       });
     }
 
-    // Check if group is approved (except for creator and admin)
+    // Chỉ chặn nhóm đã xóa (except for creator and admin)
     const isCreator = group.creator.toString() === req.user.id;
     const isAdmin = req.user.role === 'admin';
     
-    if (group.status !== 'approved' && !isCreator && !isAdmin) {
+    if (group.status === 'rejected' && !isCreator && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Nhóm này chưa được duyệt. Bạn không thể xem bài viết.'
+        message: 'Nhóm này đã bị xóa. Bạn không thể xem bài viết.'
       });
     }
 
@@ -1116,10 +1172,11 @@ export const getGroupPosts = async (req, res) => {
           select: 'name avatar'
         }
       });
+    const visiblePosts = posts.filter((post) => post.author);
 
     res.status(200).json({
       success: true,
-      posts
+      posts: visiblePosts
     });
   } catch (error) {
     res.status(500).json({
@@ -1146,15 +1203,15 @@ export const createGroupPost = async (req, res) => {
       });
     }
 
-    // Check if group is approved
-    if (group.status !== 'approved') {
+    // Check if group is deleted
+    if (group.status === 'rejected') {
       const isCreator = group.creator.toString() === req.user.id;
       const isAdmin = req.user.role === 'admin';
       
       if (!isCreator && !isAdmin) {
         return res.status(403).json({
           success: false,
-          message: 'Nhóm này chưa được duyệt. Bạn không thể đăng bài.'
+          message: 'Nhóm này đã bị xóa. Bạn không thể đăng bài.'
         });
       }
     }
@@ -1265,6 +1322,7 @@ export const createGroupPost = async (req, res) => {
 
     const post = await Post.create({
       author: req.user.id,
+      authorNameSnapshot: String(req.user?.name || '').trim(),
       content: postContent,
       textBackground: normalizedTextBackground,
       images,

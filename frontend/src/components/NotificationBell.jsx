@@ -53,6 +53,46 @@ const parseConversationIdFromMessageLink = (link) => {
   }
 };
 
+const resolveNotificationDestination = (notification) => {
+  if (!notification) return null;
+  const rawLink = String(notification.link || '').trim();
+  if (rawLink) return rawLink;
+
+  const senderId = notification.sender?._id || notification.sender?.id;
+  const eventId = notification.event?._id || notification.event;
+  const groupId = notification.group?._id || notification.group;
+  const postId = notification.post?._id || notification.post;
+
+  switch (notification.type) {
+    case 'event':
+    case 'event_cohost_invite':
+      return eventId ? `/events/${eventId}` : '/events';
+    case 'group':
+    case 'group_invite':
+      return groupId ? `/groups/${groupId}` : '/home?tab=groups';
+    case 'comment':
+    case 'like':
+    case 'post':
+      return postId ? '/home' : null;
+    case 'follow':
+    case 'friend_request':
+      return senderId ? `/profile/${senderId}` : null;
+    default:
+      return null;
+  }
+};
+
+const extractSenderNameFromMessage = (message) => {
+  const raw = String(message || '').trim();
+  if (!raw) return '';
+  const separators = [' đã ', ' vừa ', ' đã gửi ', 'đã ', 'vừa '];
+  for (const sep of separators) {
+    const idx = raw.indexOf(sep);
+    if (idx > 0) return raw.slice(0, idx).trim();
+  }
+  return '';
+};
+
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -163,11 +203,7 @@ const NotificationBell = () => {
     try {
       await api.put('/notifications/read-all');
       setUnreadCount(0);
-      if (showPreviousNotifications) {
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      } else {
-        setNotifications([]);
-      }
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       await fetchUnreadCount();
     } catch (error) {
       console.error('Error marking all as read:', error);
@@ -272,6 +308,25 @@ const NotificationBell = () => {
     window.dispatchEvent(new CustomEvent('openChat', { detail: { conversationId } }));
   };
 
+  const handleNotificationOpen = async (notification) => {
+    if (!notification) return;
+    if (notification.type === 'group_invite' || notification.type === 'event_cohost_invite') return;
+
+    if (notification.type === 'message') {
+      await openMessageFromNotification(notification);
+      return;
+    }
+
+    if (!notification.isRead) {
+      await handleMarkAsRead(notification._id);
+    }
+
+    const destination = resolveNotificationDestination(notification);
+    if (!destination) return;
+    setShowDropdown(false);
+    navigate(destination);
+  };
+
   const renderMessageWithEventTitleLink = (notification) => {
     const msg = notification.message || '';
     const title = typeof notification.event?.title === 'string' ? notification.event.title.trim() : '';
@@ -342,6 +397,18 @@ const NotificationBell = () => {
       default:
         return <Bell className="w-5 h-5 text-gray-500" />;
     }
+  };
+
+  const getSenderName = (notification) => {
+    const direct = String(notification?.sender?.name || '').trim();
+    if (direct) return direct;
+    const inferred = extractSenderNameFromMessage(notification?.message);
+    return inferred || 'Người dùng';
+  };
+
+  const getSenderInitial = (notification) => {
+    const senderName = getSenderName(notification);
+    return senderName.charAt(0).toUpperCase() || '?';
   };
 
   const toggleDropdown = () => {
@@ -441,7 +508,15 @@ const NotificationBell = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowAllItems(true)}
+                  onClick={() => {
+                    if (user?.role === 'admin') {
+                      setShowDropdown(false);
+                      navigate('/admin/notifications');
+                      return;
+                    }
+                    setNotificationFilter('all');
+                    setShowAllItems(true);
+                  }}
                   className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
                 >
                   Xem tất cả
@@ -479,19 +554,7 @@ const NotificationBell = () => {
                           !notification.isRead ? 'bg-[var(--fb-input)]' : ''
                         }`}
                         onClick={() => {
-                          if (notification.type === 'group_invite' || notification.type === 'event_cohost_invite') {
-                            return;
-                          }
-                          if (notification.type === 'message') {
-                            openMessageFromNotification(notification);
-                            return;
-                          }
-                          if (!notification.isRead) {
-                            handleMarkAsRead(notification._id);
-                          }
-                          if (notification.link) {
-                            navigate(notification.link);
-                          }
+                          handleNotificationOpen(notification);
                         }}
                       >
                         <div className="flex items-start space-x-3">
@@ -503,7 +566,7 @@ const NotificationBell = () => {
                                     ? `http://localhost:5000${notification.sender.avatar}`
                                     : notification.sender.avatar
                                 }
-                                alt={notification.sender.name}
+                                alt={getSenderName(notification)}
                                 className="w-10 h-10 rounded-full object-cover cursor-pointer"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -526,7 +589,7 @@ const NotificationBell = () => {
                                 }}
                                 title="Xem trang cá nhân"
                               >
-                                {notification.sender?.name?.charAt(0) || '?'}
+                                {getSenderInitial(notification)}
                               </div>
                             )}
                           </div>
@@ -546,7 +609,7 @@ const NotificationBell = () => {
                                     }}
                                     title="Xem trang cá nhân"
                                   >
-                                    {notification.sender?.name}
+                                    {getSenderName(notification)}
                                   </span>{' '}
                                   {notification.event &&
                                   (notification.type === 'event_cohost_invite' || notification.type === 'event')
@@ -650,19 +713,7 @@ const NotificationBell = () => {
                         !notification.isRead ? 'bg-[var(--fb-input)]' : ''
                       }`}
                       onClick={() => {
-                        if (notification.type === 'group_invite' || notification.type === 'event_cohost_invite') {
-                          return;
-                        }
-                        if (notification.type === 'message') {
-                          openMessageFromNotification(notification);
-                          return;
-                        }
-                        if (!notification.isRead) {
-                          handleMarkAsRead(notification._id);
-                        }
-                        if (notification.link) {
-                          navigate(notification.link);
-                        }
+                        handleNotificationOpen(notification);
                       }}
                     >
                       <div className="flex items-start space-x-3">
@@ -674,7 +725,7 @@ const NotificationBell = () => {
                                   ? `http://localhost:5000${notification.sender.avatar}`
                                   : notification.sender.avatar
                               }
-                              alt={notification.sender.name}
+                              alt={getSenderName(notification)}
                               className="w-10 h-10 rounded-full object-cover cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -697,7 +748,7 @@ const NotificationBell = () => {
                               }}
                               title="Xem trang cá nhân"
                             >
-                              {notification.sender?.name?.charAt(0) || '?'}
+                              {getSenderInitial(notification)}
                             </div>
                           )}
                         </div>
@@ -717,7 +768,7 @@ const NotificationBell = () => {
                                   }}
                                   title="Xem trang cá nhân"
                                 >
-                                  {notification.sender?.name}
+                                  {getSenderName(notification)}
                                 </span>{' '}
                                 {notification.event &&
                                 (notification.type === 'event_cohost_invite' || notification.type === 'event')

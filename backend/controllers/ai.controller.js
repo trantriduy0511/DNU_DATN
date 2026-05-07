@@ -64,7 +64,7 @@ CÁC TÍNH NĂNG CHÍNH VÀ HƯỚNG DẪN:
    - Nhập nội dung, có thể đính kèm hình ảnh (tối đa 10 ảnh, mỗi ảnh tối đa 5MB)
    - Thêm hashtag nếu muốn
    - Nhấn "Đăng bài"
-   - Lưu ý: Bài viết cần được Admin duyệt trước khi hiển thị công khai
+   - Lưu ý: Bài viết hiển thị ngay sau khi đăng (nếu không vi phạm quy định)
 
 2. NHÓM HỌC TẬP:
    - Vào tab "Nhóm học tập" trên trang chủ
@@ -98,7 +98,7 @@ CÁC TÍNH NĂNG CHÍNH VÀ HƯỚNG DẪN:
 
 6. THÔNG BÁO:
    - Icon chuông ở header hiển thị số thông báo chưa đọc
-   - Nhận thông báo khi: Có người bình luận, trả lời bình luận, thích bài viết, bài viết được duyệt/từ chối, có sự kiện mới
+   - Nhận thông báo khi: Có người bình luận, trả lời bình luận, thích bài viết, có sự kiện mới
    - Đánh dấu đã đọc hoặc xóa thông báo
 
 7. QUẢN LÝ TÀI KHOẢN:
@@ -122,7 +122,7 @@ CÁC TÍNH NĂNG CHÍNH VÀ HƯỚNG DẪN:
 QUYỀN HẠN THEO VAI TRÒ:
 - Sinh viên: Đăng bài, tham gia nhóm, đăng ký sự kiện, chat, tải tài liệu
 - Giảng viên: Tất cả quyền của sinh viên + đăng tài liệu, tạo nhóm, tạo sự kiện
-- Admin: Quản lý toàn bộ hệ thống, duyệt bài viết, quản lý người dùng, xử lý báo cáo
+- Admin: Quản lý toàn bộ hệ thống, quản lý người dùng, xử lý báo cáo
 
 **CÁCH HỖ TRỢ HỌC TẬP:**
 - Khi sinh viên hỏi về bài tập: Hướng dẫn phương pháp, gợi ý các bước, đưa ra ví dụ tương tự, nhưng KHÔNG làm hộ.
@@ -141,7 +141,7 @@ CÁC CÂU HỎI THƯỜNG GẶP VÀ CÁCH TRẢ LỜI:
    - Nhập nội dung, có thể đính kèm hình ảnh (tối đa 10 ảnh, mỗi ảnh ≤ 5MB)
    - Thêm hashtag nếu muốn
    - Nhấn "Đăng bài"
-   - Lưu ý: Bài viết cần Admin duyệt trước khi hiển thị
+   - Lưu ý: Bài viết hiển thị ngay sau khi đăng
 
 2. "Tôi muốn chia sẻ tài liệu học tập thì vào mục nào?":
    - Chọn danh mục "Tài liệu" khi đăng bài
@@ -190,9 +190,8 @@ CÁC CÂU HỎI THƯỜNG GẶP VÀ CÁCH TRẢ LỜI:
     - Lưu ý: Không thể khôi phục sau khi xóa
 
 11. "Bài viết của tôi có cần chờ duyệt trước khi hiện lên không?":
-    - Có, tất cả bài viết cần Admin duyệt
-    - Thời gian duyệt: Thường trong vòng 24h
-    - Bạn sẽ nhận thông báo khi bài viết được duyệt/từ chối
+    - Không, bài viết hiện hiển thị ngay sau khi đăng
+    - Nếu vi phạm quy định, bài viết có thể bị ẩn/xử lý bởi Admin
 
 12. "Tại sao bài viết của tôi bị báo vi phạm quy định?":
     - Có thể do: Nội dung không phù hợp, spam, vi phạm bản quyền
@@ -605,7 +604,7 @@ CÁC CÂU HỎI THƯỜNG GẶP VÀ CÁCH TRẢ LỜI:
    - "Làm sao đổi mật khẩu?": Vào Cài đặt > Đổi mật khẩu, nhập mật khẩu cũ và mật khẩu mới
 
 2. Câu hỏi về bài viết:
-   - "Tại sao bài viết của tôi chưa hiển thị?": Bài viết cần được Admin duyệt trước khi hiển thị công khai, thường trong vòng 24h
+   - "Tại sao bài viết của tôi chưa hiển thị?": Kiểm tra kết nối mạng, tải lại trang, hoặc bài viết có thể đã bị ẩn do vi phạm quy định
    - "Làm sao chỉnh sửa bài viết?": Nhấn nút "..." trên bài viết của bạn > Chọn "Chỉnh sửa"
    - "Làm sao xóa bài viết?": Nhấn nút "..." > Chọn "Xóa bài viết"
    - "Làm sao lưu bài viết?": Nhấn icon bookmark trên bài viết, xem lại trong "Đã lưu"
@@ -743,9 +742,32 @@ const sanitizeAIText = (value = '') =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-const compactAIText = (value = '', maxChars = 280, maxSentences = 3) => {
+const compactAIText = (value = '', maxChars = 460, maxSentences = 3) => {
   const text = sanitizeAIText(value);
   if (!text) return text;
+  const truncateByBoundary = (input = '') => {
+    if (input.length <= maxChars) return input.trim();
+    const draft = input.slice(0, maxChars).trim();
+    const punctuationCut = Math.max(draft.lastIndexOf('. '), draft.lastIndexOf('! '), draft.lastIndexOf('? '), draft.lastIndexOf('\n'));
+    if (punctuationCut >= Math.floor(maxChars * 0.6)) {
+      return `${draft.slice(0, punctuationCut + 1).trim()}...`;
+    }
+    const wordCut = draft.lastIndexOf(' ');
+    if (wordCut >= Math.floor(maxChars * 0.6)) {
+      return `${draft.slice(0, wordCut).trim()}...`;
+    }
+    return `${draft.trim()}...`;
+  };
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const bulletLines = lines.filter((line) => /^[-*]\s+/.test(line));
+  if (bulletLines.length > 0) {
+    let compactBullets = bulletLines.slice(0, 3).join('\n').trim();
+    compactBullets = truncateByBoundary(compactBullets);
+    return compactBullets;
+  }
   const sentenceParts = text
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
@@ -753,11 +775,17 @@ const compactAIText = (value = '', maxChars = 280, maxSentences = 3) => {
     .slice(0, maxSentences);
   let compact = sentenceParts.join(' ').trim();
   if (!compact) compact = text;
-  if (compact.length > maxChars) {
-    compact = `${compact.slice(0, maxChars - 3).trim()}...`;
-  }
+  compact = truncateByBoundary(compact);
   return compact;
 };
+
+const trimLeadGreeting = (value = '') =>
+  String(value || '')
+    .replace(
+      /^(ch[aà]o( b[aạ]n)?[!,. ]*|xin ch[aà]o[!,. ]*|m[iì]nh l[aà] [^.!?]{0,80}[.!?]\s*)+/iu,
+      ''
+    )
+    .trim();
 
 const normalizeImageBase64 = (value = '') => {
   const raw = String(value || '').trim();
@@ -776,7 +804,12 @@ const getQuickIntentAnswer = (rawMessage = '') => {
     msg.includes('dang bai') &&
     (msg.includes('lam sao') || msg.includes('cach') || msg.includes('the nao') || msg.includes('o dau'))
   ) {
-    return 'Vào trang chủ, nhấn nút Bạn đang nghĩ gì hoặc dấu cộng, nhập nội dung rồi bấm Đăng bài.';
+    return '- Vào trang chủ và nhấn nút Bạn đang nghĩ gì (hoặc dấu +).\n- Nhập nội dung, chọn đúng danh mục như Tài liệu nếu cần.\n- Kiểm tra file đính kèm hợp lệ rồi nhấn Đăng bài.';
+  }
+  if (
+    /(dang bai|chia se).*(tai lieu).*(giang vien)|((tai lieu).*(giang vien).*(dang|duoc))/i.test(msg)
+  ) {
+    return '- Có, bạn được đăng tài liệu để chia sẻ học tập trên DNU Social.\n- Chỉ đăng khi nội dung không vi phạm bản quyền hoặc quy định nhà trường.\n- Nên ghi rõ nguồn tài liệu để tránh bị từ chối duyệt.';
   }
   if (/(quen mat khau|doi mat khau)/.test(msg)) {
     return 'Vào Cài đặt > Đổi mật khẩu. Nếu quên mật khẩu, dùng chức năng Quên mật khẩu ở màn hình đăng nhập.';
@@ -797,6 +830,7 @@ const DEFAULT_AI_GREETING =
   'Chào bạn! Mình là trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay?';
 const AI_QUOTA_FALLBACK_MESSAGE =
   'AI đang tạm quá tải nên chưa phân tích sâu được ngay lúc này. Bạn thử gửi lại sau ít phút hoặc đặt câu hỏi ngắn gọn hơn để mình hỗ trợ nhanh hơn.';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 const mapStoredMessages = (stored = []) =>
   (stored || []).map((item) => ({
@@ -813,6 +847,194 @@ const buildHistoryInput = (conversationHistory = []) =>
       type: msg.type,
       content: msg.content
     }));
+
+const isDatabaseError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('not connected') ||
+    message.includes('buffering timed out') ||
+    message.includes('server selection timed out') ||
+    message.includes('econnrefused') ||
+    message.includes('topology') ||
+    message.includes('mongoose')
+  );
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetriableAiError = (error) => {
+  const status = Number(error?.status || error?.statusCode || 0);
+  if ([408, 409, 425, 429, 500, 502, 503, 504].includes(status)) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    message.includes('timeout') ||
+    message.includes('timed out') ||
+    message.includes('quota') ||
+    message.includes('rate limit') ||
+    message.includes('overload') ||
+    message.includes('temporarily unavailable')
+  );
+};
+
+const runWithRetry = async (task, retries = 2, baseDelayMs = 500) => {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await task();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= retries || !isRetriableAiError(error)) break;
+      const delayMs = baseDelayMs * (2 ** attempt);
+      await sleep(delayMs);
+    }
+  }
+  throw lastError;
+};
+
+const hasProviderKey = (provider) => {
+  if (provider === 'gemini') return Boolean(String(process.env.GEMINI_API_KEY || '').trim());
+  if (provider === 'openai') return Boolean(String(process.env.OPENAI_API_KEY || '').trim());
+  return false;
+};
+
+const buildOpenAIMessages = ({
+  enhancedContext,
+  studyMaterial,
+  user,
+  recentHistory,
+  normalizedCurrentMessage,
+  hasImageAttachment,
+  imageMimeType,
+  imageBase64
+}) => {
+  const messages = [
+    {
+      role: 'system',
+      content: enhancedContext
+    },
+    {
+      role: 'assistant',
+      content: studyMaterial
+        ? 'Chào bạn! Mình là DNU Buddy - trợ lý học tập của bạn. Mình đã nhận được tài liệu học tập của bạn. Bạn muốn hỏi gì về tài liệu này?'
+        : 'Chào bạn! Mình là DNU Buddy - trợ lý học tập của DNU Social. Mình ở đây để hỗ trợ bạn trong việc học tập và sử dụng hệ thống. Bạn cần mình giúp gì hôm nay?'
+    }
+  ];
+
+  if (user) {
+    messages.push({
+      role: 'system',
+      content: `Thông tin người dùng hiện tại: Tên: ${user.name}, Vai trò: ${user.studentRole || 'Sinh viên'}, Quyền: ${user.role || 'user'}`
+    });
+  }
+
+  (recentHistory || []).forEach((msg) => {
+    messages.push({
+      role: msg.type === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    });
+  });
+
+  if (hasImageAttachment) {
+    const content = [];
+    if (normalizedCurrentMessage) {
+      content.push({ type: 'text', text: normalizedCurrentMessage });
+    } else {
+      content.push({ type: 'text', text: 'Hãy phân tích ảnh này ngắn gọn, đúng trọng tâm theo ngữ cảnh người dùng.' });
+    }
+    content.push({
+      type: 'image_url',
+      image_url: { url: `data:${imageMimeType};base64,${imageBase64}` }
+    });
+    messages.push({
+      role: 'user',
+      content
+    });
+  } else {
+    messages.push({
+      role: 'user',
+      content: normalizedCurrentMessage
+    });
+  }
+
+  return messages;
+};
+
+const callGeminiChat = async ({ modelName, history, requestParts }) => {
+  const model = getGenAI().getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      temperature: 0.4,
+      topK: 40,
+      topP: 0.9,
+      maxOutputTokens: 1024
+    }
+  });
+
+  const chat = model.startChat({
+    history,
+    generationConfig: {
+      temperature: 0.4,
+      topK: 40,
+      topP: 0.9,
+      maxOutputTokens: 1024
+    }
+  });
+
+  const result = await chat.sendMessage(requestParts);
+  const response = await result.response;
+  return response.text();
+};
+
+const callOpenAIChat = async ({ modelName, messages, timeoutMs = 12000 }) => {
+  const key = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!key) {
+    const error = new Error('OpenAI API key is missing');
+    error.status = 401;
+    throw error;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages,
+        temperature: 0.4,
+        max_tokens: 800
+      }),
+      signal: controller.signal
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data?.error?.message || 'OpenAI API request failed');
+      error.status = response.status;
+      throw error;
+    }
+
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content.map((part) => part?.text || '').join(' ').trim();
+    }
+    return '';
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('OpenAI request timeout');
+      timeoutError.status = 408;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export const getAIChatHistory = async (req, res) => {
   try {
@@ -901,23 +1123,28 @@ export const chatWithGemini = async (req, res) => {
 
     const quickAnswer = !hasImageAttachment ? getQuickIntentAnswer(normalizedCurrentMessage) : null;
     if (quickAnswer && !hasImageAttachment) {
-      const concise = compactAIText(quickAnswer, 220, 2);
+      const concise = compactAIText(quickAnswer, 260, 2);
       if (user?._id) {
-        await AIChatHistory.findOneAndUpdate(
-          { userId: user._id },
-          {
-            $push: {
-              messages: {
-                $each: [
-                  { type: 'user', content: normalizedCurrentMessage, ragSources: [], createdAt: new Date() },
-                  { type: 'ai', content: concise, ragSources: [], createdAt: new Date() }
-                ],
-                $slice: -60
+        try {
+          await AIChatHistory.findOneAndUpdate(
+            { userId: user._id },
+            {
+              $push: {
+                messages: {
+                  $each: [
+                    { type: 'user', content: normalizedCurrentMessage, ragSources: [], createdAt: new Date() },
+                    { type: 'ai', content: concise, ragSources: [], createdAt: new Date() }
+                  ],
+                  $slice: -60
+                }
               }
-            }
-          },
-          { upsert: true, new: true }
-        );
+            },
+            { upsert: true, new: true }
+          );
+        } catch (historyError) {
+          if (!isDatabaseError(historyError)) throw historyError;
+          console.warn('Skip saving AI quick-reply history due to DB issue:', historyError.message);
+        }
       }
 
       return res.json({
@@ -927,31 +1154,24 @@ export const chatWithGemini = async (req, res) => {
       });
     }
 
-    // Check if API key is configured
-    if (!process.env.GEMINI_API_KEY) {
+    // Check if at least one provider key is configured
+    if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
       return res.status(500).json({
         success: false,
-        message: 'AI service chưa được cấu hình. Vui lòng liên hệ admin.'
+        message: 'AI service chưa được cấu hình (thiếu API key). Vui lòng liên hệ admin.'
       });
     }
-
-    // Get the Gemini model with improved settings for better understanding
-    const modelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
-    const model = getGenAI().getGenerativeModel({ 
-      model: modelName,
-      generationConfig: {
-        temperature: 0.6,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 420
-      },
-    });
 
     const ragQuestion = normalizedCurrentMessage || 'Phân tích nội dung ảnh người dùng gửi';
     let runtimeConversationHistory = buildHistoryInput(conversationHistory);
     if (runtimeConversationHistory.length === 0 && user?._id) {
-      const doc = await AIChatHistory.findOne({ userId: user._id }).select('messages').lean();
-      runtimeConversationHistory = buildHistoryInput(mapStoredMessages(doc?.messages || []));
+      try {
+        const doc = await AIChatHistory.findOne({ userId: user._id }).select('messages').lean();
+        runtimeConversationHistory = buildHistoryInput(mapStoredMessages(doc?.messages || []));
+      } catch (historyError) {
+        if (!isDatabaseError(historyError)) throw historyError;
+        console.warn('Skip loading AI history due to DB issue:', historyError.message);
+      }
     }
 
     // Build conversation history with system context
@@ -987,10 +1207,23 @@ ${studyMaterial}
 - Trích dẫn rõ ràng phần nào trong tài liệu (ví dụ: "Theo mục 2 của bài học...", "Trong phần đầu của tài liệu...")
 - Không bịa ra câu trả lời nếu không có trong tài liệu
 - Vẫn giữ phong cách thân thiện, khuyến khích, xưng "mình" và gọi "bạn"
-- Câu trả lời NGẮN GỌN: tối đa 3 câu, ưu tiên trọng tâm, không liệt kê dài dòng.`;
+- Trả lời NGẮN GỌN NHƯNG ĐỦ Ý, không giới hạn số câu cứng.
+- Mẫu ưu tiên:
+  1) Trả lời trực tiếp câu hỏi trong 1 dòng đầu.
+  2) Nêu các ý chính cần thiết (2-5 ý, mỗi ý ngắn).
+  3) Nếu thiếu dữ liệu, nói rõ thiếu gì và cần người dùng cung cấp gì.
+- Không kéo dài lan man, không lặp lại đề bài.`;
     } else {
       // Normal mode - general learning assistant
-      enhancedContext += '\n\nQUAN TRỌNG: Trả lời trực tiếp vào ý chính, tối đa 2-3 câu. Không chào hỏi dài, không nhận xét cảm xúc người dùng, không nói lan man.';
+      enhancedContext += `\n\nQUAN TRỌNG (BẮT BUỘC):
+- Trả lời đúng trọng tâm câu hỏi hiện tại, không kể thêm nội dung ngoài câu hỏi.
+- Không chào hỏi dài, không lặp lại đề, không viết lan man.
+- Cấu trúc trả lời:
+  1) Dòng đầu trả lời trực tiếp.
+  2) Các ý chính cần thiết (2-5 ý, ngắn và rõ).
+  3) Nếu cần, kết thúc bằng 1 câu hành động cụ thể.
+- Độ dài mục tiêu: ngắn gọn nhưng đầy đủ, khoảng 80-220 từ tùy độ khó câu hỏi.
+- Tuyệt đối không cắt cụt câu trả lời giữa chừng.`;
     }
 
     if (ragContext.contextText) {
@@ -1046,17 +1279,6 @@ ${ragContext.contextText}
       });
     });
 
-    // Start chat with history
-    const chat = model.startChat({
-      history: history,
-      generationConfig: {
-        temperature: 0.6,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 420
-      },
-    });
-
     // Send current message and get response
     const requestParts = [];
     if (normalizedCurrentMessage) {
@@ -1073,9 +1295,72 @@ ${ragContext.contextText}
       });
     }
 
-    const result = await chat.sendMessage(requestParts);
-    const response = await result.response;
-    const text = compactAIText(response.text(), 280, 3);
+    const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS || 12000);
+    const aiRetries = Number(process.env.AI_MAX_RETRIES || 2);
+    const providers = [
+      String(process.env.AI_PRIMARY_PROVIDER || 'gemini').toLowerCase(),
+      String(process.env.AI_FALLBACK_PROVIDER || 'openai').toLowerCase()
+    ].filter(Boolean);
+    const providerOrder = [...new Set(providers)];
+    const availableProviders = providerOrder.filter((provider) => hasProviderKey(provider));
+
+    const openAIModelName = process.env.OPENAI_MODEL_NAME || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const geminiModelName = process.env.GEMINI_MODEL_NAME || 'gemini-2.5-flash';
+    const recentHistoryForOpenAI = runtimeConversationHistory.slice(-10);
+    const openAIMessages = buildOpenAIMessages({
+      enhancedContext,
+      studyMaterial,
+      user,
+      recentHistory: recentHistoryForOpenAI,
+      normalizedCurrentMessage,
+      hasImageAttachment,
+      imageMimeType,
+      imageBase64
+    });
+
+    let rawText = '';
+    let providerUsed = '';
+    let lastProviderError = null;
+    let hasTemporaryOverload = false;
+
+    for (const provider of availableProviders) {
+      try {
+        if (provider === 'gemini') {
+          rawText = await runWithRetry(
+            () => callGeminiChat({ modelName: geminiModelName, history, requestParts }),
+            aiRetries
+          );
+          providerUsed = 'gemini';
+          break;
+        }
+
+        if (provider === 'openai') {
+          rawText = await runWithRetry(
+            () => callOpenAIChat({ modelName: openAIModelName, messages: openAIMessages, timeoutMs: aiTimeoutMs }),
+            aiRetries
+          );
+          providerUsed = 'openai';
+          break;
+        }
+      } catch (providerError) {
+        lastProviderError = providerError;
+        if (isRetriableAiError(providerError)) {
+          hasTemporaryOverload = true;
+        }
+        console.warn(`AI provider ${provider} failed:`, providerError?.message || providerError);
+      }
+    }
+
+    if (!providerUsed) {
+      if (hasTemporaryOverload) {
+        const overloadError = new Error('AI provider is temporarily overloaded');
+        overloadError.status = 503;
+        throw overloadError;
+      }
+      throw lastProviderError || new Error('All AI providers failed');
+    }
+
+    const text = sanitizeAIText(trimLeadGreeting(rawText));
 
     if (user?._id) {
       const storedUserContent = normalizedCurrentMessage || `Đã gửi ảnh${imageAttachment?.fileName ? `: ${imageAttachment.fileName}` : ''}`;
@@ -1084,27 +1369,33 @@ ${ragContext.contextText}
         { type: 'ai', content: text, ragSources: ragContext.contextBlocks || [], createdAt: new Date() }
       ];
 
-      await AIChatHistory.findOneAndUpdate(
-        { userId: user._id },
-        {
-          $push: {
-            messages: {
-              $each: newMessages,
-              $slice: -60
+      try {
+        await AIChatHistory.findOneAndUpdate(
+          { userId: user._id },
+          {
+            $push: {
+              messages: {
+                $each: newMessages,
+                $slice: -60
+              }
             }
+          },
+          {
+            upsert: true,
+            new: true
           }
-        },
-        {
-          upsert: true,
-          new: true
-        }
-      );
+        );
+      } catch (historyError) {
+        if (!isDatabaseError(historyError)) throw historyError;
+        console.warn('Skip saving AI history due to DB issue:', historyError.message);
+      }
     }
 
     res.json({
       success: true,
       message: text,
-      ragSources: ragContext.contextBlocks || []
+      ragSources: ragContext.contextBlocks || [],
+      providerUsed
     });
   } catch (error) {
     console.error('Error calling Gemini API:', error);
@@ -1117,7 +1408,12 @@ ${ragContext.contextText}
       });
     }
 
-    if (error.message?.includes('quota') || error.message?.includes('limit') || error.status === 429) {
+    if (
+      error.message?.includes('quota') ||
+      error.message?.includes('limit') ||
+      error.status === 429 ||
+      error.status === 503
+    ) {
       return res.status(200).json({
         success: true,
         degraded: true,

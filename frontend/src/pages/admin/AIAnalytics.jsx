@@ -28,8 +28,19 @@ const AIAnalytics = () => {
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+  const sanitizeAIOutput = (value) =>
+    String(value || '')
+      .replace(/[*#_~>|[\]`]/g, ' ')
+      .replace(/[^\p{L}\p{N}\s.,;:!?()/%\-–—\n]/gu, ' ')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
   useEffect(() => {
     fetchAnalytics();
+    // Invalidate AI-generated tabs when period changes to avoid stale content.
+    setPrediction('');
+    setRecommendations('');
   }, [timeRange]);
 
   const fetchAnalytics = async () => {
@@ -58,14 +69,17 @@ const AIAnalytics = () => {
     try {
       setPredicting(true);
       const res = await api.get('/ai/predict', {
-        params: { days: 30 }
+        params: { days: timeRange }
       });
       
       if (res.data.success) {
         setPrediction(res.data.prediction);
+      } else {
+        alert('Không thể tạo dự báo: ' + (res.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error fetching prediction:', error);
+      alert('Lỗi khi tạo dự báo: ' + (error.response?.data?.message || error.message));
     } finally {
       setPredicting(false);
     }
@@ -74,13 +88,18 @@ const AIAnalytics = () => {
   const fetchRecommendations = async () => {
     try {
       setRecommending(true);
-      const res = await api.get('/ai/recommendations');
+      const res = await api.get('/ai/recommendations', {
+        params: { timeRange }
+      });
       
       if (res.data.success) {
         setRecommendations(res.data.recommendations);
+      } else {
+        alert('Không thể tạo khuyến nghị: ' + (res.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error fetching recommendations:', error);
+      alert('Lỗi khi tạo khuyến nghị: ' + (error.response?.data?.message || error.message));
     } finally {
       setRecommending(false);
     }
@@ -115,25 +134,24 @@ const AIAnalytics = () => {
   }
 
   return (
-    <div className="bg-gray-50">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
                 <Sparkles className="w-8 h-8 text-blue-500" />
                 AI Phân Tích Dữ Liệu
               </h1>
-              <p className="text-gray-600 mt-2">
+              <p className="text-sm md:text-base text-gray-600 mt-1 md:mt-2">
                 Phân tích thông minh và dự báo xu hướng cho hệ thống DNU Social
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(Number(e.target.value))}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               >
                 <option value={7}>7 ngày</option>
                 <option value={30}>30 ngày</option>
@@ -141,7 +159,7 @@ const AIAnalytics = () => {
               </select>
               <button
                 onClick={fetchAnalytics}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Làm mới
@@ -151,8 +169,8 @@ const AIAnalytics = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex border-b">
+        <div className="bg-white rounded-lg shadow-sm mb-6 overflow-hidden">
+          <div className="flex border-b overflow-x-auto custom-scrollbar scrollbar-hide whitespace-nowrap">
             {[
               { id: 'overview', label: 'Tổng Quan', icon: BarChart3 },
               { id: 'insights', label: 'AI Insights', icon: Lightbulb },
@@ -164,10 +182,10 @@ const AIAnalytics = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                  className={`flex items-center gap-2 px-4 md:px-6 py-4 font-medium transition-colors shrink-0 ${
                     activeTab === tab.id
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   <Icon className="w-5 h-5" />
@@ -342,7 +360,7 @@ const AIAnalytics = () => {
             </div>
             <div className="prose max-w-none">
               <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                {aiInsights || 'Đang tải insights...'}
+                {sanitizeAIOutput(aiInsights) || 'Đang tải insights...'}
               </div>
             </div>
           </div>
@@ -351,20 +369,20 @@ const AIAnalytics = () => {
         {/* Prediction Tab */}
         {activeTab === 'prediction' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <TrendingUp className="w-6 h-6 text-blue-500" />
-                <h2 className="text-2xl font-bold">Dự Báo Xu Hướng</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Dự Báo Xu Hướng</h2>
               </div>
               <button
                 onClick={fetchPrediction}
                 disabled={predicting}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
               >
                 {predicting ? (
                   <>
                     <Loader className="w-4 h-4 animate-spin" />
-                    Đang phân tích...
+                    Đang tính toán...
                   </>
                 ) : (
                   <>
@@ -377,7 +395,7 @@ const AIAnalytics = () => {
             {prediction ? (
               <div className="prose max-w-none">
                 <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                  {prediction}
+                  {sanitizeAIOutput(prediction)}
                 </div>
               </div>
             ) : (
@@ -392,15 +410,15 @@ const AIAnalytics = () => {
         {/* Recommendations Tab */}
         {activeTab === 'recommendations' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-6 h-6 text-purple-500" />
-                <h2 className="text-2xl font-bold">Khuyến Nghị Cải Thiện</h2>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Khuyến Nghị Cải Thiện</h2>
               </div>
               <button
                 onClick={fetchRecommendations}
                 disabled={recommending}
-                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
               >
                 {recommending ? (
                   <>
@@ -418,7 +436,7 @@ const AIAnalytics = () => {
             {recommendations ? (
               <div className="prose max-w-none">
                 <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                  {recommendations}
+                  {sanitizeAIOutput(recommendations)}
                 </div>
               </div>
             ) : (
@@ -430,7 +448,6 @@ const AIAnalytics = () => {
           </div>
         )}
       </div>
-    </div>
   );
 };
 

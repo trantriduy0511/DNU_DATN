@@ -378,6 +378,35 @@ html .chat-ai-window-fixed-absolute,
   }
 }
 
+/* Bridge legacy light utility classes in dark mode */
+.dark .bg-white {
+  background-color: var(--fb-surface) !important;
+}
+
+.dark .bg-gray-50,
+.dark .bg-gray-100 {
+  background-color: var(--fb-input) !important;
+}
+
+.dark .border-gray-50,
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300 {
+  border-color: var(--fb-divider) !important;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700 {
+  color: var(--fb-text-primary) !important;
+}
+
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: var(--fb-text-secondary) !important;
+}
+
 
 
 

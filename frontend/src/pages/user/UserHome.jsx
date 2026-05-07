@@ -8,6 +8,7 @@ import { buildEventShareMessageContent } from '../../utils/eventShareMessage.js'
 import { buildGroupShareMessageContent } from '../../utils/groupShareMessage.js';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { useHomeSavedActionsViewModel } from '../../domains/home/viewmodels/useHomeSavedActionsViewModel';
+import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 // Chat overlays are mounted globally in NavigationBar
 import OnlineUsers from '../../components/OnlineUsers';
 import DocumentAnalyzer from '../../components/DocumentAnalyzer';
@@ -128,6 +129,16 @@ const TEXT_POST_BACKGROUNDS = [
 
 function isDarkBackground(background) {
   return /#232526|#414345|#1877f2|#7b2ff7|#f107a3|#f12711/i.test(background || '');
+}
+
+function isLecturerDocumentAuthor(post) {
+  const authorRole = post?.author?.role;
+  const authorStudentRole = post?.author?.studentRole;
+  return authorRole === 'admin' || authorStudentRole === 'Giảng viên';
+}
+
+function isLecturerDocumentPost(post) {
+  return post?.category === 'Tài liệu' && isLecturerDocumentAuthor(post);
 }
 
 const UserHome = () => {
@@ -464,12 +475,7 @@ const UserHome = () => {
   }, [posts, activeTab]);
 
   const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
-    if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
+    return resolveAvatarUrlWithFallback(avatar, name, background);
   };
 
   const withAvatarFallback = (name, background = '1877f2') => (e) => {
@@ -765,15 +771,11 @@ const UserHome = () => {
             ...params,
             limit: 40,
             /** Bảng tin: bài cá nhân từ mình / bạn bè / người theo dõi + bài nhóm đã tham gia + bài sự kiện đã tham gia (backend gộp; danh mục chỉ lọc bài cá nhân) */
-            personalScope: 'network'
+            personalScope: user?.role === 'admin' ? undefined : 'network'
           }
         });
         const homePosts = isLecturerDocsCategory
-          ? (res.data.posts || []).filter((post) => {
-              const authorRole = post?.author?.role;
-              const authorStudentRole = post?.author?.studentRole;
-              return authorRole === 'admin' || authorStudentRole === 'Giảng viên';
-            })
+          ? (res.data.posts || []).filter(isLecturerDocumentPost)
           : (res.data.posts || []);
         setPosts(homePosts);
         
@@ -789,11 +791,7 @@ const UserHome = () => {
         const res = await api.get('/posts', {
           params: { category: 'Tài liệu' }
         });
-        const docPosts = (res.data.posts || []).filter((post) => {
-          const authorRole = post?.author?.role;
-          const authorStudentRole = post?.author?.studentRole;
-          return authorRole === 'admin' || authorStudentRole === 'Giảng viên';
-        });
+        const docPosts = (res.data.posts || []).filter(isLecturerDocumentPost);
         setPosts(docPosts);
 
         const liked = new Set();
@@ -884,11 +882,24 @@ const UserHome = () => {
     const onGroupHomeFeedPrefChanged = () => {
       fetchDataRef.current?.();
     };
+    const onPostDeleted = (event) => {
+      const postId = String(event?.detail?.postId || '');
+      if (!postId) return;
+      setPosts((prev) => prev.filter((post) => String(post._id) !== postId));
+      setGroupPosts((prev) => prev.filter((post) => String(post._id) !== postId));
+      setSavedPosts((prev) => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+    };
     window.addEventListener('userGroupsChanged', onUserGroupsChanged);
     window.addEventListener('groupHomeFeedPrefChanged', onGroupHomeFeedPrefChanged);
+    window.addEventListener('postDeleted', onPostDeleted);
     return () => {
       window.removeEventListener('userGroupsChanged', onUserGroupsChanged);
       window.removeEventListener('groupHomeFeedPrefChanged', onGroupHomeFeedPrefChanged);
+      window.removeEventListener('postDeleted', onPostDeleted);
     };
   }, []);
   
@@ -1074,7 +1085,7 @@ const UserHome = () => {
     }
     link.click();
   };
-  
+
   const handleOpenReportModal = (post) => {
     setReportingPost(post);
     setShowReportModal(true);
@@ -1286,6 +1297,7 @@ const UserHome = () => {
       
       // Remove from group posts if exists
       setGroupPosts(groupPosts.filter(post => post._id !== postId));
+      window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId } }));
       
       // Close post options if open
       setShowPostOptions(null);
@@ -2091,7 +2103,7 @@ const UserHome = () => {
   const renderPostCard = (post) => (
     <div
       id={`post-${String(post._id)}`}
-      className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-sm border border-[var(--fb-divider)] mb-4 overflow-hidden hover:shadow-md transition-shadow scroll-mt-24"
+      className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden hover:shadow-md transition-shadow scroll-mt-24"
     >
       {/* Header - Facebook Style */}
       <div className="p-3 flex items-center justify-between">
@@ -2286,7 +2298,7 @@ const UserHome = () => {
       {/* Files / video đính kèm */}
       {post.files && post.files.length > 0 && (
         <div className="px-4 pb-3 space-y-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="space-y-2">
             {post.files.map((file, index) =>
               isPostAttachmentVideo(file) ? (
                 <div key={index} className="md:col-span-2">
@@ -2300,19 +2312,19 @@ const UserHome = () => {
                   />
                 </div>
               ) : (
-                <div key={index} className="flex items-center justify-between p-3 bg-[var(--fb-input)] rounded-lg border border-[var(--fb-divider)] hover:bg-[var(--fb-hover)] transition-colors">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div key={index} className="w-full flex items-center justify-between p-3 bg-[var(--fb-input)] rounded-lg border border-[var(--fb-divider)] hover:bg-[var(--fb-hover)] transition-colors">
+                  <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <BookOpen className="w-5 h-5 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[var(--fb-text-primary)] truncate">{file.name || 'Document'}</p>
+                      <p className="text-sm font-medium text-[var(--fb-text-primary)] break-words leading-5">{file.name || 'Document'}</p>
                       <p className="text-xs text-[var(--fb-text-secondary)]">{file.size || 'Unknown size'}</p>
                     </div>
                   </div>
                   <button
                     onClick={() => handleDownloadFile(file)}
-                    className="ml-2 px-3 py-1.5 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all text-sm font-medium flex items-center space-x-1 flex-shrink-0 shadow-md hover:shadow-lg"
+                    className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all text-sm font-medium flex items-center space-x-1 flex-shrink-0 shadow-md hover:shadow-lg"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -2411,7 +2423,7 @@ const UserHome = () => {
   );
 
   const renderHome = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto px-2 lg:px-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
       {/* Left Sidebar - Facebook Style */}
       <aside className="hidden lg:block lg:col-span-3">
         <div className="sticky top-20 space-y-4">
@@ -2511,10 +2523,10 @@ const UserHome = () => {
 
       {/* Main Feed - Facebook Style (~680px max readable width, full width on small screens) */}
       <div className="lg:col-span-6">
-        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-4">
+        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-3 sm:space-y-4">
         {/* New Post - Facebook Style */}
         <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
-          <div className="p-4">
+          <div className="p-3 sm:p-4">
           <div className="flex items-center space-x-3">
               <img
                 src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
@@ -2535,7 +2547,7 @@ const UserHome = () => {
 
         {/* Filter - Facebook Style */}
         <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
-          <div className="flex items-center space-x-1 p-2 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center space-x-1 p-1.5 sm:p-2 overflow-x-auto scrollbar-hide">
             {['Tất cả', 'Học tập', 'Sự kiện', 'Thảo luận', 'Tài liệu', 'Tài liệu giảng viên'].map((category) => (
               <button
                 key={category}
@@ -2715,15 +2727,9 @@ const UserHome = () => {
   const renderGroups = () => {
     const mediaForGroup = (group) => {
       const coverRaw = group.coverPhoto;
-      const coverUrl =
-        coverRaw && (coverRaw.startsWith('http') ? coverRaw : `http://localhost:5000${coverRaw}`);
+      const coverUrl = resolveMediaUrl(coverRaw);
       const av = group.avatar;
-      const legacyAvatarUrl =
-        av && (av.startsWith('http') || av.startsWith('/uploads'))
-          ? av.startsWith('http')
-            ? av
-            : `http://localhost:5000${av}`
-          : null;
+      const legacyAvatarUrl = resolveMediaUrl(av);
       const heroUrl = coverUrl || legacyAvatarUrl;
       const emoji =
         typeof av === 'string' &&
@@ -3382,6 +3388,7 @@ const UserHome = () => {
                             <button
                               type="button"
                               onClick={() => handleAcceptFriendRequestFromHub(personId)}
+                              disabled={!personId}
                               className="w-full rounded-md bg-blue-600 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
                             >
                               Xác nhận
@@ -3389,6 +3396,7 @@ const UserHome = () => {
                             <button
                               type="button"
                               onClick={() => handleRejectFriendRequestFromHub(personId)}
+                              disabled={!personId}
                               className="w-full rounded-md bg-[var(--fb-input)] py-1.5 text-xs font-semibold text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
                             >
                               Xóa
@@ -3428,7 +3436,7 @@ const UserHome = () => {
     });
     
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto px-2 lg:px-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
         <aside className="hidden lg:block lg:col-span-3">
           <div className="sticky top-20 space-y-4">
             <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden hover:shadow-md transition-shadow">
@@ -3937,7 +3945,7 @@ const UserHome = () => {
           const intN = event.interestedCount ?? event.interestedUsers?.length ?? 0;
           const evPhase = homeEventCardPhase(event.date);
           const socialLine = getHomeEventFriendSocialLine(event, eventTabFriends, user?.id);
-          const coverUrl = event.image ? `http://localhost:5000${event.image}` : null;
+          const coverUrl = resolveMediaUrl(event.image);
 
           return (
             <div
@@ -4251,7 +4259,7 @@ const UserHome = () => {
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-2 lg:px-4 py-4">
+      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-3 sm:py-4">
         {/* Render active tab content - keep container static to prevent flicker */}
         <div className="tab-content">
           {activeTab === 'home' && renderHome()}
@@ -5553,6 +5561,13 @@ const UserHome = () => {
               e.stopPropagation();
               setPostTheaterZoom((z) => Math.max(1, Math.round((z - 0.25) * 100) / 100));
             };
+            const onPostTheaterWheelZoom = (e) => {
+              if (curIsVideo) return;
+              if (e.cancelable) e.preventDefault();
+              e.stopPropagation();
+              const delta = e.deltaY < 0 ? 0.2 : -0.2;
+              setPostTheaterZoom((z) => Math.max(1, Math.min(4, Math.round((z + delta) * 100) / 100)));
+            };
             const endPostTheaterPan = (e, doTapZoom) => {
               const g = postTheaterPanGestureRef.current;
               const el = postTheaterPanRef.current;
@@ -5742,6 +5757,7 @@ const UserHome = () => {
                       <div
                         ref={postTheaterPanRef}
                         onPointerDown={onPostTheaterPanPointerDown}
+                        onWheel={onPostTheaterWheelZoom}
                         onClick={(ev) => ev.stopPropagation()}
                         className={`box-border flex min-h-0 min-w-0 w-full flex-1 overflow-auto overscroll-contain p-4 sm:p-8 ${
                           postTheaterZoom > 1
@@ -5762,8 +5778,9 @@ const UserHome = () => {
                             postTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
                           style={{
-                            maxWidth: `${100 * postTheaterZoom}%`,
-                            maxHeight: `${72 * postTheaterZoom}dvh`,
+                            width: `${100 * postTheaterZoom}%`,
+                            maxWidth: 'none',
+                            maxHeight: 'none',
                           }}
                           onClick={
                             postTheaterZoom <= 1

@@ -32,6 +32,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { buildEventShareMessageContent } from '../../utils/eventShareMessage.js';
 import { formatTimeAgo } from '../../utils/formatTime';
+import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 // Chat overlays are mounted globally in NavigationBar
 
 let bodyScrollLockCount = 0;
@@ -293,12 +294,7 @@ const EventsPage = () => {
   const coverFileInputRef = useRef(null);
 
   const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
-    if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
-    }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
+    return resolveAvatarUrlWithFallback(avatar, name, background);
   };
 
   const withAvatarFallback = (name, background = '1877f2') => (e) => {
@@ -773,7 +769,7 @@ const EventsPage = () => {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-6">
         {/* Header */}
         <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -852,9 +848,7 @@ const EventsPage = () => {
             {visibleEvents.map((event) => {
               const status = getEventStatus(event.date);
               const rsvp = getUserEventRsvp(event, user?.id);
-              const coverSrc = event.image
-                ? `http://localhost:5000/${String(event.image).replace(/^\//, '')}`
-                : null;
+              const coverSrc = resolveMediaUrl(event.image);
               const socialLine = getEventFriendSocialLine(event, friendsList, user?.id);
               const goingCount = event.participantsCount ?? event.participants?.length ?? 0;
               const interestedCount = event.interestedCount ?? event.interestedUsers?.length ?? 0;

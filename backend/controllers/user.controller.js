@@ -157,7 +157,8 @@ export const getUserById = async (req, res) => {
 // @access  Private
 export const addFriend = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    // Password has select:false in schema; include it so currentPassword check works.
+    const user = await User.findById(req.user.id).select('+password');
     const friend = await User.findById(req.params.id);
 
     if (!friend) {
@@ -198,7 +199,8 @@ export const addFriend = async (req, res) => {
 // @access  Private
 export const removeFriend = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const userId = req.user?._id || req.user?.id;
+    const user = await User.findById(userId).select('+password');
     const friend = await User.findById(req.params.id);
 
     if (!friend) {
@@ -343,20 +345,23 @@ export const updateProfile = async (req, res) => {
     
     // Update password if provided
     if (newPassword) {
-      // Validate current password
-      if (!currentPassword) {
-        return res.status(400).json({
-          success: false,
-          message: 'Vui lòng nhập mật khẩu hiện tại'
-        });
-      }
-      
-      const isMatch = await user.comparePassword(currentPassword);
-      if (!isMatch) {
-        return res.status(400).json({
-          success: false,
-          message: 'Mật khẩu hiện tại không đúng'
-        });
+      // Validate current password only when account already has one.
+      // For accounts created without password, allow user to set first password directly.
+      if (user.password) {
+        if (!currentPassword) {
+          return res.status(400).json({
+            success: false,
+            message: 'Vui lòng nhập mật khẩu hiện tại'
+          });
+        }
+
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+          return res.status(400).json({
+            success: false,
+            message: 'Mật khẩu hiện tại không đúng'
+          });
+        }
       }
       
       // Validate new password strength

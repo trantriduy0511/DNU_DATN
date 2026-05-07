@@ -2,20 +2,43 @@ import React, { useEffect, useState } from "react";
 import { Upload, FileText, Sparkles, AlertCircle, Loader2, CheckCircle2, X, BookOpen, RefreshCw, RotateCcw } from "lucide-react";
 import api from "../utils/api";
 
-const TABS = [
-  { id: "summary", label: "Tóm tắt" },
-  { id: "keyPoints", label: "Điểm chính" },
-  { id: "structure", label: "Cấu trúc" },
-  { id: "concepts", label: "Khái niệm" },
-  { id: "full", label: "Toàn bộ phân tích" },
-];
+const TABS = [{ id: "full", label: "Toàn bộ phân tích" }];
+
+const normalizeBrokenVietnamese = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const recovered = decodeURIComponent(escape(raw));
+    return recovered || raw;
+  } catch {
+    return raw;
+  }
+};
+
+const cleanDisplayText = (value) => {
+  const fixed = normalizeBrokenVietnamese(value);
+  return fixed
+    .replace(/[^\p{L}\p{N}\s.,;:!?()/%\-]/gu, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const cleanAnalysisText = (value) => {
+  const fixed = normalizeBrokenVietnamese(value);
+  return fixed
+    .replace(/[#*]/g, " ")
+    .replace(/[^\p{L}\p{N}\s.,;:!?()/%\-\n]/gu, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
 
 const DocumentAnalyzer = () => {
   const [file, setFile] = useState(null);
   const [error, setError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("full");
   const [statusText, setStatusText] = useState("");
   const [jobs, setJobs] = useState([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
@@ -89,7 +112,7 @@ const DocumentAnalyzer = () => {
 
       if (statusData.status === "done") {
         setResult(statusData.result || null);
-        setActiveTab("summary");
+        setActiveTab("full");
         setStatusText("Phân tích hoàn tất.");
         await fetchJobs();
         return;
@@ -174,42 +197,9 @@ const DocumentAnalyzer = () => {
       );
     }
 
-    if (activeTab === "summary") {
-      return (
-        <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-          {result.summary || "Chưa có nội dung tóm tắt từ AI."}
-        </div>
-      );
-    }
-
-    if (activeTab === "keyPoints") {
-      return (
-        <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-          {result.keyPoints || "Chưa có danh sách điểm chính từ AI."}
-        </div>
-      );
-    }
-
-    if (activeTab === "structure") {
-      return (
-        <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-          {result.structure || "Chưa có phân tích cấu trúc tài liệu từ AI."}
-        </div>
-      );
-    }
-
-    if (activeTab === "concepts") {
-      return (
-        <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-          {result.concepts || "Chưa có danh sách khái niệm quan trọng từ AI."}
-        </div>
-      );
-    }
-
-    // full
     return (
       <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
-        {result.fullAnalysis || "Chưa có toàn bộ nội dung phân tích từ AI."}
+        {cleanAnalysisText(result.fullAnalysis) || "Chưa có toàn bộ nội dung phân tích từ AI."}
       </div>
     );
   };
@@ -223,7 +213,7 @@ const DocumentAnalyzer = () => {
         {fileName && (
           <span className="inline-flex items-center px-2 py-1 rounded-full bg-[var(--fb-input)] border border-[var(--fb-divider)]">
             <FileText className="w-3 h-3 mr-1 text-[var(--fb-icon)] opacity-70" />
-            {fileName}
+            {cleanDisplayText(fileName)}
           </span>
         )}
         {fileType && (
@@ -357,7 +347,7 @@ const DocumentAnalyzer = () => {
                 <div key={job.jobId} className="flex items-center justify-between border border-[var(--fb-divider)] rounded-md px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-[var(--fb-text-primary)] truncate">
-                      {job.metadata?.fileName || "Tài liệu"}
+                      {cleanDisplayText(job.metadata?.fileName || "Tài liệu")}
                     </p>
                     <p className="text-xs text-[var(--fb-text-secondary)]">
                       Trạng thái: {job.status} {typeof job.progress === "number" ? `(${job.progress}%)` : ""}

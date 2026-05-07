@@ -4,6 +4,8 @@ import Comment from '../models/Comment.model.js';
 import Event from '../models/Event.model.js';
 import Group from '../models/Group.model.js';
 import Notification from '../models/Notification.model.js';
+import Conversation from '../models/Conversation.model.js';
+import Message from '../models/Message.model.js';
 import SystemSettings from '../models/SystemSettings.model.js';
 import { emitToUser } from '../socket/socketServer.js';
 
@@ -514,7 +516,8 @@ export const updateUserStudentRole = async (req, res) => {
 // @access  Private/Admin
 export const deleteUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const { id: userId } = req.params;
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -531,11 +534,66 @@ export const deleteUser = async (req, res) => {
       });
     }
 
-    // Delete user's posts
-    await Post.deleteMany({ author: req.params.id });
+    // Delete user's content
+    await Post.deleteMany({ author: userId });
+    await Comment.deleteMany({ author: userId });
+    await Message.deleteMany({ $or: [{ sender: userId }, { receiver: userId }] });
 
-    // Delete user's comments
-    await Comment.deleteMany({ author: req.params.id });
+    // Remove stale references from social graph and groups.
+    await User.updateMany(
+      {},
+      {
+        $pull: {
+          friends: userId,
+          following: userId,
+          followers: userId,
+          blockedUsers: userId,
+          friendRequests: { from: userId }
+        }
+      }
+    );
+    await Group.updateMany(
+      {},
+      {
+        $pull: {
+          members: { user: userId }
+        }
+      }
+    );
+
+    // Remove events owned by deleted user (organizer is required field).
+    await Event.deleteMany({ organizer: userId });
+
+    // Drop/cleanup conversations linked to deleted account.
+    const directConversationIds = await Conversation.find({
+      type: 'direct',
+      participants: userId
+    }).distinct('_id');
+    if (directConversationIds.length > 0) {
+      await Message.deleteMany({ conversation: { $in: directConversationIds } });
+      await Conversation.deleteMany({ _id: { $in: directConversationIds } });
+    }
+
+    await Conversation.updateMany(
+      { type: 'group' },
+      {
+        $pull: {
+          participants: userId,
+          admins: userId
+        }
+      }
+    );
+    await Conversation.deleteMany({
+      type: 'group',
+      $or: [
+        { participants: { $size: 0 } },
+        { participants: { $size: 1 } }
+      ]
+    });
+
+    await Notification.deleteMany({
+      $or: [{ recipient: userId }, { sender: userId }]
+    });
 
     await user.deleteOne();
 
@@ -558,6 +616,9 @@ export const deleteUser = async (req, res) => {
 export const getAllPostsAdmin = async (req, res) => {
   try {
     const { search, status, category, page = 1, limit = 20 } = req.query;
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 20;
+    const skip = (parsedPage - 1) * parsedLimit;
 
     let query = {};
 
@@ -576,19 +637,52 @@ export const getAllPostsAdmin = async (req, res) => {
       query.category = category;
     }
 
-    const posts = await Post.find(query)
-      .populate('author', 'name email avatar studentRole')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+    // Backward-compatible author resolution:
+    // some legacy posts store user ref in "user" instead of "author".
+    const posts = await Post.aggregate([
+      { $match: query },
+      {
+        $addFields: {
+          authorRef: { $ifNull: ['$author', '$user'] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'authorRef',
+          foreignField: '_id',
+          as: 'authorData'
+        }
+      },
+      {
+        $addFields: {
+          author: {
+            $let: {
+              vars: { a: { $arrayElemAt: ['$authorData', 0] } },
+              in: {
+                _id: '$$a._id',
+                name: { $ifNull: ['$$a.name', '$authorNameSnapshot'] },
+                email: { $ifNull: ['$$a.email', ''] },
+                avatar: { $ifNull: ['$$a.avatar', ''] },
+                studentRole: { $ifNull: ['$$a.studentRole', ''] }
+              }
+            }
+          }
+        }
+      },
+      { $project: { authorData: 0, authorRef: 0 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parsedLimit }
+    ]);
 
     const count = await Post.countDocuments(query);
 
     res.status(200).json({
       success: true,
       count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(count / parsedLimit),
+      currentPage: parsedPage,
       posts
     });
   } catch (error) {
@@ -669,6 +763,9 @@ export const rejectPost = async (req, res) => {
 // @access  Private/Admin
 export const deletePostAdmin = async (req, res) => {
   try {
+    const isPermanentDelete =
+      String(req.query?.permanent || '').toLowerCase() === 'true' ||
+      String(req.query?.hard || '').toLowerCase() === 'true';
     const post = await Post.findById(req.params.id);
 
     if (!post) {
@@ -678,17 +775,29 @@ export const deletePostAdmin = async (req, res) => {
       });
     }
 
-    // Delete comments
-    await Comment.deleteMany({ post: req.params.id });
+    if (isPermanentDelete) {
+      // Xóa cứng: loại bỏ khỏi admin tab và khỏi luồng user.
+      await Comment.deleteMany({ post: post._id });
+      await Post.findByIdAndDelete(post._id);
+      await User.findByIdAndUpdate(post.author, { $inc: { postsCount: -1 } });
+      await Group.updateMany({ posts: post._id }, { $pull: { posts: post._id } });
+      await Event.updateMany({ posts: post._id }, { $pull: { posts: post._id } });
 
-    await post.deleteOne();
+      return res.status(200).json({
+        success: true,
+        message: 'Đã xóa vĩnh viễn bài viết'
+      });
+    }
 
-    // Update user post count
-    await User.findByIdAndUpdate(post.author, { $inc: { postsCount: -1 } });
+    // Xóa mềm: giữ lại dữ liệu để admin theo dõi lịch sử và trạng thái "Đã xóa".
+    if (post.status !== 'rejected') {
+      post.status = 'rejected';
+      await post.save();
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Đã xóa bài viết'
+      message: 'Đã chuyển bài viết sang trạng thái Đã xóa'
     });
   } catch (error) {
     res.status(500).json({
@@ -706,26 +815,80 @@ export const getAllCommentsAdmin = async (req, res) => {
   try {
     const { search, page = 1, limit = 20 } = req.query;
 
-    let query = {};
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 20;
+    const skip = (parsedPage - 1) * parsedLimit;
 
+    const baseMatch = {};
     if (search) {
-      query.content = { $regex: search, $options: 'i' };
+      baseMatch.content = { $regex: search, $options: 'i' };
     }
 
-    const comments = await Comment.find(query)
-      .populate('author', 'name email avatar studentRole')
-      .populate('post', 'content title')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+    // Một số dữ liệu cũ có thể lưu user ở field "user" thay vì "author".
+    // Chuẩn hóa bằng authorRef để admin luôn thấy đúng người bình luận.
+    const pipeline = [
+      { $match: baseMatch },
+      {
+        $addFields: {
+          authorRef: { $ifNull: ['$author', '$user'] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'authorRef',
+          foreignField: '_id',
+          as: 'authorData'
+        }
+      },
+      {
+        $lookup: {
+          from: 'posts',
+          localField: 'post',
+          foreignField: '_id',
+          as: 'postData'
+        }
+      },
+      {
+        $addFields: {
+          author: {
+            $let: {
+              vars: { a: { $arrayElemAt: ['$authorData', 0] } },
+              in: {
+                _id: '$$a._id',
+                name: { $ifNull: ['$$a.name', { $ifNull: ['$authorNameSnapshot', 'Người dùng đã xóa'] }] },
+                email: { $ifNull: ['$$a.email', ''] },
+                avatar: { $ifNull: ['$$a.avatar', ''] },
+                studentRole: { $ifNull: ['$$a.studentRole', ''] }
+              }
+            }
+          },
+          post: {
+            $let: {
+              vars: { p: { $arrayElemAt: ['$postData', 0] } },
+              in: {
+                _id: '$$p._id',
+                title: '$$p.title',
+                content: '$$p.content'
+              }
+            }
+          }
+        }
+      },
+      { $project: { authorData: 0, postData: 0, authorRef: 0 } },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: parsedLimit }
+    ];
 
-    const count = await Comment.countDocuments(query);
+    const comments = await Comment.aggregate(pipeline);
+    const count = await Comment.countDocuments(baseMatch);
 
     res.status(200).json({
       success: true,
       count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.ceil(count / parsedLimit),
+      currentPage: parsedPage,
       comments
     });
   } catch (error) {
@@ -742,6 +905,9 @@ export const getAllCommentsAdmin = async (req, res) => {
 // @access  Private/Admin
 export const deleteCommentAdmin = async (req, res) => {
   try {
+    const isPermanentDelete =
+      String(req.query?.permanent || '').toLowerCase() === 'true' ||
+      String(req.query?.hard || '').toLowerCase() === 'true';
     const comment = await Comment.findById(req.params.id);
 
     if (!comment) {
@@ -751,16 +917,30 @@ export const deleteCommentAdmin = async (req, res) => {
       });
     }
 
-    // Remove comment from post
+    if (isPermanentDelete) {
+      // Hard delete: remove completely from admin list.
+      await Post.findByIdAndUpdate(comment.post, {
+        $pull: { comments: comment._id }
+      });
+      await comment.deleteOne();
+      return res.status(200).json({
+        success: true,
+        message: 'Đã xóa vĩnh viễn bình luận'
+      });
+    }
+
+    // Soft delete: hide from user flow but keep history in admin.
+    if (comment.status !== 'rejected') {
+      comment.status = 'rejected';
+      await comment.save();
+    }
     await Post.findByIdAndUpdate(comment.post, {
       $pull: { comments: comment._id }
     });
 
-    await comment.deleteOne();
-
     res.status(200).json({
       success: true,
-      message: 'Đã xóa bình luận'
+      message: 'Đã chuyển bình luận sang trạng thái Đã xóa'
     });
   } catch (error) {
     res.status(500).json({
@@ -777,6 +957,9 @@ export const deleteCommentAdmin = async (req, res) => {
 export const getAllEventsAdmin = async (req, res) => {
   try {
     const { search, status, page = 1, limit = 20 } = req.query;
+    const now = new Date();
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 20;
 
     let query = {};
 
@@ -784,29 +967,49 @@ export const getAllEventsAdmin = async (req, res) => {
       query.title = { $regex: search, $options: 'i' };
     }
 
-    if (status) {
-      query.status = status;
+    // Keep direct status filtering only for "cancelled".
+    // Other lifecycle statuses are computed from event date.
+    if (status === 'cancelled') {
+      query.status = 'cancelled';
     }
 
     const events = await Event.find(query)
       .populate('organizer', 'name email avatar')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(parsedLimit)
+      .skip((parsedPage - 1) * parsedLimit)
       .sort({ date: -1 });
 
-    const count = await Event.countDocuments(query);
+    const withComputed = events.map((event) => {
+      const raw = event.toObject();
+      const eventDate = new Date(raw.date);
+      let computedStatus = 'upcoming';
+      if (raw.status === 'cancelled') {
+        computedStatus = 'cancelled';
+      } else if (!Number.isNaN(eventDate.getTime()) && eventDate < now) {
+        computedStatus = 'completed';
+      }
+      return {
+        ...raw,
+        computedStatus,
+        participantsCount: (raw.participants || []).length
+      };
+    });
 
-    // Add participants count to each event
-    const eventsWithCount = events.map(event => ({
-      ...event.toObject(),
-      participantsCount: event.participants.length
-    }));
+    const eventsWithCount =
+      status && ['upcoming', 'completed', 'cancelled'].includes(String(status))
+        ? withComputed.filter((event) => event.computedStatus === String(status))
+        : withComputed;
+
+    const count = status && ['upcoming', 'completed', 'cancelled'].includes(String(status))
+      ? eventsWithCount.length
+      : await Event.countDocuments(query);
+
 
     res.status(200).json({
       success: true,
       count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
+      totalPages: Math.max(1, Math.ceil(count / parsedLimit)),
+      currentPage: parsedPage,
       events: eventsWithCount
     });
   } catch (error) {
@@ -953,7 +1156,7 @@ export const getRecentActivities = async (req, res) => {
       activities.push({
         type: 'new_post',
         message: `Bài viết mới được đăng`,
-        user: post.author.name,
+        user: post.author?.name || 'Người dùng không xác định',
         time: post.createdAt
       });
     });
@@ -962,7 +1165,7 @@ export const getRecentActivities = async (req, res) => {
       activities.push({
         type: 'new_comment',
         message: `Bình luận mới`,
-        user: comment.author.name,
+        user: comment.author?.name || 'Người dùng không xác định',
         time: comment.createdAt
       });
     });
@@ -999,20 +1202,62 @@ export const getAllNotificationsAdmin = async (req, res) => {
       limit = 50 
     } = req.query;
     
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 50;
+    const skip = (parsedPage - 1) * parsedLimit;
     
-    // Build query
-    const query = {};
+    // Build query (admin notification center excludes chat-message notifications)
+    const query = { type: { $ne: 'message' } };
     
     if (type) {
+      if (type === 'message') {
+        return res.status(200).json({
+          success: true,
+          notifications: [],
+          statistics: { total: 0, unread: 0, read: 0, byType: [] },
+          pagination: { page: parsedPage, limit: parsedLimit, total: 0, totalPages: 0 }
+        });
+      }
       query.type = type;
     }
     
-    if (recipient) {
-      query.recipient = recipient;
+    if (recipient && String(recipient).trim()) {
+      const recipientKeyword = String(recipient).trim();
+      const isObjectIdLike = /^[a-fA-F0-9]{24}$/.test(recipientKeyword);
+      if (isObjectIdLike) {
+        query.recipient = recipientKeyword;
+      } else {
+        const matchedUsers = await User.find({
+          $or: [
+            { email: { $regex: recipientKeyword, $options: 'i' } },
+            { name: { $regex: recipientKeyword, $options: 'i' } }
+          ]
+        }).select('_id');
+        const recipientIds = matchedUsers.map((u) => u._id);
+        // No matched users => return empty result quickly.
+        if (recipientIds.length === 0) {
+          return res.status(200).json({
+            success: true,
+            notifications: [],
+            statistics: {
+              total: 0,
+              unread: 0,
+              read: 0,
+              byType: []
+            },
+            pagination: {
+              page: parsedPage,
+              limit: parsedLimit,
+              total: 0,
+              totalPages: 0
+            }
+          });
+        }
+        query.recipient = { $in: recipientIds };
+      }
     }
     
-    if (isRead !== undefined) {
+    if (isRead === 'true' || isRead === 'false') {
       query.isRead = isRead === 'true';
     }
     
@@ -1022,7 +1267,9 @@ export const getAllNotificationsAdmin = async (req, res) => {
         query.createdAt.$gte = new Date(startDate);
       }
       if (endDate) {
-        query.createdAt.$lte = new Date(endDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = end;
       }
     }
     
@@ -1035,17 +1282,18 @@ export const getAllNotificationsAdmin = async (req, res) => {
       .populate('group', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parsedLimit);
     
     const total = await Notification.countDocuments(query);
     
     // Get statistics
-    const totalNotifications = await Notification.countDocuments();
-    const unreadCount = await Notification.countDocuments({ isRead: false });
-    const readCount = await Notification.countDocuments({ isRead: true });
+    const totalNotifications = await Notification.countDocuments({ type: { $ne: 'message' } });
+    const unreadCount = await Notification.countDocuments({ type: { $ne: 'message' }, isRead: false });
+    const readCount = await Notification.countDocuments({ type: { $ne: 'message' }, isRead: true });
     
     // Count by type
     const notificationsByType = await Notification.aggregate([
+      { $match: { type: { $ne: 'message' } } },
       { $group: { _id: '$type', count: { $sum: 1 } } }
     ]);
     
@@ -1059,10 +1307,10 @@ export const getAllNotificationsAdmin = async (req, res) => {
         byType: notificationsByType
       },
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: parsedPage,
+        limit: parsedLimit,
         total,
-        totalPages: Math.ceil(total / parseInt(limit))
+        totalPages: Math.ceil(total / parsedLimit)
       }
     });
   } catch (error) {
@@ -1182,6 +1430,63 @@ export const deleteNotificationAdmin = async (req, res) => {
   }
 };
 
+// @desc    Mark one notification as read (Admin)
+// @route   PUT /api/admin/notifications/:id/read
+// @access  Private/Admin
+export const markNotificationAsReadAdmin = async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy thông báo'
+      });
+    }
+
+    if (!notification.isRead) {
+      notification.isRead = true;
+      await notification.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã đánh dấu thông báo là đã đọc',
+      notification
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi cập nhật trạng thái thông báo',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Mark all notifications as read (Admin)
+// @route   PUT /api/admin/notifications/read-all
+// @access  Private/Admin
+export const markAllNotificationsAsReadAdmin = async (req, res) => {
+  try {
+    const result = await Notification.updateMany(
+      { isRead: false },
+      { $set: { isRead: true } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã đánh dấu tất cả thông báo là đã đọc',
+      modifiedCount: result.modifiedCount || 0
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi đánh dấu tất cả thông báo',
+      error: error.message
+    });
+  }
+};
+
 // @desc    Get notification statistics (Admin)
 // @route   GET /api/admin/notifications/statistics
 // @access  Private/Admin
@@ -1189,7 +1494,7 @@ export const getNotificationStatistics = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    const query = {};
+    const query = { type: { $ne: 'message' } };
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) {
@@ -1421,6 +1726,51 @@ export const getPendingGroups = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi lấy danh sách nhóm chờ duyệt',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get all groups for admin
+// @route   GET /api/admin/groups
+// @access  Private/Admin
+export const getAllGroupsAdmin = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 50 } = req.query;
+    const query = {};
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (search) {
+      query.name = { $regex: search, $options: 'i' };
+    }
+
+    const groups = await Group.find(query)
+      .populate('creator', 'name avatar email studentRole')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Group.countDocuments(query);
+
+    const groupsWithCount = groups.map((group) => ({
+      ...group.toObject(),
+      membersCount: Array.isArray(group.members) ? group.members.length : 0
+    }));
+
+    res.status(200).json({
+      success: true,
+      count,
+      totalPages: Math.ceil(count / limit),
+      currentPage: parseInt(page, 10),
+      groups: groupsWithCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi lấy danh sách nhóm (admin)',
       error: error.message
     });
   }

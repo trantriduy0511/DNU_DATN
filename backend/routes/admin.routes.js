@@ -22,9 +22,12 @@ import {
   getAllNotificationsAdmin,
   sendNotificationAdmin,
   deleteNotificationAdmin,
+  markNotificationAsReadAdmin,
+  markAllNotificationsAsReadAdmin,
   getNotificationStatistics,
   approveGroup,
   rejectGroup,
+  getAllGroupsAdmin,
   getPendingGroups,
   getSystemSettings,
   updateSystemSettings,
@@ -59,9 +62,12 @@ router.get('/activities', getRecentActivities);
 router.get('/notifications', getAllNotificationsAdmin);
 router.get('/notifications/statistics', getNotificationStatistics);
 router.post('/notifications', sendNotificationAdmin);
+router.put('/notifications/read-all', markAllNotificationsAsReadAdmin);
+router.put('/notifications/:id/read', markNotificationAsReadAdmin);
 router.delete('/notifications/:id', deleteNotificationAdmin);
 
 // Group approval routes
+router.get('/groups', getAllGroupsAdmin);
 router.get('/groups/pending', getPendingGroups);
 router.put('/groups/:id/approve', approveGroup);
 router.put('/groups/:id/reject', rejectGroup);

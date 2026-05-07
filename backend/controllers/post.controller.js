@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Post from '../models/Post.model.js';
 import User from '../models/User.model.js';
 import Event from '../models/Event.model.js';
+import Group from '../models/Group.model.js';
 import { createNotification } from './notification.controller.js';
 import { getUploadedFileUrl, getUploadedImageUrl } from '../utils/uploadUrl.js';
 
@@ -102,6 +103,7 @@ export const createPost = async (req, res) => {
 
     const post = await Post.create({
       author: req.user.id,
+      authorNameSnapshot: String(req.user?.name || '').trim(),
       title: title ? title.trim() : undefined,
       content: postBodyContent,
       textBackground: normalizedTextBackground,
@@ -341,14 +343,17 @@ export const getAllPosts = async (req, res) => {
       .skip((pageNum - 1) * limitNum)
       .sort({ createdAt: -1 });
 
+    // Hide orphan posts whose author account no longer exists.
+    const visiblePosts = posts.filter((post) => post.author);
+
     const count = await Post.countDocuments(query);
 
     res.status(200).json({
       success: true,
-      count,
+      count: visiblePosts.length,
       totalPages: Math.ceil(count / limitNum),
       currentPage: pageNum,
-      posts
+      posts: visiblePosts
     });
   } catch (error) {
     res.status(500).json({
@@ -372,6 +377,14 @@ export const getPostById = async (req, res) => {
       });
 
     if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bài viết'
+      });
+    }
+
+    // Bài đã xóa mềm chỉ admin mới xem trực tiếp.
+    if (post.status === 'rejected' && req.user.role !== 'admin') {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy bài viết'
@@ -410,6 +423,13 @@ export const updatePost = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Bạn không có quyền chỉnh sửa bài viết này'
+      });
+    }
+
+    if (post.status === 'rejected' && req.user.role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài viết đã bị xóa và không thể chỉnh sửa'
       });
     }
 
@@ -565,14 +585,25 @@ export const deletePost = async (req, res) => {
       });
     }
 
-    await post.deleteOne();
+    // Soft delete: keep record for admin tracking ("Đã xóa"),
+    // but hide from normal feeds via status filter.
+    const wasApproved = post.status === 'approved';
+    if (post.status !== 'rejected') {
+      post.status = 'rejected';
+      await post.save();
+    }
 
-    // Update user post count
-    await User.findByIdAndUpdate(post.author, { $inc: { postsCount: -1 } });
+    // Keep counters/references in sync when post is removed from public view.
+    await Promise.all([
+      wasApproved
+        ? User.findByIdAndUpdate(post.author, { $inc: { postsCount: -1 } })
+        : Promise.resolve(),
+      User.updateMany({ savedPosts: post._id }, { $pull: { savedPosts: post._id } })
+    ]);
 
     res.status(200).json({
       success: true,
-      message: 'Đã xóa bài viết'
+      message: 'Đã chuyển bài viết sang trạng thái Đã xóa'
     });
   } catch (error) {
     res.status(500).json({
@@ -594,6 +625,12 @@ export const likePost = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy bài viết'
+      });
+    }
+    if (post.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài viết đã bị xóa'
       });
     }
 
@@ -646,6 +683,12 @@ export const unlikePost = async (req, res) => {
         message: 'Không tìm thấy bài viết'
       });
     }
+    if (post.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài viết đã bị xóa'
+      });
+    }
 
     post.likes = post.likes.filter(id => id.toString() !== req.user.id);
     await post.save();
@@ -677,6 +720,12 @@ export const sharePost = async (req, res) => {
         message: 'Không tìm thấy bài viết'
       });
     }
+    if (post.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài viết đã bị xóa'
+      });
+    }
 
     post.shares += 1;
     await post.save();
@@ -706,6 +755,12 @@ export const savePost = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy bài viết'
+      });
+    }
+    if (post.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bài viết đã bị xóa'
       });
     }
 
@@ -764,6 +819,7 @@ export const getSavedPosts = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate({
       path: 'savedPosts',
+      match: { status: 'approved' },
       populate: {
         path: 'author',
         select: 'name avatar studentRole major'
@@ -771,10 +827,12 @@ export const getSavedPosts = async (req, res) => {
       options: { sort: { createdAt: -1 } }
     });
 
+    const visibleSavedPosts = (user?.savedPosts || []).filter((post) => post && post.author);
+
     res.status(200).json({
       success: true,
-      count: user.savedPosts.length,
-      posts: user.savedPosts
+      count: visibleSavedPosts.length,
+      posts: visibleSavedPosts
     });
   } catch (error) {
     res.status(500).json({

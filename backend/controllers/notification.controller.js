@@ -1,11 +1,44 @@
 import Notification from '../models/Notification.model.js';
 import { emitToUser } from '../socket/socketServer.js';
+import User from '../models/User.model.js';
+import mongoose from 'mongoose';
+
+const cleanupOrphanNotificationsForRecipient = async (recipientId) => {
+  const rows = await Notification.find({ recipient: recipientId }).select('_id sender');
+  if (!rows.length) return;
+  const senderIdsRaw = [...new Set(rows.map((n) => String(n.sender || '')).filter(Boolean))];
+  if (!senderIdsRaw.length) return;
+
+  const senderIds = senderIdsRaw.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  const invalidSenderRows = rows
+    .filter((n) => !mongoose.Types.ObjectId.isValid(String(n.sender || '')))
+    .map((n) => n._id);
+
+  let existingSet = new Set();
+  if (senderIds.length > 0) {
+    const existingUsers = await User.find({ _id: { $in: senderIds } }).select('_id');
+    existingSet = new Set(existingUsers.map((u) => String(u._id)));
+  }
+
+  const orphanIds = rows
+    .filter((n) => !existingSet.has(String(n.sender || '')))
+    .map((n) => n._id);
+
+  const toDelete = [...new Set([...orphanIds, ...invalidSenderRows].map((id) => String(id)))].filter((id) =>
+    mongoose.Types.ObjectId.isValid(id)
+  );
+  if (toDelete.length > 0) {
+    await Notification.deleteMany({ _id: { $in: toDelete } });
+  }
+};
 
 // @desc    Get user notifications
 // @route   GET /api/notifications
 // @access  Private
 export const getNotifications = async (req, res) => {
   try {
+    await cleanupOrphanNotificationsForRecipient(req.user.id);
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
@@ -56,6 +89,8 @@ export const getNotifications = async (req, res) => {
 // @access  Private
 export const getUnreadCount = async (req, res) => {
   try {
+    await cleanupOrphanNotificationsForRecipient(req.user.id);
+
     const unreadCount = await Notification.countDocuments({ 
       recipient: req.user.id, 
       isRead: false 

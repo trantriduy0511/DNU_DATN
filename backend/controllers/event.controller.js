@@ -460,10 +460,11 @@ export const getEventPosts = async (req, res) => {
         path: 'comments',
         populate: { path: 'author', select: 'name avatar' }
       });
+    const visiblePosts = posts.filter((post) => post.author);
 
     res.status(200).json({
       success: true,
-      posts
+      posts: visiblePosts
     });
   } catch (error) {
     console.error('getEventPosts:', error);
@@ -568,6 +569,7 @@ export const createEventPost = async (req, res) => {
 
     const post = await Post.create({
       author: uid,
+      authorNameSnapshot: String(req.user?.name || '').trim(),
       content: contentBody,
       textBackground: normalizedTextBackground,
       category,

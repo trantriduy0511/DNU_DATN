@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Search, ArrowLeft, MoreVertical, Check, CheckCheck, Image as ImageIcon, FileText, Paperclip, Film, Users, Plus, UserPlus, LogOut, Trash2, Ban, User, UserMinus, RotateCcw, ExternalLink, Calendar } from 'lucide-react';
+import { MessageCircle, X, Send, Search, ArrowLeft, MoreVertical, MoreHorizontal, Check, CheckCheck, Image as ImageIcon, FileText, Paperclip, Film, Users, Plus, UserPlus, LogOut, Trash2, Ban, User, UserMinus, RotateCcw, ExternalLink, Calendar } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
@@ -78,6 +78,23 @@ const stripTrailingShareUrl = (text) => {
     .replace(/https?:\/\/\S+/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+};
+
+const normalizeSharedPostCaption = (rawText) => {
+  const text = String(rawText || '').trim();
+  if (!text) return '';
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const filtered = lines.filter(
+    (line) =>
+      !/đã chia sẻ bài viết/i.test(line) &&
+      !/^xem tại:/i.test(line) &&
+      !/^https?:\/\//i.test(line)
+  );
+  const joined = filtered.join(' ');
+  return joined.replace(/[“”]/g, '"').trim();
 };
 
 /** Ngày giờ trên thẻ chia sẻ sự kiện trong chat (gần giống Facebook). */
@@ -169,8 +186,8 @@ const ChatUsers = () => {
   const [selectedMembersToAdd, setSelectedMembersToAdd] = useState([]);
   const [addingMembers, setAddingMembers] = useState(false);
   const [hoveredMessageId, setHoveredMessageId] = useState(null);
-  const [deletingMessageId, setDeletingMessageId] = useState(null);
   const [recallingMessageId, setRecallingMessageId] = useState(null);
+  const [openMessageMenuId, setOpenMessageMenuId] = useState(null);
   const [openConversationMenu, setOpenConversationMenu] = useState(null);
   const [deletingConversationId, setDeletingConversationId] = useState(null);
   const [blockingUserId, setBlockingUserId] = useState(null);
@@ -179,7 +196,11 @@ const ChatUsers = () => {
   const [removingParticipantId, setRemovingParticipantId] = useState(null);
   const [conversationFilter, setConversationFilter] = useState('all'); // 'all', 'unread', 'group'
   const participantMenuRef = useRef(null);
+  const messageMenuRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const shouldAutoScrollRef = useRef(true);
+  const forceScrollOnNextMessagesRef = useRef(false);
   const menuRef = useRef(null);
   const userMenuRef = useRef(null);
   const conversationMenuRef = useRef(null);
@@ -494,6 +515,8 @@ const ChatUsers = () => {
 
   useEffect(() => {
     if (selectedConversation && socketRef.current) {
+      shouldAutoScrollRef.current = true;
+      forceScrollOnNextMessagesRef.current = true;
       fetchMessages(selectedConversation._id);
       markAsRead(selectedConversation._id);
       
@@ -528,7 +551,10 @@ const ChatUsers = () => {
   }, [isOpen]);
 
   useEffect(() => {
-    scrollToBottom();
+    if (forceScrollOnNextMessagesRef.current || shouldAutoScrollRef.current) {
+      scrollToBottom(forceScrollOnNextMessagesRef.current ? 'auto' : 'smooth');
+      forceScrollOnNextMessagesRef.current = false;
+    }
   }, [messages]);
 
   // Initial fetch for unread count
@@ -563,8 +589,17 @@ const ChatUsers = () => {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const handleMessagesScroll = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const threshold = 80;
+    const distanceToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldAutoScrollRef.current = distanceToBottom <= threshold;
+  };
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    shouldAutoScrollRef.current = true;
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   const fetchUnreadCount = async () => {
@@ -762,7 +797,11 @@ const ChatUsers = () => {
     if (conversation.type === 'group') {
       return null;
     }
-    return conversation.participants?.find(p => p._id !== user.id);
+    const currentUserId = String(user?.id || user?._id || '');
+    return conversation.participants?.find((p) => {
+      const participantId = String(p?._id || p?.id || p || '');
+      return participantId && participantId !== currentUserId;
+    }) || null;
   };
 
   const getConversationName = (conversation) => {
@@ -1027,28 +1066,6 @@ const ChatUsers = () => {
     setSelectedMembersToAdd(selectedMembersToAdd.filter(m => m._id !== userId));
   };
 
-  const handleDeleteMessage = async (messageId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tin nhắn này?')) {
-      return;
-    }
-
-    try {
-      setDeletingMessageId(messageId);
-      await api.delete(`/messages/delete/${messageId}`);
-      
-      // Message will be removed via socket event, but remove optimistically
-      setMessages(prev => prev.filter(msg => msg._id !== messageId));
-      
-      // Refresh conversations to update lastMessage (silent update)
-      fetchConversations(false);
-    } catch (error) {
-      console.error('Error deleting message:', error);
-      alert(error.response?.data?.message || 'Lỗi khi xóa tin nhắn');
-    } finally {
-      setDeletingMessageId(null);
-    }
-  };
-
   const handleRecallMessage = async (messageId) => {
     if (!window.confirm('Bạn có chắc chắn muốn thu hồi tin nhắn này? Tin nhắn sẽ không thể xem được nữa.')) {
       return;
@@ -1056,6 +1073,7 @@ const ChatUsers = () => {
 
     try {
       setRecallingMessageId(messageId);
+      setOpenMessageMenuId(null);
       await api.put(`/messages/recall/${messageId}`);
       
       // Message will be updated via socket event, but update optimistically
@@ -1076,18 +1094,7 @@ const ChatUsers = () => {
   const canRecallMessage = (message) => {
     if (!message || message.isRecalled) return false;
     if (message.sender?._id !== user.id) return false;
-    
-    // Check if message is within 15 minutes
-    const messageTime = new Date(message.createdAt);
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    return messageTime >= fifteenMinutesAgo;
-  };
-
-  const canDeleteMessage = (message) => {
-    if (!message) return false;
-    
-    // User can only delete their own messages
-    return message.sender?._id === user.id;
+    return true;
   };
 
   const handleLeaveGroup = async () => {
@@ -1266,16 +1273,19 @@ const ChatUsers = () => {
       if (participantMenuRef.current && !participantMenuRef.current.contains(event.target)) {
         setOpenParticipantMenu(null);
       }
+      if (messageMenuRef.current && !messageMenuRef.current.contains(event.target)) {
+        setOpenMessageMenuId(null);
+      }
     };
 
-    if (showGroupMenu || openConversationMenu || openParticipantMenu) {
+    if (showGroupMenu || openConversationMenu || openParticipantMenu || openMessageMenuId) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showGroupMenu, openConversationMenu, openParticipantMenu]);
+  }, [showGroupMenu, openConversationMenu, openParticipantMenu, openMessageMenuId]);
 
   const getUnreadCountForConversation = (conversation) => {
     if (!conversation.lastMessage) return 0;
@@ -1636,7 +1646,7 @@ const ChatUsers = () => {
             <div className="flex-1 flex flex-col w-full min-w-0 h-full overflow-hidden">
               {/* Chat Header */}
               <div className="bg-[#0084ff] text-white p-3 flex items-center justify-between border-b border-[#0066cc] flex-shrink-0">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-0.5">
                   <button
                     onClick={() => setSelectedConversation(null)}
                     className="p-1.5 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
@@ -1646,7 +1656,7 @@ const ChatUsers = () => {
                   </button>
                   <button
                     type="button"
-                    className={`flex items-center space-x-3 text-left rounded-lg -m-1 p-1 transition-colors ${
+                    className={`flex items-center space-x-1 text-left rounded-lg -m-1 p-1 transition-colors ${
                       selectedConversation?.type !== 'group'
                         ? 'hover:bg-white hover:bg-opacity-10 cursor-pointer'
                         : 'cursor-default'
@@ -1828,7 +1838,11 @@ const ChatUsers = () => {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f0f2f5]">
+              <div
+                ref={messagesContainerRef}
+                onScroll={handleMessagesScroll}
+                className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f0f2f5]"
+              >
                 {messages.map((msg) => {
                   const isOwn = msg.sender?._id === user.id;
                   const eventShare =
@@ -1843,8 +1857,9 @@ const ChatUsers = () => {
                       : null;
                   const shareBodyText =
                     shareTarget && msg.content ? stripTrailingShareUrl(msg.content) : '';
+                  const normalizedShareCaption =
+                    shareTarget && shareBodyText ? normalizeSharedPostCaption(shareBodyText) : '';
 
-                  const canDelete = canDeleteMessage(msg);
                   const canRecall = canRecallMessage(msg);
                   
                   return (
@@ -1863,7 +1878,7 @@ const ChatUsers = () => {
                         />
                       )}
                       <div
-                        className={`flex flex-col ${isOwn ? 'items-end' : ''} ${
+                        className={`relative flex flex-col ${isOwn ? 'items-end' : ''} ${
                           eventShare || groupShare
                             ? 'max-w-[min(280px,calc(100%-2.75rem))]'
                             : 'max-w-[min(17rem,calc(100%-2.75rem))]'
@@ -2061,9 +2076,13 @@ const ChatUsers = () => {
                                   </>
                                 ) : shareTarget ? (
                                   <>
-                                    {shareBodyText ? (
-                                      <p className="text-sm whitespace-pre-wrap leading-relaxed mb-2">
-                                        {renderTextWithClickableUrls(shareBodyText, isOwn)}
+                                    {normalizedShareCaption ? (
+                                      <p
+                                        className={`mb-2 px-2 text-sm leading-relaxed ${
+                                          isOwn ? 'text-white/95' : 'text-gray-800'
+                                        }`}
+                                      >
+                                        {normalizedShareCaption}
                                       </p>
                                     ) : null}
                                     <button
@@ -2075,43 +2094,31 @@ const ChatUsers = () => {
                                           navigate(`/home?post=${shareTarget.postId}`);
                                         }
                                       }}
-                                      className={`flex items-center gap-2 w-full rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
+                                      className={`block w-full overflow-hidden rounded-2xl text-left shadow-md transition hover:opacity-[0.98] ${
                                         isOwn
-                                          ? 'bg-white/20 hover:bg-white/30 text-white'
-                                          : 'bg-white shadow-sm border border-gray-200/80 hover:bg-blue-50 text-blue-700'
+                                          ? 'ring-1 ring-white/40'
+                                          : 'border border-gray-200/90'
                                       }`}
                                     >
-                                      <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-90" />
-                                      <span>Xem bài viết được chia sẻ</span>
+                                      <div
+                                        className={`flex items-center gap-2 px-3.5 py-2 ${
+                                          isOwn ? 'bg-white/15 text-white' : 'bg-[#f0f2f5] text-gray-700'
+                                        }`}
+                                      >
+                                        <ExternalLink className="h-4 w-4 shrink-0 opacity-85" />
+                                        <span className="text-xs font-semibold uppercase tracking-wide opacity-90">
+                                          Bài viết được chia sẻ
+                                        </span>
+                                      </div>
+                                      <div className={`px-3.5 py-3 ${isOwn ? 'bg-white' : 'bg-white'}`}>
+                                        <p className="text-[15px] font-semibold leading-snug text-gray-900">
+                                          Xem bài viết
+                                        </p>
+                                        <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                                          Mở bài viết gốc trong bảng tin để xem đầy đủ nội dung, ảnh và bình luận.
+                                        </p>
+                                      </div>
                                     </button>
-                                    <a
-                                      href={
-                                        shareTarget.kind === 'group'
-                                          ? `/groups/${shareTarget.groupId}?post=${shareTarget.postId}`
-                                          : `/home?post=${shareTarget.postId}`
-                                      }
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (shareTarget.kind === 'group') {
-                                          navigate(`/groups/${shareTarget.groupId}?post=${shareTarget.postId}`);
-                                        } else {
-                                          navigate(`/home?post=${shareTarget.postId}`);
-                                        }
-                                      }}
-                                      className={`block text-xs font-medium underline break-all mt-1.5 ${
-                                        isOwn ? 'text-blue-50 hover:text-white' : 'text-blue-700 hover:text-blue-900'
-                                      }`}
-                                    >
-                                      {typeof window !== 'undefined'
-                                        ? `${window.location.origin}${
-                                            shareTarget.kind === 'group'
-                                              ? `/groups/${shareTarget.groupId}?post=${shareTarget.postId}`
-                                              : `/home?post=${shareTarget.postId}`
-                                          }`
-                                        : shareTarget.kind === 'group'
-                                          ? `/groups/${shareTarget.groupId}?post=${shareTarget.postId}`
-                                          : `/home?post=${shareTarget.postId}`}
-                                    </a>
                                   </>
                                 ) : (
                                   <p className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -2130,57 +2137,56 @@ const ChatUsers = () => {
                             </>
                           )}
                         </div>
-                        <div className={`flex items-center space-x-1 mt-0.5 px-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                          {isOwn && (
-                            msg.isRead ? (
-                              <CheckCheck className="w-3 h-3 text-blue-500" />
-                            ) : (
-                              <Check className="w-3 h-3 text-gray-400" />
-                            )
-                          )}
-                          <span className="text-xs text-gray-400">
-                            {formatTimeAgo(msg.createdAt)}
-                          </span>
-                          {/* Action buttons - only show on hover */}
-                          {hoveredMessageId === msg._id && (
-                            <div className={`flex items-center space-x-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-                              {/* Recall button - only for own messages that can be recalled */}
-                              {canRecall && (
-                                <button
-                                  onClick={() => handleRecallMessage(msg._id)}
-                                  disabled={recallingMessageId === msg._id}
-                                  className="p-1 rounded-full transition-colors hover:bg-orange-100 text-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Thu hồi tin nhắn"
+                        {(hoveredMessageId === msg._id || openMessageMenuId === msg._id) && canRecall && (
+                          <div
+                            className={`absolute top-1 flex items-center gap-1.5 ${isOwn ? 'right-full mr-2.5' : 'left-full ml-2.5'}`}
+                          >
+                            {isOwn && (
+                              msg.isRead ? (
+                                <CheckCheck className="w-3 h-3 text-blue-500" />
+                              ) : (
+                                <Check className="w-3 h-3 text-gray-400" />
+                              )
+                            )}
+                            <span className="whitespace-nowrap text-xs leading-none text-gray-400">
+                              {formatTimeAgo(msg.createdAt)}
+                            </span>
+                            <div className="relative" ref={openMessageMenuId === msg._id ? messageMenuRef : null}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenMessageMenuId((prev) => (prev === msg._id ? null : msg._id))
+                                }
+                                className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-[var(--fb-text-secondary)] transition-colors hover:bg-[var(--fb-hover)]"
+                                title="Tùy chọn tin nhắn"
+                              >
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </button>
+
+                              {openMessageMenuId === msg._id && (
+                                <div
+                                  className={`absolute z-20 mt-1 min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg ${
+                                    isOwn ? 'right-0' : 'left-0'
+                                  }`}
                                 >
-                                  {recallingMessageId === msg._id ? (
-                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                                  ) : (
-                                    <RotateCcw className="w-3 h-3" />
-                                  )}
-                                </button>
-                              )}
-                              {/* Delete button - only show if user can delete */}
-                              {canDelete && (
-                                <button
-                                  onClick={() => handleDeleteMessage(msg._id)}
-                                  disabled={deletingMessageId === msg._id}
-                                  className={`p-1 rounded-full transition-colors ${
-                                    isOwn
-                                      ? 'hover:bg-white hover:bg-opacity-20 text-white'
-                                      : 'hover:bg-red-100 text-red-500'
-                                  } ${deletingMessageId === msg._id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  title="Xóa tin nhắn"
-                                >
-                                  {deletingMessageId === msg._id ? (
-                                    <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                                  ) : (
-                                    <Trash2 className="w-3 h-3" />
-                                  )}
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRecallMessage(msg._id)}
+                                    disabled={recallingMessageId === msg._id}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    {recallingMessageId === msg._id ? (
+                                      <div className="h-3.5 w-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                                    ) : (
+                                      <RotateCcw className="h-3.5 w-3.5" />
+                                    )}
+                                    <span>Thu hồi tin nhắn</span>
+                                  </button>
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

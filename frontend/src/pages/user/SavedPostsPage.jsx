@@ -156,7 +156,7 @@ export default function SavedPostsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)]">
-      <main className="max-w-7xl mx-auto px-2 lg:px-4 py-4">
+      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">

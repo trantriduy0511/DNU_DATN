@@ -54,11 +54,11 @@ const SystemSettingsSchema = new mongoose.Schema({
   // Group Settings
   autoApproveGroups: {
     type: Boolean,
-    default: false
+    default: true
   },
   requireGroupApproval: {
     type: Boolean,
-    default: true
+    default: false
   },
   maxGroupsPerUser: {
     type: Number,

@@ -26,44 +26,87 @@ const getGenAIClient = () => {
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const normalizeUploadedFileName = (name) => {
+  const raw = String(name || '').trim();
+  if (!raw) return 'unknown';
+  try {
+    const recovered = Buffer.from(raw, 'latin1').toString('utf8');
+    const hasUnicode = /[\u0100-\uFFFF]/.test(recovered);
+    return hasUnicode ? recovered : raw;
+  } catch {
+    return raw;
+  }
+};
 
-const extractSection = (text, startMarker, endMarker) => {
-  const startIndex = text.indexOf(startMarker);
-  if (startIndex === -1) return null;
+const sanitizeAiText = (value) =>
+  String(value || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/[#*]/g, ' ')
+    .replace(/`/g, '')
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .replace(/^[\-\u2022]\s+/gm, '')
+    .replace(/[^\p{L}\p{N}\s.,;:!?()/%\-]/gu, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
-  const start = startIndex + startMarker.length;
-  const end = endMarker ? text.indexOf(endMarker, start) : text.length;
-  if (end === -1 && endMarker) return null;
+const cleanList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeAiText(item)).filter(Boolean);
+  }
+  const text = sanitizeAiText(value);
+  if (!text) return [];
+  return text
+    .split(/\r?\n|;\s+/)
+    .map((item) => sanitizeAiText(item))
+    .filter(Boolean)
+    .slice(0, 12);
+};
 
-  return text.substring(start, end).trim();
+const tryExtractJson = (rawText) => {
+  const text = String(rawText || '').trim();
+  if (!text) return null;
+
+  const fencedMatch = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  const jsonCandidate = fencedMatch?.[1] || text;
+
+  try {
+    return JSON.parse(jsonCandidate);
+  } catch {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 };
 
 const buildAnalysisPrompt = (documentText) => `
-Bạn là chuyên gia phân tích tài liệu học tập. Hãy phân tích tài liệu sau đây và cung cấp:
+Bạn là trợ lý phân tích tài liệu học tập.
+Hãy trả về DUY NHẤT JSON hợp lệ, không kèm markdown, không code fence, không giải thích thêm.
 
-1. **TÓM TẮT (Summary):**
-   - Tóm tắt ngắn gọn nội dung chính (100-200 từ)
-   - Highlight các ý quan trọng nhất
-   - Phân loại chủ đề/chuyên ngành
+Schema JSON:
+{
+  "summary": "string, 120-220 từ",
+  "keyPoints": ["string", "string", "..."], // 5-10 ý
+  "structure": ["string", "string", "..."], // 4-10 mục cấu trúc/outline
+  "concepts": ["string", "string", "..."] // 5-10 khái niệm quan trọng
+}
 
-2. **KEY POINTS (Điểm chính):**
-   - Liệt kê 5-10 điểm quan trọng nhất
-   - Mỗi điểm ngắn gọn, rõ ràng
-   - Sắp xếp theo thứ tự quan trọng
+Yêu cầu nội dung:
+- Viết tiếng Việt, dễ hiểu, đúng trọng tâm.
+- Không dùng ký tự trang trí đặc biệt.
+- Mỗi phần phải khác nhau về nội dung, không lặp nguyên văn.
 
-3. **CẤU TRÚC (Structure):**
-   - Nhận diện các phần/chương chính
-   - Tạo outline/bảng mục lục
-   - Đánh giá độ khó (dễ/trung bình/khó)
-
-4. **KHÁI NIỆM QUAN TRỌNG (Key Concepts):**
-   - Trích xuất 5-10 khái niệm/thuật ngữ quan trọng
-   - Giải thích ngắn gọn từng khái niệm
-   - Gợi ý từ khóa để tìm kiếm thêm
-
-Hãy trả lời bằng tiếng Việt, rõ ràng, có cấu trúc. Sử dụng định dạng markdown để dễ đọc.
-
-TÀI LIỆU CẦN PHÂN TÍCH:
+TÀI LIỆU:
 """
 ${documentText}
 """
@@ -110,19 +153,39 @@ const callGeminiWithRetry = async (analysisPrompt, maxAttempts = 3) => {
   throw lastError;
 };
 
-const buildAnalysisResult = (aiAnalysis, fileName, documentText, fileType) => ({
-  summary: extractSection(aiAnalysis, 'TÓM TẮT', 'KEY POINTS'),
-  keyPoints: extractSection(aiAnalysis, 'KEY POINTS', 'CẤU TRÚC'),
-  structure: extractSection(aiAnalysis, 'CẤU TRÚC', 'KHÁI NIỆM'),
-  concepts: extractSection(aiAnalysis, 'KHÁI NIỆM', null),
-  fullAnalysis: aiAnalysis,
-  metadata: {
-    fileName,
-    fileType,
-    textLength: documentText.length,
-    analyzedAt: new Date().toISOString(),
-  },
-});
+const buildAnalysisResult = (aiAnalysis, fileName, documentText, fileType) => {
+  const parsed = tryExtractJson(aiAnalysis) || {};
+
+  const summary = sanitizeAiText(parsed.summary || aiAnalysis || '');
+  const keyPointsList = cleanList(parsed.keyPoints);
+  const structureList = cleanList(parsed.structure);
+  const conceptsList = cleanList(parsed.concepts);
+
+  const keyPoints = keyPointsList.map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+  const structure = structureList.map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+  const concepts = conceptsList.map((item, idx) => `${idx + 1}. ${item}`).join('\n');
+
+  const fullAnalysis = [
+    `Tóm tắt:\n${summary}`,
+    `Điểm chính:\n${keyPoints || 'Chưa có dữ liệu.'}`,
+    `Cấu trúc:\n${structure || 'Chưa có dữ liệu.'}`,
+    `Khái niệm quan trọng:\n${concepts || 'Chưa có dữ liệu.'}`,
+  ].join('\n\n');
+
+  return {
+    summary: summary || 'Chưa có nội dung tóm tắt.',
+    keyPoints: keyPoints || 'Chưa có danh sách điểm chính.',
+    structure: structure || 'Chưa có phân tích cấu trúc.',
+    concepts: concepts || 'Chưa có danh sách khái niệm.',
+    fullAnalysis,
+    metadata: {
+      fileName,
+      fileType,
+      textLength: documentText.length,
+      analyzedAt: new Date().toISOString(),
+    },
+  };
+};
 
 let workerInstance = null;
 
@@ -149,7 +212,7 @@ const processDocumentAnalysisByJobId = async (jobId) => {
   try {
     const prompt = buildAnalysisPrompt(docJob.sourceText);
     const aiAnalysis = await callGeminiWithRetry(prompt, 3);
-    const fileName = docJob.metadata?.fileName || 'unknown';
+    const fileName = normalizeUploadedFileName(docJob.metadata?.fileName || 'unknown');
     const fileType = docJob.metadata?.fileType || '.txt';
     const result = buildAnalysisResult(aiAnalysis, fileName, docJob.sourceText, fileType);
 

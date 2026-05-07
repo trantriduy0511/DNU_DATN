@@ -6,6 +6,11 @@ const postSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  authorNameSnapshot: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   title: {
     type: String,
     trim: true
