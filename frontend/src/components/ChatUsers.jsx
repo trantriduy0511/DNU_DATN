@@ -9,6 +9,7 @@ import { getSocket, initializeSocket, disconnectSocket } from '../utils/socket';
 import { parseEventShareFromMessage, resolveEventShareImageUrl } from '../utils/eventShareMessage.js';
 import { parseGroupShareFromMessage, resolveGroupShareImageUrl } from '../utils/groupShareMessage.js';
 import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 /** So sánh id từ Mongo/API/socket (ObjectId vs string) — dùng thay cho === */
 const idsEqual = (a, b) => {
@@ -142,9 +143,7 @@ const ChatUsers = () => {
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const resolveAvatarUrl = (avatar, name, background = '10b981') => {
     if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
+      return resolveMediaUrl(avatar);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };
@@ -1914,13 +1913,13 @@ const ChatUsers = () => {
                                   {msg.images.map((img, idx) => (
                                     <a
                                       key={idx}
-                                      href={`http://localhost:5000${img.url}`}
+                                      href={resolveMediaUrl(img.url)}
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="relative group"
                                     >
                                       <img
-                                        src={`http://localhost:5000${img.url}`}
+                                        src={resolveMediaUrl(img.url)}
                                         alt={img.originalName || 'Image'}
                                         className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90"
                                       />
@@ -1942,7 +1941,7 @@ const ChatUsers = () => {
                                         }`}
                                       >
                                         <video
-                                          src={`http://localhost:5000${file.url}`}
+                                          src={resolveMediaUrl(file.url)}
                                           className="w-full max-h-48 object-contain bg-black/80"
                                           controls
                                           playsInline
@@ -1955,7 +1954,7 @@ const ChatUsers = () => {
                                             <p className="text-[10px] opacity-75">{formatFileSize(file.size)}</p>
                                           </div>
                                           <a
-                                            href={`http://localhost:5000${file.url}`}
+                                            href={resolveMediaUrl(file.url)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-[11px] font-semibold text-blue-600 hover:underline flex-shrink-0"
@@ -1967,7 +1966,7 @@ const ChatUsers = () => {
                                     ) : (
                                       <a
                                         key={idx}
-                                        href={`http://localhost:5000${file.url}`}
+                                        href={resolveMediaUrl(file.url)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className={`flex items-center space-x-2 p-2 rounded-lg ${

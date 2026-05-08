@@ -147,9 +147,7 @@ const AdminDashboard = () => {
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
     if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
+      return resolveMediaUrl(avatar);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };
@@ -4859,7 +4857,7 @@ const AdminDashboard = () => {
                       if (fileUrl) {
                         // Nếu là relative path, thêm baseURL
                         if (fileUrl.startsWith('/uploads')) {
-                          fileUrl = `http://localhost:5000${fileUrl}`;
+                          fileUrl = resolveMediaUrl(fileUrl);
                         } 
                         // Nếu là blob URL, không thể download
                         else if (fileUrl.startsWith('blob:')) {
@@ -4868,7 +4866,7 @@ const AdminDashboard = () => {
                         // Nếu là absolute URL (http/https), giữ nguyên
                         else if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
                           // Có thể là relative path khác
-                          fileUrl = `http://localhost:5000${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+                          fileUrl = resolveMediaUrl(fileUrl);
                         }
                       }
                       

@@ -1,11 +1,14 @@
+import { getBackendOrigin } from '../shared/config/runtimeConfig';
+
 export const resolveMediaUrl = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
   if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
-  if (raw.startsWith('/uploads')) return `http://localhost:5000${raw}`;
-  if (raw.startsWith('uploads/')) return `http://localhost:5000/${raw}`;
-  if (raw.startsWith('/')) return `http://localhost:5000${raw}`;
-  return `http://localhost:5000/${raw}`;
+  const backendOrigin = getBackendOrigin();
+  if (raw.startsWith('/uploads')) return `${backendOrigin}${raw}`;
+  if (raw.startsWith('uploads/')) return `${backendOrigin}/${raw}`;
+  if (raw.startsWith('/')) return `${backendOrigin}${raw}`;
+  return `${backendOrigin}/${raw}`;
 };
 
 export const resolveAvatarUrlWithFallback = (avatar, name, background = '3b82f6') => {

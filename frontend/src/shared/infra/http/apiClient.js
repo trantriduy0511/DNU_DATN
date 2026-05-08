@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { getAuthTokenFromStorage, clearAuthSession } from '../storage/storageService';
+import { getApiBaseUrl } from '../../config/runtimeConfig';
 
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
   },

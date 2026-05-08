@@ -1037,9 +1037,7 @@ const UserHome = () => {
 
   const resolvePostImageSrc = (src) => {
     if (!src || typeof src !== 'string') return '';
-    if (src.startsWith('/uploads')) return `http://localhost:5000${src}`;
-    if (src.startsWith('http')) return src;
-    return `http://localhost:5000${src}`;
+    return resolveMediaUrl(src);
   };
 
   const openImageTheater = (post, imageIndex = 0) => {
@@ -2079,7 +2077,7 @@ const UserHome = () => {
 
   const postAttachmentUrl = (file) => {
     const raw = file.url || '';
-    return raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+    return resolveMediaUrl(raw);
   };
 
   const isPostAttachmentVideo = (file) => {
@@ -2114,9 +2112,7 @@ const UserHome = () => {
           <img
             src={
               post.author?.avatar
-                ? (post.author.avatar.startsWith('/uploads')
-                    ? `http://localhost:5000${post.author.avatar}`
-                    : post.author.avatar)
+                ? resolveMediaUrl(post.author.avatar)
                 : `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author?.name || 'User')}&background=1877f2&color=fff`
             }
             alt={post.author?.name}
@@ -2285,9 +2281,7 @@ const UserHome = () => {
       {post.images && post.images.length > 0 && (
         <PostImageGallery
           images={post.images}
-          resolveUrl={(raw) =>
-            raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw.startsWith('http') ? raw : raw
-          }
+          resolveUrl={(raw) => resolveMediaUrl(raw)}
           isVideo={isPostGalleryMediaVideo}
           videoPreviewSrc={videoPreviewSrc}
           onCellClick={(index) => openImageTheater(post, index)}
@@ -2437,9 +2431,7 @@ const UserHome = () => {
                 <img
                   src={
                     user?.avatar
-                      ? (user.avatar.startsWith('/uploads')
-                          ? `http://localhost:5000${user.avatar}`
-                          : user.avatar)
+                      ? resolveMediaUrl(user.avatar)
                       : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=1877f2&color=fff`
                   }
                   alt={user?.name}
@@ -2629,7 +2621,7 @@ const UserHome = () => {
                       <div className="w-9 h-9 rounded-full bg-[var(--fb-input)] flex items-center justify-center overflow-hidden flex-shrink-0">
                         {c.avatar && (String(c.avatar).startsWith('http') || String(c.avatar).startsWith('/uploads')) ? (
                           <img
-                            src={String(c.avatar).startsWith('/uploads') ? `http://localhost:5000${c.avatar}` : c.avatar}
+                            src={resolveMediaUrl(c.avatar)}
                             alt={c.name}
                             className="w-full h-full object-cover"
                           />
@@ -3448,9 +3440,7 @@ const UserHome = () => {
                   <img
                     src={
                       user?.avatar
-                        ? (user.avatar.startsWith('/uploads')
-                            ? `http://localhost:5000${user.avatar}`
-                            : user.avatar)
+                        ? resolveMediaUrl(user.avatar)
                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=1877f2&color=fff`
                     }
                     alt={user?.name}
@@ -3833,7 +3823,7 @@ const UserHome = () => {
                         <div className="w-9 h-9 rounded-full bg-[var(--fb-input)] flex items-center justify-center overflow-hidden flex-shrink-0">
                           {c.avatar && (String(c.avatar).startsWith('http') || String(c.avatar).startsWith('/uploads')) ? (
                             <img
-                              src={String(c.avatar).startsWith('/uploads') ? `http://localhost:5000${c.avatar}` : c.avatar}
+                              src={resolveMediaUrl(c.avatar)}
                               alt={c.name}
                               className="w-full h-full object-cover"
                             />
@@ -4993,8 +4983,8 @@ const UserHome = () => {
                           />
                           <img
                             src={
-                              f.avatar?.startsWith('/uploads')
-                                ? `http://localhost:5000${f.avatar}`
+                              f.avatar
+                                ? resolveMediaUrl(f.avatar)
                                 : f.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
                             }
                             alt=""
@@ -5201,7 +5191,7 @@ const UserHome = () => {
                       {post.images && post.images.length > 0 && (() => {
                         const raw = post.images[0];
                         const imageUrl = raw.startsWith('/uploads')
-                          ? `http://localhost:5000${raw}`
+                          ? resolveMediaUrl(raw)
                           : raw;
                         if (isPostGalleryMediaVideo(raw)) {
                           return (
@@ -6236,7 +6226,7 @@ const UserHome = () => {
                   <div className="grid grid-cols-3 gap-2">
                     {editPostImages.map((image, index) => {
                       const imageUrl = image.startsWith('/uploads')
-                        ? `http://localhost:5000${image}`
+                        ? resolveMediaUrl(image)
                         : image;
                       return (
                         <div key={index} className="relative group">
@@ -6685,7 +6675,7 @@ const UserHome = () => {
                             src={
                               groupSettingsForm.coverPhoto.startsWith('http')
                                 ? groupSettingsForm.coverPhoto
-                                : `http://localhost:5000${groupSettingsForm.coverPhoto}`
+                                : resolveMediaUrl(groupSettingsForm.coverPhoto)
                             }
                             alt=""
                             className="h-48 w-full rounded-lg object-cover"

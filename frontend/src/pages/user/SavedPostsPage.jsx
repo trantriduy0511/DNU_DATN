@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { PostCommentSection } from '../../components/PostCommentSection';
 import { useSavedPostsViewModel } from '../../domains/saved/viewmodels/useSavedPostsViewModel';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 export default function SavedPostsPage() {
   const navigate = useNavigate();
@@ -55,9 +56,7 @@ export default function SavedPostsPage() {
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
     if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
+      return resolveMediaUrl(avatar);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };
@@ -93,7 +92,7 @@ export default function SavedPostsPage() {
   const getPostPreviewImage = (post) => {
     const firstImage = post?.images?.[0];
     if (firstImage && typeof firstImage === 'string') {
-      return firstImage.startsWith('/uploads') ? `http://localhost:5000${firstImage}` : firstImage;
+      return resolveMediaUrl(firstImage);
     }
     return null;
   };
@@ -103,13 +102,13 @@ export default function SavedPostsPage() {
   const getPreviewMedia = (post) => {
     const firstImage = post?.images?.[0];
     if (firstImage && typeof firstImage === 'string') {
-      const src = firstImage.startsWith('/uploads') ? `http://localhost:5000${firstImage}` : firstImage;
+      const src = resolveMediaUrl(firstImage);
       return { type: isVideoUrl(src) ? 'video' : 'image', src };
     }
 
     const firstFile = post?.files?.[0];
     if (firstFile?.url) {
-      const src = String(firstFile.url).startsWith('/uploads') ? `http://localhost:5000${firstFile.url}` : firstFile.url;
+      const src = resolveMediaUrl(firstFile.url);
       const mime = String(firstFile.mimeType || '').toLowerCase();
       const isVid = mime.startsWith('video/') || isVideoUrl(src);
       if (isVid) {

@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
 import { useAuthStore } from '../../../store/authStore';
 import { getAuthTokenFromStorage } from '../storage/storageService';
+import { getBackendOrigin } from '../../config/runtimeConfig';
 
 let socket = null;
 let socketAuthToken = null;
@@ -27,7 +28,7 @@ export const initializeSocket = () => {
   }
 
   socketAuthToken = token;
-  socket = io('http://localhost:5000', {
+  socket = io(getBackendOrigin(), {
     auth: { token },
     transports: ['websocket', 'polling'],
     reconnection: true,

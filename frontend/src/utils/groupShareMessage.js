@@ -1,3 +1,5 @@
+import { getBackendOrigin } from '../shared/config/runtimeConfig';
+
 /** Marker + JSON — chat parse để hiển thị thẻ nhóm (cùng kiểu với sự kiện). */
 export const GROUP_SHARE_MSG_MARKER = '[[DNU_GROUP_SHARE]]';
 
@@ -67,6 +69,7 @@ export function resolveGroupShareImageUrl(imagePath) {
   if (!imagePath || typeof imagePath !== 'string') return '';
   const s = imagePath.trim();
   if (s.startsWith('http')) return s;
-  if (s.startsWith('/uploads')) return `http://localhost:5000${s}`;
-  return `http://localhost:5000/${s.replace(/^\//, '')}`;
+  const backendOrigin = getBackendOrigin();
+  if (s.startsWith('/uploads')) return `${backendOrigin}${s}`;
+  return `${backendOrigin}/${s.replace(/^\//, '')}`;
 }

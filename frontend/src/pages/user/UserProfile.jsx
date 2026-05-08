@@ -10,6 +10,7 @@ import ImageUploadModal from '../../components/ImageUploadModal';
 import PostImageGallery from '../../components/PostImageGallery';
 import { useProfileMediaInteractionsViewModel } from '../../domains/profile/viewmodels/useProfileMediaInteractionsViewModel';
 import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
+import { getBackendOrigin } from '../../shared/config/runtimeConfig';
 
 function isProfilePostGalleryVideoPath(src) {
   if (!src || typeof src !== 'string') return false;
@@ -535,10 +536,10 @@ export default function UserProfile() {
       alert(`📥 Đang tải xuống: ${file?.name || 'file'}`);
       return;
     }
-    const fileUrl = file.url.startsWith('http') ? file.url : `http://localhost:5000${file.url}`;
+    const fileUrl = resolveMediaUrl(file.url);
     const fileName = file.name || file.url.split('/').pop() || 'download';
     window.open(
-      `http://localhost:5000/api/files/download-url?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`,
+      `${getBackendOrigin()}/api/files/download-url?url=${encodeURIComponent(fileUrl)}&name=${encodeURIComponent(fileName)}`,
       '_blank'
     );
   };
@@ -546,7 +547,7 @@ export default function UserProfile() {
   const postAttachmentUrl = (file) => {
     const raw = file.url || '';
     if (!raw) return '';
-    return raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+    return resolveMediaUrl(raw);
   };
 
   const videoPreviewSrc = (src) => {
@@ -746,7 +747,7 @@ export default function UserProfile() {
       for (const img of post?.images || []) {
         const raw = String(img || '');
         if (!raw) continue;
-        const url = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        const url = resolveMediaUrl(raw);
         items.push({
           url,
           raw,
@@ -800,7 +801,7 @@ export default function UserProfile() {
       (p.images || []).some((img) => {
         const raw = String(img || '');
         if (!raw) return false;
-        const resolved = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        const resolved = resolveMediaUrl(raw);
         return resolved === photo.url;
       })
     );
@@ -808,7 +809,7 @@ export default function UserProfile() {
       const postImageIndex = (matchedPost.images || []).findIndex((img) => {
         const raw = String(img || '');
         if (!raw) return false;
-        const resolved = raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw;
+        const resolved = resolveMediaUrl(raw);
         return resolved === photo.url;
       });
       openProfileImageTheater(matchedPost, postImageIndex >= 0 ? postImageIndex : 0);
@@ -1170,7 +1171,7 @@ export default function UserProfile() {
             <PostImageGallery
               images={post.images}
               resolveUrl={(raw) =>
-                raw.startsWith('/uploads') ? `http://localhost:5000${raw}` : raw.startsWith('http') ? raw : raw
+                resolveMediaUrl(raw)
               }
               isVideo={isProfilePostGalleryVideoPath}
               videoPreviewSrc={videoPreviewSrc}
@@ -3043,10 +3044,9 @@ export default function UserProfile() {
                             />
                             <img
                               src={
-                                f.avatar?.startsWith('/uploads')
-                                  ? `http://localhost:5000${f.avatar}`
-                                  : f.avatar ||
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
+                                f.avatar
+                                  ? resolveMediaUrl(f.avatar)
+                                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
                               }
                               alt=""
                               className="w-10 h-10 rounded-full object-cover flex-shrink-0"

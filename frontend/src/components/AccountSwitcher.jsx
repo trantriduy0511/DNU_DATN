@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { User, ChevronDown, Plus, LogOut, Check, X, Bookmark, Settings, Shield } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const AccountSwitcher = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -89,9 +90,7 @@ const AccountSwitcher = () => {
             {user?.avatar ? (
               <img
                 src={
-                  user.avatar.startsWith('/uploads')
-                    ? `http://localhost:5000${user.avatar}`
-                    : user.avatar
+                  resolveMediaUrl(user.avatar)
                 }
                 alt={user.name}
                 className="w-full h-full object-cover"
@@ -138,9 +137,7 @@ const AccountSwitcher = () => {
                   {user?.avatar ? (
                     <img
                       src={
-                        user.avatar.startsWith('/uploads')
-                          ? `http://localhost:5000${user.avatar}`
-                          : user.avatar
+                        resolveMediaUrl(user.avatar)
                       }
                       alt={user.name}
                       className="w-full h-full object-cover"

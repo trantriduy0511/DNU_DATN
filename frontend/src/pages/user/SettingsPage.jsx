@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Moon, Sun, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 const THEME_KEY = 'dnu_theme';
 
@@ -119,9 +120,7 @@ const SettingsPage = () => {
           <img
             src={
               user?.avatar
-                ? (String(user.avatar).startsWith('/uploads')
-                    ? `http://localhost:5000${user.avatar}`
-                    : user.avatar)
+                ? resolveMediaUrl(user.avatar)
                 : `https://ui-avatars.com/api/?name=${encodeURIComponent(
                     user?.name || 'User'
                   )}&background=1877f2&color=fff`

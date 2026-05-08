@@ -10,6 +10,7 @@ import ChatUsers from './ChatUsers';
 import ChatAI from './ChatAI';
 import { FixedChatActionButtons } from './FixedChatActionButtons';
 import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const SEARCH_HISTORY_KEY = 'dnu_nav_search_history_v1';
 const SEARCH_HISTORY_MAX = 12;
@@ -531,9 +532,7 @@ const NavigationBar = () => {
                                     <img
                                       src={
                                         result.avatar
-                                          ? (String(result.avatar).startsWith('/uploads')
-                                              ? `http://localhost:5000${result.avatar}`
-                                              : result.avatar)
+                                          ? resolveMediaUrl(result.avatar)
                                           : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
                                       }
                                       alt={result.name}
@@ -797,9 +796,7 @@ const NavigationBar = () => {
                                   <img
                                     src={
                                       result.avatar
-                                        ? (String(result.avatar).startsWith('/uploads')
-                                            ? `http://localhost:5000${result.avatar}`
-                                            : result.avatar)
+                                        ? resolveMediaUrl(result.avatar)
                                         : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
                                     }
                                     alt={result.name}

@@ -481,7 +481,7 @@ const EventDetailPage = () => {
       if (!Array.isArray(images) || images.length === 0) continue;
       images.forEach((img, idx) => {
         if (typeof img !== 'string') return;
-        const url = img.startsWith('http') ? img : `http://localhost:5000${img}`;
+        const url = resolveMediaUrl(img);
         items.push({ key: `${post._id}-${idx}`, url, postId: post._id, post, imageIndex: idx });
       });
     }
@@ -2771,10 +2771,9 @@ const EventDetailPage = () => {
                             />
                             <img
                               src={
-                                f.avatar?.startsWith('/uploads')
-                                  ? `http://localhost:5000${f.avatar}`
-                                  : f.avatar ||
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
+                                f.avatar
+                                  ? resolveMediaUrl(f.avatar)
+                                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
                               }
                               alt=""
                               className="h-10 w-10 flex-shrink-0 rounded-full object-cover"

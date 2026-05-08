@@ -6,6 +6,7 @@ import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
 import { initializeSocket } from '../utils/socket';
 import { useAuthStore } from '../store/authStore';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const sameId = (a, b) => String(a) === String(b);
 
@@ -561,11 +562,7 @@ const NotificationBell = () => {
                           <div className="flex-shrink-0">
                             {notification.sender?.avatar ? (
                               <img
-                                src={
-                                  String(notification.sender.avatar).startsWith('/uploads')
-                                    ? `http://localhost:5000${notification.sender.avatar}`
-                                    : notification.sender.avatar
-                                }
+                                src={resolveMediaUrl(notification.sender.avatar)}
                                 alt={getSenderName(notification)}
                                 className="w-10 h-10 rounded-full object-cover cursor-pointer"
                                 onClick={(e) => {
@@ -720,11 +717,7 @@ const NotificationBell = () => {
                         <div className="flex-shrink-0">
                           {notification.sender?.avatar ? (
                             <img
-                              src={
-                                String(notification.sender.avatar).startsWith('/uploads')
-                                  ? `http://localhost:5000${notification.sender.avatar}`
-                                  : notification.sender.avatar
-                              }
+                              src={resolveMediaUrl(notification.sender.avatar)}
                               alt={getSenderName(notification)}
                               className="w-10 h-10 rounded-full object-cover cursor-pointer"
                               onClick={(e) => {

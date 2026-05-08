@@ -1,3 +1,5 @@
+import { getBackendOrigin } from '../shared/config/runtimeConfig';
+
 /** Marker + JSON một dòng — chat parse để hiển thị thẻ sự kiện (giống Facebook). */
 export const EVENT_SHARE_MSG_MARKER = '[[DNU_EVENT_SHARE]]';
 
@@ -50,6 +52,7 @@ export function resolveEventShareImageUrl(imagePath) {
   if (!imagePath || typeof imagePath !== 'string') return '';
   const s = imagePath.trim();
   if (s.startsWith('http')) return s;
-  if (s.startsWith('/uploads')) return `http://localhost:5000${s}`;
-  return `http://localhost:5000/${s.replace(/^\//, '')}`;
+  const backendOrigin = getBackendOrigin();
+  if (s.startsWith('/uploads')) return `${backendOrigin}${s}`;
+  return `${backendOrigin}/${s.replace(/^\//, '')}`;
 }

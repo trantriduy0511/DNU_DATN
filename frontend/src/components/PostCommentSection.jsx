@@ -4,13 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Send, X, ChevronDown, BookOpen, Download, ImagePlus } from 'lucide-react';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 
 const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
   if (avatar) {
-    const a = String(avatar);
-    if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-    return a;
+    return resolveMediaUrl(avatar);
   }
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
 };
@@ -28,7 +27,7 @@ function isPostGalleryVideoUrl(src) {
 
 function postAttachmentUrl(file) {
   const raw = file?.url || '';
-  return raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+  return resolveMediaUrl(raw);
 }
 
 function isPostAttachmentVideo(file) {
@@ -332,7 +331,7 @@ export function PostCommentSection({
                     <div className="mt-2 grid grid-cols-2 gap-1.5">
                       {comment.images.map((img, idx) => {
                         const src = String(img || '');
-                        const url = src.startsWith('http') ? src : `http://localhost:5000${src}`;
+                        const url = resolveMediaUrl(src);
                         return (
                           <img
                             key={`${comment._id}-img-${idx}`}
@@ -590,7 +589,7 @@ export function PostCommentSection({
                 {(() => {
                   const imgs = (post.images || []).filter((x) => typeof x === 'string');
                   if (!imgs.length) return null;
-                  const url = (src) => (src.startsWith('http') ? src : `http://localhost:5000${src}`);
+                  const url = (src) => resolveMediaUrl(src);
                   const imgClickable = Boolean(onOpenImageTheater);
                   const openAt = (index) => (e) => {
                     e.preventDefault();

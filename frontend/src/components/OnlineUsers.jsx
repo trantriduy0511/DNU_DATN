@@ -5,14 +5,13 @@ import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
 import { initializeSocket } from '../utils/socket';
 import { useAuthStore } from '../store/authStore';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const OnlineUsers = ({ variant = 'widget' }) => {
   const isContacts = variant === 'contacts';
   const resolveAvatarUrl = (avatar, name, background = '10b981') => {
     if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
+      return resolveMediaUrl(avatar);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };

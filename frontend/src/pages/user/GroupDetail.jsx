@@ -1120,7 +1120,7 @@ const GroupDetail = () => {
 
   const handleDownloadPostFile = (file) => {
     const raw = file.url || '';
-    const url = raw.startsWith('http') ? raw : `http://localhost:5000${raw}`;
+    const url = resolveMediaUrl(raw);
     const link = document.createElement('a');
     link.href = url;
     link.download = file.name || 'document';
@@ -3892,7 +3892,7 @@ const GroupDetail = () => {
                             src={
                               groupSettingsForm.coverPhoto.startsWith('http')
                                 ? groupSettingsForm.coverPhoto
-                                : `http://localhost:5000${groupSettingsForm.coverPhoto}`
+                                : resolveMediaUrl(groupSettingsForm.coverPhoto)
                             }
                             alt=""
                             className="h-48 w-full rounded-lg object-cover"
@@ -4223,7 +4223,7 @@ const GroupDetail = () => {
                     <p className="text-xs font-medium text-[var(--fb-text-secondary)]">Ảnh/video hiện có</p>
                     <div className="grid grid-cols-3 gap-2">
                       {editPostExistingImages.map((img, index) => {
-                        const url = img.startsWith('http') ? img : `http://localhost:5000${img}`;
+                        const url = resolveMediaUrl(img);
                         const isVideo = isGroupPostGalleryVideoPath(img);
                         return (
                           <div key={`${img}-${index}`} className="group relative">
@@ -4477,8 +4477,8 @@ const GroupDetail = () => {
                           />
                           <img
                             src={
-                              f.avatar?.startsWith('/uploads')
-                                ? `http://localhost:5000${f.avatar}`
+                              f.avatar
+                                ? resolveMediaUrl(f.avatar)
                                 : f.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(f.name || '?')}&background=1877f2&color=fff`
                             }
                             alt=""

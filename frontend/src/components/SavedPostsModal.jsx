@@ -4,6 +4,7 @@ import { Bookmark, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const SavedPostsModal = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -13,9 +14,7 @@ const SavedPostsModal = () => {
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
     if (avatar) {
-      const a = String(avatar);
-      if (a.startsWith('/uploads')) return `http://localhost:5000${a}`;
-      return a;
+      return resolveMediaUrl(avatar);
     }
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
   };
@@ -186,9 +185,7 @@ const SavedPostsModal = () => {
                   </button>
 
                   {post.images && post.images.length > 0 && (() => {
-                    const imageUrl = String(post.images[0]).startsWith('/uploads')
-                      ? `http://localhost:5000${post.images[0]}`
-                      : post.images[0];
+                    const imageUrl = resolveMediaUrl(post.images[0]);
                     return (
                       <button
                         type="button"
