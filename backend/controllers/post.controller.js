@@ -843,4 +843,84 @@ export const getSavedPosts = async (req, res) => {
   }
 };
 
+/** Cận dưới / cận trên [start, end) — “hôm nay” theo múi Asia/Ho_Chi_Minh */
+export function getVietnamTodayBounds() {
+  const ymd = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+  const [yStr, mStr, dStr] = ymd.split('-');
+  const pad = (s) => String(s).padStart(2, '0');
+  const start = new Date(`${yStr}-${pad(mStr)}-${pad(dStr)}T00:00:00+07:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const label = `${pad(dStr)}/${pad(mStr)}/${yStr} (Việt Nam)`;
+  return { start, end, label };
+}
+
+/**
+ * Bài đăng trong “hôm nay” (VN) trong phạm vi feed trang chủ (bảng tin) của user — dùng bổ sung prompt AI.
+ */
+export async function getTodayHomeFeedPostsSnapshotForAi(me) {
+  if (!me) {
+    return { contextText: '', total: 0, label: '' };
+  }
+  try {
+    const hidden = new Set((me.groupsHiddenFromHomeFeed || []).map((g) => String(g)));
+    const followHomeGroupIds = (me.groups || []).filter((gid) => !hidden.has(String(gid)));
+    const networkAuthorIds = uniqueAuthorIds(me._id || me.id, me.friends || [], me.following || []);
+    const feedEventIds = await getHomeFeedEventIdsForUser(me._id || me.id);
+    const homeFeedScope = buildHomeFeedScope(followHomeGroupIds, networkAuthorIds, true, feedEventIds, null);
+    const { start, end, label } = getVietnamTodayBounds();
+    const query = {
+      $and: [homeFeedScope, { status: 'approved' }, { createdAt: { $gte: start, $lt: end } }]
+    };
+    const total = await Post.countDocuments(query);
+    const posts = await Post.find(query)
+      .populate('author', 'name')
+      .select('title content category createdAt author')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    const visible = posts.filter((p) => p.author);
+    if (total === 0) {
+      return {
+        contextText: `**BÀI ĐĂNG TRONG NGÀY (${label}) — PHẠM VI BẢNG TIN BẠN XEM ĐƯỢC:**\n- Không có bài viết (status: đã duyệt) nào được đăng trong khoảng 00:00–24:00 giờ Việt Nam trong phạm vi feed trang chủ của bạn (bạn bè / đang theo dõi / nhóm hiện trên feed / sự kiện đã tham gia).\n`,
+        total: 0,
+        label
+      };
+    }
+    if (visible.length === 0) {
+      return {
+        contextText: `**BÀI ĐĂNG TRONG NGÀY (${label}) — PHẠM VI BẢNG TIN:** Có **${total}** bài khớp điều kiện trong CSDL nhưng không có mục nào hiển thị chi tiết (thiếu thông tin tác giả).\n`,
+        total,
+        label
+      };
+    }
+    const listed = visible.slice(0, 15);
+    const lines = listed.map((p, i) => {
+      const title = (p.title || '').trim() || '(Không tiêu đề)';
+      const raw = String(p.content || '').trim().replace(/\s+/g, ' ');
+      const preview = raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
+      const author = p.author?.name || 'Thành viên';
+      const cat = p.category || '';
+      const t = p.createdAt ? new Date(p.createdAt).toISOString() : '';
+      const prevPart = preview ? ` — nội dung rút gọn: "${preview}"` : '';
+      return `${i + 1}. [${cat}] ${title} — tác giả: ${author} — ${t}${prevPart}`;
+    });
+    const summaryLine =
+      total > listed.length
+        ? `- Tổng số bài đăng trong ngày (trong phạm vi feed): **${total}** (liệt kê ${listed.length} bài mới nhất).`
+        : `- Tổng số bài đăng trong ngày: **${total}**.`;
+    return {
+      contextText: `**BÀI ĐĂNG TRONG NGÀY (${label}) — PHẠM VI BẢNG TIN BẠN XEM ĐƯỢC (00:00–24:00 giờ VN):**\n${lines.join('\n')}\n${summaryLine}\n`,
+      total,
+      label
+    };
+  } catch (e) {
+    console.error('getTodayHomeFeedPostsSnapshotForAi:', e);
+    return { contextText: '', total: 0, label: '', error: e.message };
+  }
+}
 

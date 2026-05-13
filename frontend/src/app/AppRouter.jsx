@@ -13,6 +13,7 @@ import GroupDetail from '../pages/user/GroupDetail';
 import EventsPage from '../pages/user/EventsPage';
 import EventDetailPage from '../pages/user/EventDetailPage';
 import SavedPostsPage from '../pages/user/SavedPostsPage';
+import NotificationsPage from '../pages/user/NotificationsPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 import NavigationBar from '../components/NavigationBar';
 import PageTransition from '../components/PageTransition';
@@ -100,6 +101,17 @@ export default function AppRouter() {
               <PageTransition>
                 <NavigationBar />
                 <SavedPostsPage />
+              </PageTransition>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <NavigationBar />
+                <NotificationsPage />
               </PageTransition>
             </ProtectedRoute>
           }

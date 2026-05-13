@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { 
-  ArrowLeft, Settings, X, UserPlus, Trash2, Shield, Lock, AlertCircle, 
+import {
+  ArrowLeft, Settings, X, UserPlus, Trash2, Shield, Lock, AlertCircle,
   FileText, Heart, MessageCircle, Bookmark, MoreHorizontal, Share2,
-  Send, Image as ImageIcon, Smile, Plus, Check, Search, Image, 
+  Send, Image as ImageIcon, Smile, Plus, Check, Search, Image,
   Bell, Eye, EyeOff, Pin, Edit, Trash, AlertTriangle,
   BookOpen, ChevronDown, LogOut, Globe, Users,
   ChevronLeft, ChevronRight, Maximize2, Camera, ZoomIn, ZoomOut, RefreshCw
 } from 'lucide-react';
+import { notify, confirmAsync, promptAsync } from '../../lib/notify';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { buildGroupShareMessageContent } from '../../utils/groupShareMessage.js';
@@ -439,7 +440,7 @@ const GroupDetail = () => {
       }));
     } catch (error) {
       console.error('Error toggling like:', error);
-      alert('Lỗi thích bài viết');
+      notify('Lỗi thích bài viết');
     }
   };
 
@@ -468,19 +469,20 @@ const GroupDetail = () => {
       setSavedPostIds(next);
     } catch (error) {
       console.error('Error toggling saved post:', error);
-      alert(error.response?.data?.message || 'Không cập nhật được trạng thái lưu');
+      notify(error.response?.data?.message || 'Không cập nhật được trạng thái lưu');
     }
   };
 
   const reportPost = async (postId) => {
-    const reason = window.prompt('Nhập lý do báo cáo bài viết:');
-    if (!reason || !reason.trim()) return;
+    const reason = await promptAsync('Nhập lý do báo cáo bài viết:');
+    if (reason == null) return;
+    if (!reason.trim()) return;
     try {
       await api.post(`/posts/${postId}/report`, { reason: reason.trim() });
-      alert('Đã gửi báo cáo bài viết.');
+      notify('Đã gửi báo cáo bài viết.');
     } catch (error) {
       console.error('Error reporting post:', error);
-      alert(error.response?.data?.message || 'Không thể báo cáo bài viết');
+      notify(error.response?.data?.message || 'Không thể báo cáo bài viết');
     }
   };
 
@@ -521,7 +523,7 @@ const GroupDetail = () => {
       editPostNewImages.length > 0 ||
       editPostNewFiles.length > 0;
     if (!trimmed && !hasAnyMedia) {
-      alert('Bài viết phải có nội dung hoặc ít nhất một tệp đính kèm');
+      notify('Bài viết phải có nội dung hoặc ít nhất một tệp đính kèm');
       return;
     }
     setEditPostSaving(true);
@@ -552,10 +554,10 @@ const GroupDetail = () => {
       setEditPostExistingFiles([]);
       setEditPostNewImages([]);
       setEditPostNewFiles([]);
-      alert('Đã cập nhật bài viết.');
+      notify('Đã cập nhật bài viết.');
     } catch (error) {
       console.error('Error updating post:', error);
-      alert(error.response?.data?.message || 'Không thể cập nhật bài viết');
+      notify(error.response?.data?.message || 'Không thể cập nhật bài viết');
     } finally {
       setEditPostSaving(false);
     }
@@ -572,10 +574,10 @@ const GroupDetail = () => {
         next.delete(post._id);
         return next;
       });
-      alert('Đã xóa bài viết.');
+      notify('Đã xóa bài viết.');
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert(error.response?.data?.message || 'Không thể xóa bài viết');
+      notify(error.response?.data?.message || 'Không thể xóa bài viết');
     }
   };
 
@@ -602,10 +604,10 @@ const GroupDetail = () => {
         return next;
       });
       setDeletingPost(null);
-      alert('Đã xóa bài viết.');
+      notify('Đã xóa bài viết.');
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert(error.response?.data?.message || 'Không thể xóa bài viết');
+      notify(error.response?.data?.message || 'Không thể xóa bài viết');
     } finally {
       setDeletePostLoading(false);
     }
@@ -693,7 +695,7 @@ const GroupDetail = () => {
       setShareFriendsList(res.data.friends || []);
     } catch (error) {
       console.error('Error loading friends:', error);
-      alert(error.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(error.response?.data?.message || 'Không tải được danh sách bạn bè');
       setShareModal(null);
     } finally {
       setShareFriendsLoading(false);
@@ -730,7 +732,7 @@ const GroupDetail = () => {
     if (!shareModal || !id) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     if (shareModal.mode === 'post' && !shareModal.post?._id) return;
@@ -754,7 +756,7 @@ const GroupDetail = () => {
         const n = ids.length;
         setShareModal(null);
         setShareSelectedFriendIds(new Set());
-        alert(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
+        notify(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
         return;
       }
 
@@ -785,10 +787,10 @@ const GroupDetail = () => {
       const n = ids.length;
       setShareModal(null);
       setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
+      notify(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Share to friends failed:', error);
-      alert(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -850,6 +852,36 @@ const GroupDetail = () => {
       window.clearTimeout(t);
     };
   }, [searchParams, groupPosts, filteredPosts, activeTab, postSearchQuery, id, loading]);
+
+  useEffect(() => {
+    const urlPid = searchParams.get('post');
+    const th = imageTheater;
+    if (th?.post?._id && th.mode !== 'groupCover') {
+      const p = th.post;
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: String(p._id), title: (p.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    if (urlPid && groupPosts.some((p) => String(p._id) === String(urlPid))) {
+      const p = groupPosts.find((x) => String(x._id) === String(urlPid));
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: urlPid, title: (p?.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+  }, [imageTheater, searchParams, groupPosts]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+    };
+  }, []);
 
   const resolvePostImageSrc = (src) => {
     return resolveMediaUrl(src);
@@ -987,7 +1019,7 @@ const GroupDetail = () => {
     const text = groupCoverCommentDraft.trim();
     if (!text || !group?._id) return;
     if (!user?.id && !user?._id) {
-      alert('Vui lòng đăng nhập để bình luận.');
+      notify('Vui lòng đăng nhập để bình luận.');
       return;
     }
     const uid = String(user?.id || user?._id || '');
@@ -1299,7 +1331,7 @@ const GroupDetail = () => {
       });
     } catch (error) {
       console.error('Error fetching group:', error);
-      alert('Lỗi tải thông tin nhóm');
+      notify('Lỗi tải thông tin nhóm');
       navigate('/home');
     }
     setLoading(false);
@@ -1316,7 +1348,7 @@ const GroupDetail = () => {
 
   const handleCreateAnnouncement = async () => {
     if (!announcementForm.title.trim() || !announcementForm.content.trim()) {
-      alert('Vui lòng nhập tiêu đề và nội dung');
+      notify('Vui lòng nhập tiêu đề và nội dung');
       return;
     }
 
@@ -1328,10 +1360,10 @@ const GroupDetail = () => {
       
       if (editingAnnouncement) {
         await api.put(`/groups/${id}/announcements/${editingAnnouncement._id}`, payload);
-        alert('✅ Đã cập nhật thông báo thành công!');
+        notify('✅ Đã cập nhật thông báo thành công!');
       } else {
         await api.post(`/groups/${id}/announcements`, payload);
-        alert('✅ Đã tạo thông báo thành công!');
+        notify('✅ Đã tạo thông báo thành công!');
       }
       
       setShowAnnouncementModal(false);
@@ -1346,7 +1378,7 @@ const GroupDetail = () => {
       fetchAnnouncements();
     } catch (error) {
       console.error('Error creating announcement:', error);
-      alert('❌ ' + (error.response?.data?.message || 'Lỗi tạo thông báo'));
+      notify('❌ ' + (error.response?.data?.message || 'Lỗi tạo thông báo'));
     }
   };
 
@@ -1363,15 +1395,15 @@ const GroupDetail = () => {
   };
 
   const handleDeleteAnnouncement = async (announcementId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thông báo này?')) return;
+    if (!(await confirmAsync('Bạn có chắc muốn xóa thông báo này?'))) return;
 
     try {
       await api.delete(`/groups/${id}/announcements/${announcementId}`);
-      alert('✅ Đã xóa thông báo!');
+      notify('✅ Đã xóa thông báo!');
       fetchAnnouncements();
     } catch (error) {
       console.error('Error deleting announcement:', error);
-      alert('❌ ' + (error.response?.data?.message || 'Lỗi xóa thông báo'));
+      notify('❌ ' + (error.response?.data?.message || 'Lỗi xóa thông báo'));
     }
   };
 
@@ -1393,7 +1425,7 @@ const GroupDetail = () => {
       window.dispatchEvent(new CustomEvent('groupHomeFeedPrefChanged'));
     } catch (error) {
       console.error('home-feed follow:', error);
-      alert(error.response?.data?.message || 'Không thể cập nhật theo dõi nhóm trên trang chủ');
+      notify(error.response?.data?.message || 'Không thể cập nhật theo dõi nhóm trên trang chủ');
     }
   };
 
@@ -1402,7 +1434,7 @@ const GroupDetail = () => {
       const pendingInviteId = searchParams.get('invite');
       if (pendingInviteId && id) {
         const res = await api.post(`/groups/${id}/invites/${pendingInviteId}/accept`);
-        alert(res.data?.message || '✅ Đã tham gia nhóm!');
+        notify(res.data?.message || '✅ Đã tham gia nhóm!');
         setSearchParams((prev) => {
           const next = new URLSearchParams(prev);
           next.delete('invite');
@@ -1413,47 +1445,47 @@ const GroupDetail = () => {
         return;
       }
       await api.post(`/groups/${id}/join`);
-      alert('✅ Đã tham gia nhóm thành công!');
+      notify('✅ Đã tham gia nhóm thành công!');
       await fetchGroupDetail();
       window.dispatchEvent(new CustomEvent('userGroupsChanged'));
     } catch (error) {
       console.error('Error joining group:', error);
-      alert('❌ ' + (error.response?.data?.message || 'Lỗi tham gia nhóm'));
+      notify('❌ ' + (error.response?.data?.message || 'Lỗi tham gia nhóm'));
     }
   };
 
   const handleLeaveGroup = async () => {
     if (!id || id === 'undefined' || id === 'null') {
-      alert('ID nhóm không hợp lệ');
+      notify('ID nhóm không hợp lệ');
       return;
     }
     
-    if (!window.confirm('Bạn có chắc muốn rời nhóm này?')) {
+    if (!(await confirmAsync('Bạn có chắc muốn rời nhóm này?'))) {
       return;
     }
     try {
       await api.post(`/groups/${id}/leave`);
-      alert('Đã rời nhóm!');
+      notify('Đã rời nhóm!');
       navigate('/home');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi rời nhóm');
+      notify(error.response?.data?.message || 'Lỗi rời nhóm');
     }
   };
 
   const handleDeleteGroup = async () => {
     if (!id || id === 'undefined' || id === 'null') {
-      alert('ID nhóm không hợp lệ');
+      notify('ID nhóm không hợp lệ');
       return;
     }
-    if (!window.confirm('Bạn có chắc muốn xóa nhóm này? Hành động này không thể hoàn tác.')) {
+    if (!(await confirmAsync('Bạn có chắc muốn xóa nhóm này? Hành động này không thể hoàn tác.'))) {
       return;
     }
     try {
       await api.delete(`/groups/${id}`);
-      alert('Đã xóa nhóm!');
+      notify('Đã xóa nhóm!');
       navigate('/home');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi xóa nhóm');
+      notify(error.response?.data?.message || 'Lỗi xóa nhóm');
     }
   };
 
@@ -1462,7 +1494,7 @@ const GroupDetail = () => {
     const hasImages = newGroupPostImages.length > 0;
     const hasFiles = newGroupPostFiles.length > 0;
     if (!hasText && !hasImages && !hasFiles) {
-      alert('Vui lòng nhập nội dung hoặc đính kèm ảnh / file / video');
+      notify('Vui lòng nhập nội dung hoặc đính kèm ảnh / file / video');
       return;
     }
 
@@ -1476,7 +1508,7 @@ const GroupDetail = () => {
     );
 
     if (!currentIsMember) {
-      alert('Bạn cần tham gia nhóm để đăng bài. Vui lòng nhấn nút "Tham gia nhóm" trước.');
+      notify('Bạn cần tham gia nhóm để đăng bài. Vui lòng nhấn nút "Tham gia nhóm" trước.');
       return;
     }
 
@@ -1513,7 +1545,7 @@ const GroupDetail = () => {
       // Refresh group data to show new post
       await fetchGroupDetail();
 
-      alert('✅ ' + (res.data.message || 'Đã đăng bài viết thành công!'));
+      notify('✅ ' + (res.data.message || 'Đã đăng bài viết thành công!'));
     } catch (error) {
       console.error('Error creating group post:', error);
       console.error('Error response:', error.response?.data);
@@ -1523,7 +1555,7 @@ const GroupDetail = () => {
                           error.message || 
                           'Lỗi đăng bài viết';
       
-      alert('❌ ' + errorMessage);
+      notify('❌ ' + errorMessage);
       
       // If error is about not being a member, refresh group data
       if (error.response?.status === 403) {
@@ -1551,7 +1583,7 @@ const GroupDetail = () => {
   const handleAddMember = async (userId, { closeAddMemberModal = true } = {}) => {
     try {
       const res = await api.post(`/groups/${id}/invites`, { userId });
-      alert(res.data?.message || 'Đã gửi lời mời tham gia nhóm');
+      notify(res.data?.message || 'Đã gửi lời mời tham gia nhóm');
       if (closeAddMemberModal) {
         setShowAddMemberModal(false);
         setUserSearchQuery('');
@@ -1559,7 +1591,7 @@ const GroupDetail = () => {
       }
       await fetchGroupDetail();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi gửi lời mời');
+      notify(error.response?.data?.message || 'Lỗi gửi lời mời');
     }
   };
 
@@ -1580,7 +1612,7 @@ const GroupDetail = () => {
       setInviteFriendsList(res.data.friends || []);
     } catch (error) {
       console.error('Error loading friends:', error);
-      alert(error.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(error.response?.data?.message || 'Không tải được danh sách bạn bè');
       closeInviteFriendsModal();
     } finally {
       setInviteFriendsLoading(false);
@@ -1606,7 +1638,7 @@ const GroupDetail = () => {
         setGroupCardShareFriendsList(res.data.friends || []);
       } catch (error) {
         console.error('Error loading friends for share:', error);
-        alert(error.response?.data?.message || 'Không tải được danh sách bạn bè');
+        notify(error.response?.data?.message || 'Không tải được danh sách bạn bè');
         closeGroupCardShareModal();
       } finally {
         setGroupCardShareFriendsLoading(false);
@@ -1628,7 +1660,7 @@ const GroupDetail = () => {
     if (!group?._id) return;
     const ids = [...groupCardShareSelectedIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     setGroupCardShareSending(true);
@@ -1643,10 +1675,10 @@ const GroupDetail = () => {
         await api.post(`/messages/${cid}`, fd);
       }
       closeGroupCardShareModal();
-      alert(`Đã gửi nhóm tới ${ids.length} người bạn qua tin nhắn.`);
+      notify(`Đã gửi nhóm tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Group card share failed:', error);
-      alert(error.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setGroupCardShareSending(false);
     }
@@ -1675,11 +1707,11 @@ const GroupDetail = () => {
       if (res.data?.notSent?.length) {
         msg += `\n\nKhông gửi được ${res.data.notSent.length} lời mời (đã là thành viên, đã có lời mời chờ, hoặc không đủ điều kiện).`;
       }
-      alert(msg);
+      notify(msg);
       closeInviteFriendsModal();
       await fetchGroupDetail();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi gửi lời mời');
+      notify(error.response?.data?.message || 'Lỗi gửi lời mời');
     } finally {
       setInviteBatchSending(false);
     }
@@ -1716,15 +1748,15 @@ const GroupDetail = () => {
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) {
+    if (!(await confirmAsync('Bạn có chắc muốn xóa thành viên này khỏi nhóm?'))) {
       return;
     }
     try {
       await api.delete(`/groups/${id}/members/${memberId}`);
-      alert('Đã xóa thành viên khỏi nhóm!');
+      notify('Đã xóa thành viên khỏi nhóm!');
       fetchGroupDetail();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi xóa thành viên');
+      notify(error.response?.data?.message || 'Lỗi xóa thành viên');
     }
   };
 
@@ -1768,7 +1800,7 @@ const GroupDetail = () => {
       setShowGroupSettingsModal(true);
     } catch (error) {
       console.error('Error fetching group data:', error);
-      alert('Không thể tải thông tin nhóm');
+      notify('Không thể tải thông tin nhóm');
     }
   };
 
@@ -1844,11 +1876,11 @@ const GroupDetail = () => {
       setShowGroupSettingsModal(false);
       setSettingsErrors({});
       
-      alert('✅ Cập nhật cài đặt nhóm thành công!');
+      notify('✅ Cập nhật cài đặt nhóm thành công!');
     } catch (error) {
       console.error('Error updating group settings:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Lỗi cập nhật cài đặt nhóm';
-      alert('❌ ' + errorMessage);
+      notify('❌ ' + errorMessage);
     } finally {
       setSavingSettings(false);
     }
@@ -1967,7 +1999,7 @@ const GroupDetail = () => {
     setInviteFromUrlLoading(true);
     try {
       await api.post(`/groups/${id}/invites/${inviteFromUrl}/accept`);
-      alert('Đã tham gia nhóm!');
+      notify('Đã tham gia nhóm!');
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.delete('invite');
@@ -1976,7 +2008,7 @@ const GroupDetail = () => {
       await fetchGroupDetail();
       window.dispatchEvent(new CustomEvent('userGroupsChanged'));
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể chấp nhận lời mời');
+      notify(error.response?.data?.message || 'Không thể chấp nhận lời mời');
     } finally {
       setInviteFromUrlLoading(false);
     }
@@ -1993,7 +2025,7 @@ const GroupDetail = () => {
         return next;
       }, { replace: true });
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể từ chối lời mời');
+      notify(error.response?.data?.message || 'Không thể từ chối lời mời');
     } finally {
       setInviteFromUrlLoading(false);
     }
@@ -2883,7 +2915,7 @@ const GroupDetail = () => {
                       (!post.images || post.images.length === 0) &&
                       (!post.files || post.files.length === 0) ? (
                         <div
-                          className={`w-full min-h-[360px] md:min-h-[420px] rounded-xl px-5 py-8 flex items-center justify-center text-center text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words ${
+                          className={`w-full min-h-[260px] md:min-h-[320px] max-h-[55vh] overflow-y-auto rounded-xl px-5 py-8 flex items-center justify-center text-center text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words ${
                             isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'
                           }`}
                           style={{ background: post.textBackground }}
@@ -2927,7 +2959,7 @@ const GroupDetail = () => {
                                   controls
                                   playsInline
                                   preload="metadata"
-                                  className="w-full max-h-[min(70vh,620px)] rounded-lg bg-black object-contain"
+                                  className="w-full max-h-[min(55vh,500px)] rounded-lg bg-black object-contain"
                                 />
                                 {file.name ? (
                                   <p className="text-xs text-[var(--fb-text-secondary)] truncate mt-1 px-0.5">{file.name}</p>

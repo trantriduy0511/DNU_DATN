@@ -28,7 +28,8 @@ import {
   Bookmark,
   AlertTriangle,
 } from 'lucide-react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { notify, confirmAsync, promptAsync } from '../../lib/notify';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { buildEventShareMessageContent } from '../../utils/eventShareMessage.js';
@@ -154,6 +155,7 @@ function isDarkBackground(background) {
 
 const EventDetailPage = () => {
   const { eventId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
@@ -508,6 +510,36 @@ const EventDetailPage = () => {
     };
   }, [event?._id]);
 
+  useEffect(() => {
+    const urlPid = searchParams.get('post');
+    const th = imageTheater;
+    if (th?.post?._id) {
+      const p = th.post;
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: String(p._id), title: (p.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    if (urlPid && eventDiscussionPosts.some((p) => String(p._id) === String(urlPid))) {
+      const p = eventDiscussionPosts.find((x) => String(x._id) === String(urlPid));
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: urlPid, title: (p?.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+  }, [imageTheater, searchParams, eventDiscussionPosts]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+    };
+  }, []);
+
   const getEventStatus = (eventDate) => {
     const now = new Date();
     const date = new Date(eventDate);
@@ -557,7 +589,7 @@ const EventDetailPage = () => {
     e.target.value = '';
     if (!file || !event?._id) return;
     if (file.size > 10 * 1024 * 1024) {
-      alert('Kích thước ảnh không được vượt quá 10MB');
+      notify('Kích thước ảnh không được vượt quá 10MB');
       return;
     }
     setEventCoverUploading(true);
@@ -569,7 +601,7 @@ const EventDetailPage = () => {
       });
       if (res.data?.event) setEvent(res.data.event);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không cập nhật được ảnh sự kiện');
+      notify(err.response?.data?.message || 'Không cập nhật được ảnh sự kiện');
     } finally {
       setEventCoverUploading(false);
     }
@@ -593,25 +625,26 @@ const EventDetailPage = () => {
       const res = await api.get(`/events/${id}`);
       setEvent(res.data.event);
     } catch (error) {
-      alert(error.response?.data?.message || 'Không cập nhật được phản hồi');
+      notify(error.response?.data?.message || 'Không cập nhật được phản hồi');
     }
   };
 
   const handleDeleteEvent = async (id) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa sự kiện này?')) return;
+    if (!(await confirmAsync('Bạn có chắc chắn muốn xóa sự kiện này?'))) return;
     try {
       await api.delete(`/events/${id}`);
       navigate('/events', { replace: true });
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi xóa sự kiện');
+      notify(error.response?.data?.message || 'Lỗi xóa sự kiện');
     }
   };
 
   const reportEvent = async (ev) => {
-    const reason = window.prompt('Nhập lý do báo cáo sự kiện:');
-    if (!reason || !reason.trim()) return;
+    const reason = await promptAsync('Nhập lý do báo cáo sự kiện:');
+    if (reason == null) return;
+    if (!reason.trim()) return;
     if (!ev?._id) {
-      alert('Không thể xác định sự kiện để báo cáo.');
+      notify('Không thể xác định sự kiện để báo cáo.');
       return;
     }
     try {
@@ -620,10 +653,10 @@ const EventDetailPage = () => {
         category: 'Sự kiện',
         reason: reason.trim()
       });
-      alert('Đã gửi báo cáo sự kiện.');
+      notify('Đã gửi báo cáo sự kiện.');
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không thể báo cáo sự kiện');
+      notify(e.response?.data?.message || 'Không thể báo cáo sự kiện');
     }
   };
 
@@ -692,7 +725,7 @@ const EventDetailPage = () => {
       setDiscussionFiles([]);
       await refreshEventDiscussionPosts(id);
     } catch (e) {
-      alert(e.response?.data?.message || 'Không đăng được bài');
+      notify(e.response?.data?.message || 'Không đăng được bài');
     } finally {
       setDiscussionSubmitting(false);
     }
@@ -723,7 +756,7 @@ const EventDetailPage = () => {
       else await api.post(`/posts/${postId}/like`);
     } catch (e) {
       setEventDiscussionPosts(snapshot);
-      alert(e.response?.data?.message || 'Lỗi thích bài viết');
+      notify(e.response?.data?.message || 'Lỗi thích bài viết');
     }
   };
 
@@ -751,26 +784,27 @@ const EventDetailPage = () => {
       setSavedEventPostIds(next);
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không cập nhật được trạng thái lưu');
+      notify(e.response?.data?.message || 'Không cập nhật được trạng thái lưu');
     }
   };
 
   const reportEventPost = async (postId) => {
-    const reason = window.prompt('Nhập lý do báo cáo bài viết:');
-    if (!reason || !reason.trim()) return;
+    const reason = await promptAsync('Nhập lý do báo cáo bài viết:');
+    if (reason == null) return;
+    if (!reason.trim()) return;
     try {
       await api.post(`/posts/${postId}/report`, { reason: reason.trim() });
-      alert('Đã gửi báo cáo bài viết.');
+      notify('Đã gửi báo cáo bài viết.');
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không thể báo cáo bài viết');
+      notify(e.response?.data?.message || 'Không thể báo cáo bài viết');
     }
   };
 
   const handleDeleteEventPost = async (post) => {
     const postId = post?._id;
     if (!postId) return;
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) return;
+    if (!(await confirmAsync('Bạn có chắc chắn muốn xóa bài viết này?'))) return;
 
     try {
       await api.delete(`/posts/${postId}`);
@@ -787,10 +821,10 @@ const EventDetailPage = () => {
         if (!current?.post?._id) return current;
         return String(current.post._id) === String(postId) ? null : current;
       });
-      alert('Đã xóa bài viết.');
+      notify('Đã xóa bài viết.');
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không thể xóa bài viết');
+      notify(e.response?.data?.message || 'Không thể xóa bài viết');
     }
   };
 
@@ -816,7 +850,7 @@ const EventDetailPage = () => {
       setShareFriendsList(res.data.friends || []);
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(e.response?.data?.message || 'Không tải được danh sách bạn bè');
       setShareModalPost(null);
     } finally {
       setShareFriendsLoading(false);
@@ -827,7 +861,7 @@ const EventDetailPage = () => {
     if (!shareModalPost?._id || !eventId) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const postId = shareModalPost._id;
@@ -859,10 +893,10 @@ const EventDetailPage = () => {
       const n = ids.length;
       setShareModalPost(null);
       setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
+      notify(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
+      notify(e.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -881,7 +915,7 @@ const EventDetailPage = () => {
       setShareFriendsList(res.data.friends || []);
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(e.response?.data?.message || 'Không tải được danh sách bạn bè');
       setEventSharePickerIntent(null);
     } finally {
       setShareFriendsLoading(false);
@@ -892,7 +926,7 @@ const EventDetailPage = () => {
     if (!event?._id || !eventSharePickerIntent) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const ev = event;
@@ -905,7 +939,7 @@ const EventDetailPage = () => {
         const sent = res.data?.sentCount ?? ids.length;
         setEventSharePickerIntent(null);
         setShareSelectedFriendIds(new Set());
-        alert(res.data?.message || `Đã gửi ${sent} lời mời.`);
+        notify(res.data?.message || `Đã gửi ${sent} lời mời.`);
         return;
       }
 
@@ -923,10 +957,10 @@ const EventDetailPage = () => {
       }
       setEventSharePickerIntent(null);
       setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
+      notify(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (e) {
       console.error(e);
-      alert(e.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
+      notify(e.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -1832,7 +1866,7 @@ const EventDetailPage = () => {
                                                 (!post.images || post.images.length === 0) &&
                                                 (!post.files || post.files.length === 0) ? (
                                                   <div
-                                                    className={`flex min-h-[360px] w-full items-center justify-center rounded-xl px-5 py-8 text-center text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words md:min-h-[420px] ${
+                                                    className={`flex min-h-[260px] md:min-h-[320px] max-h-[55vh] overflow-y-auto w-full items-center justify-center rounded-xl px-5 py-8 text-center text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words ${
                                                       isDarkBackground(post.textBackground)
                                                         ? 'text-white'
                                                         : 'text-[var(--fb-text-primary)]'
@@ -1875,7 +1909,7 @@ const EventDetailPage = () => {
                                                           controls
                                                           playsInline
                                                           preload="metadata"
-                                                          className="w-full max-h-[min(70vh,620px)] rounded-lg bg-black object-contain"
+                                                          className="w-full max-h-[min(55vh,500px)] rounded-lg bg-black object-contain"
                                                         />
                                                         {file.name ? (
                                                           <p className="mt-1 truncate px-0.5 text-xs text-[#65676B]">
@@ -2267,14 +2301,23 @@ const EventDetailPage = () => {
                               ? 'Kéo để xem vùng khác; chạm nhẹ vào ảnh để phóng thêm'
                               : 'Bấm để phóng thêm; khi tối đa bấm lại để vừa khung'
                           }
-                          className={`m-auto block max-w-none object-contain transition-[max-height,max-width] duration-200 ease-out ${
+                          className={`m-auto block object-contain transition-[width,max-width,max-height] duration-200 ease-out ${
                             eventPostTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
-                          style={{
-                            width: `${100 * eventPostTheaterZoom}%`,
-                            maxWidth: 'none',
-                            maxHeight: 'none',
-                          }}
+                          style={
+                            eventPostTheaterZoom <= 1
+                              ? {
+                                  width: 'auto',
+                                  height: 'auto',
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                }
+                              : {
+                                  width: `${100 * eventPostTheaterZoom}%`,
+                                  maxWidth: 'none',
+                                  maxHeight: 'none',
+                                }
+                          }
                           onClick={
                             eventPostTheaterZoom <= 1
                               ? (ev) => {

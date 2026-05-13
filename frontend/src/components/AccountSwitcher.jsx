@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { User, ChevronDown, Plus, LogOut, Check, X, Bookmark, Settings, Shield } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { confirmAsync } from '../lib/notify';
 
 const AccountSwitcher = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,7 +44,7 @@ const AccountSwitcher = () => {
 
   const handleRemoveAccount = async (accountId, e) => {
     e.stopPropagation();
-    if (confirm('Bạn có chắc muốn xóa tài khoản này khỏi danh sách?')) {
+    if (await confirmAsync('Bạn có chắc muốn xóa tài khoản này khỏi danh sách?')) {
       await removeAccount(accountId);
       const remaining = useAuthStore.getState().accounts?.length ?? 0;
       if (remaining === 0) {
@@ -72,7 +73,7 @@ const AccountSwitcher = () => {
   };
 
   const handleLogoutAll = async () => {
-    if (confirm('Bạn có chắc muốn đăng xuất tất cả các tài khoản?')) {
+    if (await confirmAsync('Bạn có chắc muốn đăng xuất tất cả các tài khoản?')) {
       await logout(true); // Logout all
       navigate('/login');
     }
@@ -158,7 +159,7 @@ const AccountSwitcher = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="p-2 border-b border-gray-200">
+            <div className="p-2 border-b border-[var(--fb-divider)]">
               <button 
                 onClick={() => {
                   setIsOpen(false);
@@ -166,34 +167,30 @@ const AccountSwitcher = () => {
                     navigate(`/profile/${selfUserId}`);
                   }
                 }}
-                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-[var(--fb-hover)] transition-colors text-left"
               >
-                <User className="w-5 h-5 text-gray-600" />
-                <span className="text-gray-700">Trang cá nhân</span>
+                <User className="w-5 h-5 text-[var(--fb-icon)]" />
+                <span className="text-[var(--fb-text-primary)]">Trang cá nhân</span>
               </button>
               <button 
                 onClick={() => {
                   setIsOpen(false);
-                  // Dispatch custom event to open saved posts
                   window.dispatchEvent(new CustomEvent('openSavedPosts'));
                 }}
-                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-[var(--fb-hover)] transition-colors text-left"
               >
-                <Bookmark className="w-5 h-5 text-gray-600" />
-                <span className="text-gray-700">Đã lưu</span>
+                <Bookmark className="w-5 h-5 text-[var(--fb-icon)]" />
+                <span className="text-[var(--fb-text-primary)]">Đã lưu</span>
               </button>
-              <button className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left">
-                <Settings className="w-5 h-5 text-gray-600" />
-                <span
-                  className="text-gray-700"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsOpen(false);
-                    navigate('/settings');
-                  }}
-                >
-                  Cài đặt
-                </span>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/settings');
+                }}
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-[var(--fb-hover)] transition-colors text-left"
+              >
+                <Settings className="w-5 h-5 text-[var(--fb-icon)]" />
+                <span className="text-[var(--fb-text-primary)]">Cài đặt</span>
               </button>
               {user?.role === 'admin' && (
                 <button
@@ -201,31 +198,31 @@ const AccountSwitcher = () => {
                     navigate('/admin');
                     setIsOpen(false);
                   }}
-                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-left"
+                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-purple-100/60 dark:hover:bg-purple-900/30 transition-colors text-left"
                 >
-                  <Shield className="w-5 h-5 text-purple-600" />
-                  <span className="text-purple-600 font-medium">Quản trị</span>
+                  <Shield className="w-5 h-5 text-purple-600 dark:text-purple-300" />
+                  <span className="text-purple-700 dark:text-purple-300 font-medium">Quản trị</span>
                 </button>
               )}
               <button
                 onClick={async () => {
                   setIsOpen(false);
-                  await logout(false); // Logout current account only
+                  await logout(false);
                   if (accounts.length === 1) {
                     navigate('/login');
                   }
                 }}
-                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-left"
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-left"
               >
-                <LogOut className="w-5 h-5 text-red-600" />
-                <span className="text-red-600 font-medium">Đăng xuất</span>
+                <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" />
+                <span className="text-red-600 dark:text-red-400 font-medium">Đăng xuất</span>
               </button>
             </div>
 
             {/* Other Accounts */}
             {accounts.filter((acc) => !sameAccountId(acc.id, currentAccountId)).length > 0 && (
-              <div className="p-3 border-b border-gray-200">
-                <p className="text-xs text-gray-500 mb-2">Chuyển đổi tài khoản</p>
+              <div className="p-3 border-b border-[var(--fb-divider)]">
+                <p className="text-xs text-[var(--fb-text-secondary)] mb-2">Chuyển đổi tài khoản</p>
                 <div className="space-y-2">
                   {accounts
                     .filter((acc) => !sameAccountId(acc.id, currentAccountId))
@@ -233,21 +230,21 @@ const AccountSwitcher = () => {
                       <div
                         key={String(account.id)}
                         onClick={() => handleSwitchAccount(account.id)}
-                        className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+                        className="flex items-center space-x-3 p-2 rounded-lg hover:bg-[var(--fb-hover)] cursor-pointer transition-colors group"
                       >
                         <div className="w-10 h-10 rounded-full bg-gradient-to-r from-green-500 to-teal-500 flex items-center justify-center text-white font-semibold">
                           {account.user?.name?.charAt(0) || 'U'}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-gray-800">{account.user?.name}</p>
-                          <p className="text-xs text-gray-500">{account.user?.email}</p>
-                          <p className="text-xs text-gray-600 mt-1">
+                          <p className="font-medium text-[var(--fb-text-primary)]">{account.user?.name}</p>
+                          <p className="text-xs text-[var(--fb-text-secondary)]">{account.user?.email}</p>
+                          <p className="text-xs text-[var(--fb-text-secondary)] mt-1">
                             {account.user?.role === 'admin' ? '👑 Admin' : account.user?.studentRole === 'Giảng viên' ? '👨‍🏫 Giảng viên' : '👨‍🎓 Sinh viên'}
                           </p>
                         </div>
                         <button
                           onClick={(e) => handleRemoveAccount(account.id, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 rounded transition-all"
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-all"
                           title="Xóa tài khoản"
                         >
                           <X className="w-4 h-4 text-red-500" />
@@ -265,28 +262,28 @@ const AccountSwitcher = () => {
                   setShowAddAccountModal(true);
                   setIsOpen(false);
                 }}
-                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors text-left"
+                className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/25 transition-colors text-left"
               >
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-blue-600 dark:text-blue-300" />
                 </div>
                 <div>
-                  <p className="font-medium text-blue-600">Thêm tài khoản</p>
-                  <p className="text-xs text-gray-500">Chuyển đổi nhanh giữa các tài khoản</p>
+                  <p className="font-medium text-blue-600 dark:text-blue-300">Thêm tài khoản</p>
+                  <p className="text-xs text-[var(--fb-text-secondary)]">Chuyển đổi nhanh giữa các tài khoản</p>
                 </div>
               </button>
               
               {accounts.length > 1 && (
                 <button
                   onClick={handleLogoutAll}
-                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-left mt-1"
+                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/25 transition-colors text-left mt-1"
                 >
-                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                    <LogOut className="w-5 h-5 text-red-600" />
+                  <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                    <LogOut className="w-5 h-5 text-red-600 dark:text-red-300" />
                   </div>
                   <div>
-                    <p className="font-medium text-red-600">Đăng xuất tất cả</p>
-                    <p className="text-xs text-gray-500">{accounts.length} tài khoản</p>
+                    <p className="font-medium text-red-600 dark:text-red-400">Đăng xuất tất cả</p>
+                    <p className="text-xs text-[var(--fb-text-secondary)]">{accounts.length} tài khoản</p>
                   </div>
                 </button>
               )}

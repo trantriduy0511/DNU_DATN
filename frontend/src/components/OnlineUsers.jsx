@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, Circle, MessageCircle, Search, MoreHorizontal } from 'lucide-react';
+import { Users, Circle, MessageCircle, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
@@ -243,9 +243,6 @@ const OnlineUsers = ({ variant = 'widget' }) => {
                 aria-pressed={showContactsSearch}
               >
                 <Search className="w-4 h-4 text-[var(--fb-icon)]" />
-              </button>
-              <button type="button" className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-colors" title="Tuỳ chọn">
-                <MoreHorizontal className="w-4 h-4 text-[var(--fb-icon)]" />
               </button>
             </div>
           </div>

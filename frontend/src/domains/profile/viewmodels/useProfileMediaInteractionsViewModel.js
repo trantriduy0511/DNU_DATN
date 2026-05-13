@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { notify } from '../../../lib/notify';
 
 export function useProfileMediaInteractionsViewModel({ profileId, currentUser }) {
   const [profileMediaCommentInput, setProfileMediaCommentInput] = useState('');
@@ -69,7 +70,7 @@ export function useProfileMediaInteractionsViewModel({ profileId, currentUser })
         await navigator.share({ title, text: `Chia sẻ ${title}`, url });
       } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
-        alert('Đã sao chép liên kết để chia sẻ');
+        notify('Đã sao chép liên kết để chia sẻ');
       }
     } catch {
       // ignore cancelled share

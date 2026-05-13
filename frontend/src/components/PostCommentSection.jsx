@@ -5,6 +5,7 @@ import { MessageCircle, Send, X, ChevronDown, BookOpen, Download, ImagePlus } fr
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { notify, confirmAsync } from '../lib/notify';
 
 
 const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
@@ -128,7 +129,7 @@ export function PostCommentSection({
 
       const validationMsg = validateBeforePostComment?.();
       if (validationMsg) {
-        alert(validationMsg);
+        notify(validationMsg);
         return;
       }
 
@@ -162,7 +163,7 @@ export function PostCommentSection({
         // Avoid forced full-feed refresh here to prevent modal flicker.
       } catch (error) {
         console.error('Error adding comment:', error);
-        alert('Lỗi thêm bình luận');
+        notify('Lỗi thêm bình luận');
       }
     };
 
@@ -192,7 +193,7 @@ export function PostCommentSection({
     };
 
     const handleDeleteComment = async (commentId) => {
-      if (!window.confirm('Bạn có chắc muốn xóa bình luận này?')) return;
+      if (!(await confirmAsync('Bạn có chắc muốn xóa bình luận này?'))) return;
 
       try {
         await api.delete(`/comments/${commentId}`);
@@ -219,7 +220,7 @@ export function PostCommentSection({
         // Avoid forced full-feed refresh here to prevent modal flicker.
       } catch (error) {
         console.error('Error deleting comment:', error);
-        alert('Lỗi xóa bình luận');
+        notify('Lỗi xóa bình luận');
       }
     };
 

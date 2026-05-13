@@ -12,7 +12,6 @@ const Register = () => {
     confirmPassword: '',
     studentRole: 'Sinh viên',
     majors: [], // Changed to array for multiple selection
-    studentId: ''
   });
   const [showMajorsDropdown, setShowMajorsDropdown] = useState(false);
 
@@ -355,34 +354,22 @@ const Register = () => {
             </div>
 
             <div>
-              <label className={labelClass}>Mã sinh viên (tùy chọn)</label>
-              <input
-                type="text"
-                name="studentId"
-                value={formData.studentId}
-                onChange={handleChange}
-                className={`${inputDark} pl-4`}
-                placeholder="K17..."
-              />
-            </div>
-
-            <div>
               <label className={labelClass}>Mật khẩu</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                <Lock className="absolute z-10 pointer-events-none left-3 top-3 w-5 h-5 text-white/70" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`${inputLight} pr-11`}
+                  className={`${inputDark} pr-11`}
                   placeholder="••••••••"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(prev => !prev)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-700 transition-colors"
+                  className="absolute right-3 top-3 text-white/70 hover:text-white transition-colors"
                   aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -421,20 +408,20 @@ const Register = () => {
             <div>
               <label className={labelClass}>Xác nhận mật khẩu</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                <Lock className="absolute z-10 pointer-events-none left-3 top-3 w-5 h-5 text-white/70" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className={`${inputLight} pr-11`}
+                  className={`${inputDark} pr-11`}
                   placeholder="••••••••"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(prev => !prev)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-700 transition-colors"
+                  className="absolute right-3 top-3 text-white/70 hover:text-white transition-colors"
                   aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

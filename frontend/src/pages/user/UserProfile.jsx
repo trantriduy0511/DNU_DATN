@@ -11,6 +11,7 @@ import PostImageGallery from '../../components/PostImageGallery';
 import { useProfileMediaInteractionsViewModel } from '../../domains/profile/viewmodels/useProfileMediaInteractionsViewModel';
 import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 import { getBackendOrigin } from '../../shared/config/runtimeConfig';
+import { notify, confirmAsync } from '../../lib/notify';
 
 function isProfilePostGalleryVideoPath(src) {
   if (!src || typeof src !== 'string') return false;
@@ -83,7 +84,6 @@ export default function UserProfile() {
     major: '',
     bio: '',
     location: '',
-    studentId: '',
     phone: '',
     website: '',
     facebook: ''
@@ -162,19 +162,19 @@ export default function UserProfile() {
       setSavedSet(next);
       window.dispatchEvent(new CustomEvent('savedPostsChanged', { detail: { postIds: Array.from(next) } }));
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi lưu bài viết');
+      notify(error.response?.data?.message || 'Lỗi lưu bài viết');
     }
   };
 
   const handleUnfriendFromList = async (friendId) => {
     if (!friendId) return;
-    if (!window.confirm('Bạn có chắc chắn muốn hủy kết bạn?')) return;
+    if (!(await confirmAsync('Bạn có chắc chắn muốn hủy kết bạn?'))) return;
     try {
       await api.delete(`/friends/${friendId}`);
       setFriends((prev) => prev.filter((x) => String(x?._id || x?.id) !== String(friendId)));
       setOpenFriendMenuId(null);
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi hủy kết bạn');
+      notify(error.response?.data?.message || 'Lỗi hủy kết bạn');
     }
   };
 
@@ -187,7 +187,7 @@ export default function UserProfile() {
 
   const handleUnfollowFromList = async (targetUserId) => {
     if (!targetUserId) return;
-    if (!window.confirm('Bỏ theo dõi người này?')) return;
+    if (!(await confirmAsync('Bỏ theo dõi người này?'))) return;
     try {
       await api.delete(`/users/follow/${targetUserId}`);
       setProfileUser((prev) => {
@@ -197,7 +197,7 @@ export default function UserProfile() {
       });
       setOpenFollowingMenuId(null);
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi bỏ theo dõi');
+      notify(error.response?.data?.message || 'Lỗi bỏ theo dõi');
     }
   };
 
@@ -207,7 +207,6 @@ export default function UserProfile() {
       major: profileUser?.major || currentUser?.major || '',
       bio: profileUser?.bio || '',
       location: profileUser?.location || '',
-      studentId: profileUser?.studentId || '',
       phone: profileUser?.phone || '',
       website: profileUser?.website || '',
       facebook: profileUser?.facebook || ''
@@ -237,7 +236,6 @@ export default function UserProfile() {
         major,
         bio: editAboutForm.bio ?? '',
         location: editAboutForm.location ?? '',
-        studentId: editAboutForm.studentId ?? '',
         phone: editAboutForm.phone ?? '',
         website: editAboutForm.website ?? '',
         facebook: editAboutForm.facebook ?? ''
@@ -308,7 +306,7 @@ export default function UserProfile() {
         setProfileUser((prev) => (prev ? { ...prev, followers: [...(prev.followers || []), currentUser?.id].filter(Boolean) } : prev));
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi theo dõi');
+      notify(error.response?.data?.message || 'Lỗi theo dõi');
     } finally {
       setActionLoading(false);
     }
@@ -456,7 +454,7 @@ export default function UserProfile() {
       fetchUserProfile();
     } catch (error) {
       console.error('Error accepting friend request:', error);
-      alert('Lỗi khi chấp nhận lời mời');
+      notify('Lỗi khi chấp nhận lời mời');
     } finally {
       setActionLoading(false);
     }
@@ -469,7 +467,7 @@ export default function UserProfile() {
       setFriendRequests((prev) => prev.filter((r) => (r.from?._id || r.from?.id) !== fromUserId));
     } catch (error) {
       console.error('Error rejecting friend request:', error);
-      alert('Lỗi khi từ chối lời mời');
+      notify('Lỗi khi từ chối lời mời');
     } finally {
       setActionLoading(false);
     }
@@ -493,23 +491,23 @@ export default function UserProfile() {
   const handleDeleteCurrentLightboxImage = async () => {
     const photo = currentLightboxPhoto;
     if (!photo || photo.type !== 'post-image' || !photo.postId) {
-      alert('Ảnh này không hỗ trợ xóa từ màn hình xem nhanh.');
+      notify('Ảnh này không hỗ trợ xóa từ màn hình xem nhanh.');
       return;
     }
 
     const post = userPosts.find((p) => String(p._id) === String(photo.postId));
     if (!post) {
-      alert('Không tìm thấy bài viết chứa ảnh này.');
+      notify('Không tìm thấy bài viết chứa ảnh này.');
       return;
     }
 
     const nextImages = (post.images || []).filter((img) => String(img || '') !== String(photo.raw || ''));
     if (nextImages.length === (post.images || []).length) {
-      alert('Không thể xác định ảnh cần xóa.');
+      notify('Không thể xác định ảnh cần xóa.');
       return;
     }
 
-    if (!window.confirm('Bạn có chắc muốn xóa ảnh này?')) return;
+    if (!(await confirmAsync('Bạn có chắc muốn xóa ảnh này?'))) return;
 
     try {
       setDeletingLightboxImage(true);
@@ -525,7 +523,7 @@ export default function UserProfile() {
       );
     } catch (error) {
       console.error('Delete image failed:', error);
-      alert(error.response?.data?.message || 'Xóa ảnh thất bại');
+      notify(error.response?.data?.message || 'Xóa ảnh thất bại');
     } finally {
       setDeletingLightboxImage(false);
     }
@@ -533,7 +531,7 @@ export default function UserProfile() {
 
   const handleDownloadFile = (file) => {
     if (!file?.url) {
-      alert(`📥 Đang tải xuống: ${file?.name || 'file'}`);
+      notify(`📥 Đang tải xuống: ${file?.name || 'file'}`);
       return;
     }
     const fileUrl = resolveMediaUrl(file.url);
@@ -564,13 +562,13 @@ export default function UserProfile() {
   };
 
   const handleDeletePost = async (postId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn xóa bài viết này?'))) {
       return;
     }
 
     try {
       await api.delete(`/posts/${postId}`);
-      alert('✅ Đã xóa bài viết thành công!');
+      notify('✅ Đã xóa bài viết thành công!');
 
       setProfileImageTheater((t) => (t?.post?._id === postId ? null : t));
       setProfileTheaterPostMenuOpen(false);
@@ -586,7 +584,7 @@ export default function UserProfile() {
       fetchUserProfile();
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('❌ Lỗi xóa bài viết: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi xóa bài viết: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -597,12 +595,12 @@ export default function UserProfile() {
       const { updateUser } = useAuthStore.getState();
       updateUser({ avatar: newAvatar });
     }
-    alert('✅ Cập nhật ảnh đại diện thành công!');
+    notify('✅ Cập nhật ảnh đại diện thành công!');
   };
 
   const handleCoverUploadSuccess = (newCoverPhoto) => {
     setProfileUser({ ...profileUser, coverPhoto: newCoverPhoto });
-    alert('✅ Cập nhật ảnh bìa thành công!');
+    notify('✅ Cập nhật ảnh bìa thành công!');
   };
 
   const fetchFriendStatus = async () => {
@@ -621,10 +619,10 @@ export default function UserProfile() {
       setActionLoading(true);
       await api.post(`/friends/request/${profileId}`);
       setFriendStatus('request_sent');
-      alert('✅ Đã gửi lời mời kết bạn');
+      notify('✅ Đã gửi lời mời kết bạn');
     } catch (error) {
       console.error('Error sending friend request:', error);
-      alert(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
+      notify(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
     } finally {
       setActionLoading(false);
     }
@@ -635,10 +633,10 @@ export default function UserProfile() {
       setActionLoading(true);
       await api.delete(`/friends/request/${profileId}`);
       setFriendStatus('none');
-      alert('✅ Đã hủy lời mời kết bạn');
+      notify('✅ Đã hủy lời mời kết bạn');
     } catch (error) {
       console.error('Error canceling request:', error);
-      alert('Lỗi khi hủy lời mời');
+      notify('Lỗi khi hủy lời mời');
     } finally {
       setActionLoading(false);
     }
@@ -649,10 +647,10 @@ export default function UserProfile() {
       setActionLoading(true);
       await api.put(`/friends/accept/${profileId}`);
       setFriendStatus('friends');
-      alert('✅ Đã chấp nhận lời mời kết bạn');
+      notify('✅ Đã chấp nhận lời mời kết bạn');
     } catch (error) {
       console.error('Error accepting request:', error);
-      alert('Lỗi khi chấp nhận lời mời');
+      notify('Lỗi khi chấp nhận lời mời');
     } finally {
       setActionLoading(false);
     }
@@ -663,26 +661,26 @@ export default function UserProfile() {
       setActionLoading(true);
       await api.put(`/friends/reject/${profileId}`);
       setFriendStatus('none');
-      alert('✅ Đã từ chối lời mời kết bạn');
+      notify('✅ Đã từ chối lời mời kết bạn');
     } catch (error) {
       console.error('Error rejecting request:', error);
-      alert('Lỗi khi từ chối lời mời');
+      notify('Lỗi khi từ chối lời mời');
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleUnfriend = async () => {
-    if (!confirm('Bạn có chắc muốn hủy kết bạn?')) return;
+    if (!(await confirmAsync('Bạn có chắc muốn hủy kết bạn?'))) return;
     
     try {
       setActionLoading(true);
       await api.delete(`/friends/${profileId}`);
       setFriendStatus('none');
-      alert('✅ Đã hủy kết bạn');
+      notify('✅ Đã hủy kết bạn');
     } catch (error) {
       console.error('Error unfriending:', error);
-      alert('Lỗi khi hủy kết bạn');
+      notify('Lỗi khi hủy kết bạn');
     } finally {
       setActionLoading(false);
     }
@@ -701,7 +699,7 @@ export default function UserProfile() {
       }));
     } catch (error) {
       console.error('Error starting chat:', error);
-      alert('Lỗi khi mở chat');
+      notify('Lỗi khi mở chat');
     }
   };
 
@@ -716,7 +714,7 @@ export default function UserProfile() {
       }));
     } catch (error) {
       console.error('Error starting chat with user:', error);
-      alert('Lỗi khi mở chat');
+      notify('Lỗi khi mở chat');
     }
   };
 
@@ -875,7 +873,7 @@ export default function UserProfile() {
       );
     } catch (error) {
       console.error('Error toggling like:', error);
-      alert(error.response?.data?.message || 'Lỗi thích bài viết');
+      notify(error.response?.data?.message || 'Lỗi thích bài viết');
     }
   };
 
@@ -900,7 +898,7 @@ export default function UserProfile() {
       setShareFriendsList(res.data.friends || []);
     } catch (error) {
       console.error('Error loading friends:', error);
-      alert(error.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(error.response?.data?.message || 'Không tải được danh sách bạn bè');
       setShareModalPost(null);
     } finally {
       setShareFriendsLoading(false);
@@ -911,7 +909,7 @@ export default function UserProfile() {
     if (!shareModalPost?._id) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const postId = shareModalPost._id;
@@ -942,10 +940,10 @@ export default function UserProfile() {
       const n = ids.length;
       setShareModalPost(null);
       setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
+      notify(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Share to friends failed:', error);
-      alert(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -2255,15 +2253,15 @@ export default function UserProfile() {
             className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl border border-[var(--fb-divider)] w-full max-w-md overflow-hidden flex flex-col h-[90vh] max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 flex-shrink-0">
+            <div className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] p-4 flex-shrink-0 border-b border-[var(--fb-divider)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center">
-                    <Edit className="w-5 h-5 text-white" />
+                  <div className="w-11 h-11 bg-[var(--fb-input)] rounded-full flex items-center justify-center">
+                    <Edit className="w-5 h-5 text-[var(--fb-icon)]" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-extrabold text-white">Chỉnh sửa thông tin</h3>
-                    <p className="text-sm text-blue-100 mt-0.5">Cập nhật cơ bản, giới thiệu và liên hệ</p>
+                    <h3 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Chỉnh sửa thông tin</h3>
+                    <p className="text-sm text-[var(--fb-text-secondary)] mt-0.5">Cập nhật cơ bản, giới thiệu và liên hệ</p>
                   </div>
                 </div>
                 <button
@@ -2273,7 +2271,7 @@ export default function UserProfile() {
                     setShowEditAboutModal(false);
                     setEditAboutError('');
                   }}
-                  className="text-white hover:bg-white/20 p-2 rounded-full transition-colors disabled:opacity-60"
+                  className="text-[var(--fb-icon)] hover:bg-[var(--fb-hover)] p-2 rounded-full transition-colors disabled:opacity-60"
                   title="Đóng"
                 >
                   <X className="w-5 h-5" />
@@ -2346,20 +2344,6 @@ export default function UserProfile() {
                   onChange={handleEditAboutChange}
                   className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="VD: Hà Nội"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-[var(--fb-text-secondary)] mb-2">
-                  Mã sinh viên
-                </label>
-                <input
-                  type="text"
-                  name="studentId"
-                  value={editAboutForm.studentId}
-                  onChange={handleEditAboutChange}
-                  className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="VD: DNU123456"
                 />
               </div>
 
@@ -2680,14 +2664,23 @@ export default function UserProfile() {
                               ? 'Kéo để xem vùng khác; chạm nhẹ vào ảnh để phóng thêm'
                               : 'Bấm để phóng thêm; khi tối đa bấm lại để vừa khung'
                           }
-                          className={`m-auto block max-w-none object-contain transition-[max-height,max-width] duration-200 ease-out ${
+                          className={`m-auto block object-contain transition-[width,max-width,max-height] duration-200 ease-out ${
                             profilePostTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
-                          style={{
-                            width: `${100 * profilePostTheaterZoom}%`,
-                            maxWidth: 'none',
-                            maxHeight: 'none',
-                          }}
+                          style={
+                            profilePostTheaterZoom <= 1
+                              ? {
+                                  width: 'auto',
+                                  height: 'auto',
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                }
+                              : {
+                                  width: `${100 * profilePostTheaterZoom}%`,
+                                  maxWidth: 'none',
+                                  maxHeight: 'none',
+                                }
+                          }
                           onClick={
                             profilePostTheaterZoom <= 1
                               ? (ev) => {
@@ -2780,7 +2773,7 @@ export default function UserProfile() {
                                 onClick={() => {
                                   setProfileTheaterPostMenuOpen(false);
                                   closeProfileImageTheater();
-                                  alert('Vui lòng mở bài viết từ trang chủ để báo cáo.');
+                                  notify('Vui lòng mở bài viết từ trang chủ để báo cáo.');
                                 }}
                               >
                                 Báo cáo bài viết

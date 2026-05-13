@@ -12,6 +12,7 @@ import {
   Loader,
   RefreshCw
 } from 'lucide-react';
+import { notify } from '../../lib/notify';
 import api from '../../utils/api';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
@@ -59,7 +60,7 @@ const AIAnalytics = () => {
     } catch (error) {
       console.error('Error fetching analytics:', error);
       console.error('Error details:', error.response?.data);
-      alert('Lỗi khi tải dữ liệu phân tích: ' + (error.response?.data?.message || error.message));
+      notify('Lỗi khi tải dữ liệu phân tích: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -75,11 +76,11 @@ const AIAnalytics = () => {
       if (res.data.success) {
         setPrediction(res.data.prediction);
       } else {
-        alert('Không thể tạo dự báo: ' + (res.data.message || 'Lỗi không xác định'));
+        notify('Không thể tạo dự báo: ' + (res.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error fetching prediction:', error);
-      alert('Lỗi khi tạo dự báo: ' + (error.response?.data?.message || error.message));
+      notify('Lỗi khi tạo dự báo: ' + (error.response?.data?.message || error.message));
     } finally {
       setPredicting(false);
     }
@@ -95,11 +96,11 @@ const AIAnalytics = () => {
       if (res.data.success) {
         setRecommendations(res.data.recommendations);
       } else {
-        alert('Không thể tạo khuyến nghị: ' + (res.data.message || 'Lỗi không xác định'));
+        notify('Không thể tạo khuyến nghị: ' + (res.data.message || 'Lỗi không xác định'));
       }
     } catch (error) {
       console.error('Error fetching recommendations:', error);
-      alert('Lỗi khi tạo khuyến nghị: ' + (error.response?.data?.message || error.message));
+      notify('Lỗi khi tạo khuyến nghị: ' + (error.response?.data?.message || error.message));
     } finally {
       setRecommending(false);
     }

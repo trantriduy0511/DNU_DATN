@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Users, Search, MessageCircle, TrendingUp, FileText, UserPlus, Calendar, History, X } from 'lucide-react';
+import { Home, Users, Search, MessageCircle, TrendingUp, FileText, UserPlus, Calendar, History, X, Grid3x3, Bookmark, Settings, BookOpen } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../utils/api';
 import { initializeSocket } from '../utils/socket';
@@ -11,6 +11,7 @@ import ChatAI from './ChatAI';
 import { FixedChatActionButtons } from './FixedChatActionButtons';
 import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { notify } from '../lib/notify';
 
 const SEARCH_HISTORY_KEY = 'dnu_nav_search_history_v1';
 const SEARCH_HISTORY_MAX = 12;
@@ -47,7 +48,9 @@ const NavigationBar = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState(() => readSearchHistoryFromStorage());
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [showAppsMenu, setShowAppsMenu] = useState(false);
   const searchTimeoutRef = useRef(null);
+  const appsMenuRef = useRef(null);
 
   const appendSearchHistory = (rawQuery) => {
     const q = String(rawQuery || '').trim();
@@ -93,7 +96,7 @@ const NavigationBar = () => {
     if (path === '/home' || path === '/') {
       // Check if there's a tab query param
       const tabParam = new URLSearchParams(search).get('tab');
-      if (tabParam && ['groups', 'explore', 'events', 'documents'].includes(tabParam)) {
+      if (tabParam && ['groups', 'explore', 'events', 'documents', 'friends'].includes(tabParam)) {
         return tabParam;
       }
       return 'home';
@@ -344,12 +347,12 @@ const NavigationBar = () => {
     e.stopPropagation();
     try {
       await api.post(`/friends/request/${userId}`);
-      alert('✅ Đã gửi lời mời kết bạn');
+      notify('✅ Đã gửi lời mời kết bạn');
       setSearchResults(prev => prev.map(r => 
         r._id === userId ? { ...r, friendStatus: 'request_sent' } : r
       ));
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
+      notify(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
     }
   };
 
@@ -362,7 +365,7 @@ const NavigationBar = () => {
       emitAppEvent('openChat', { conversationId: res.data.conversation._id });
     } catch (error) {
       console.error('Error starting chat:', error);
-      alert('Lỗi khi mở chat');
+      notify('Lỗi khi mở chat');
     }
   };
 
@@ -411,6 +414,47 @@ const NavigationBar = () => {
     const offOpenSavedPosts = onAppEvent('openSavedPosts', openSavedPage);
     return () => offOpenSavedPosts();
   }, [navigate]);
+
+  // Đóng menu apps khi click ra ngoài
+  useEffect(() => {
+    if (!showAppsMenu) return undefined;
+    const onDocClick = (event) => {
+      if (appsMenuRef.current && !appsMenuRef.current.contains(event.target)) {
+        setShowAppsMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showAppsMenu]);
+
+  const appsMenuItems = [
+    {
+      id: 'lecturer-docs',
+      label: 'Tài liệu giảng viên',
+      icon: BookOpen,
+      iconWrapClassName: 'rounded-lg bg-sky-100 dark:bg-sky-900/40',
+      iconClassName: 'h-4 w-4 text-blue-600 dark:text-sky-300',
+      onClick: () => handleNavigateToTab('documents'),
+    },
+    {
+      id: 'friends',
+      label: 'Bạn bè',
+      icon: Users,
+      onClick: () => handleNavigateToTab('friends'),
+    },
+    {
+      id: 'saved',
+      label: 'Bài viết đã lưu',
+      icon: Bookmark,
+      onClick: () => navigate('/saved'),
+    },
+    {
+      id: 'settings',
+      label: 'Cài đặt',
+      icon: Settings,
+      onClick: () => navigate('/settings'),
+    },
+  ];
 
   return (
     <>
@@ -644,12 +688,65 @@ const NavigationBar = () => {
 
           {/* Right Icons - Facebook Style */}
           <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0 ml-auto">
+            {/* Apps menu (chỉ hiển thị trên mobile) */}
+            <div className="relative md:hidden" ref={appsMenuRef}>
+              <button
+                type="button"
+                onClick={() => setShowAppsMenu((prev) => !prev)}
+                className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
+                  showAppsMenu
+                    ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
+                    : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
+                }`}
+                title="Menu"
+                aria-label="Menu"
+                aria-expanded={showAppsMenu}
+              >
+                <Grid3x3 className="w-5 h-5" />
+              </button>
+              {showAppsMenu && (
+                <div className="absolute left-0 top-full mt-1 w-60 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-xl py-1 z-[80]">
+                  {appsMenuItems.map((item) => {
+                    const Icon = item.icon;
+                    const iconCls = item.iconClassName || 'h-4 w-4 text-[var(--fb-text-primary)]';
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setShowAppsMenu(false);
+                          item.onClick?.();
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
+                      >
+                        <span
+                          className={
+                            item.iconWrapClassName
+                              ? `relative inline-flex h-8 w-8 shrink-0 items-center justify-center ${item.iconWrapClassName}`
+                              : 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--fb-input)]'
+                          }
+                        >
+                          <Icon className={iconCls} />
+                          {typeof item.badge === 'number' && item.badge > 0 && (
+                            <span className="absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                              {item.badge > 9 ? '9+' : item.badge}
+                            </span>
+                          )}
+                        </span>
+                        <span className="truncate font-medium">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleRefreshHome}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 (location.pathname === '/home' || location.pathname === '/') && !location.search.includes('tab=')
-                  ? 'text-blue-600 bg-blue-50' 
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
               }`}
               title="Trang chủ"
             >
@@ -663,8 +760,8 @@ const NavigationBar = () => {
               onClick={() => handleNavigateToTab('groups')}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 activeTab === 'groups' || location.pathname.startsWith('/groups')
-                  ? 'text-blue-600 bg-blue-50' 
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
               }`}
               title="Nhóm"
             >
@@ -678,8 +775,8 @@ const NavigationBar = () => {
               onClick={() => handleNavigate('/events')}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 activeTab === 'events' || location.pathname.startsWith('/events')
-                  ? 'text-blue-600 bg-blue-50' 
-                  : 'text-gray-600 hover:bg-gray-100'
+                  ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
               }`}
               title="Sự kiện"
             >
@@ -693,7 +790,7 @@ const NavigationBar = () => {
             
             <button
               onClick={() => emitAppEvent('openChatWindow')}
-              className="hidden sm:inline-flex p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors relative"
+              className="hidden sm:inline-flex p-2 rounded-lg text-[var(--fb-icon)] hover:bg-[var(--fb-hover)] transition-colors relative"
               title="Tin nhắn"
             >
               <MessageCircle className="w-5 h-5" />

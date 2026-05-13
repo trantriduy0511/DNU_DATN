@@ -1,12 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bookmark, Plus, X, MoreHorizontal, Share2, SlidersHorizontal, Search, Send, Heart, MessageCircle } from 'lucide-react';
+import { Bookmark, Plus, X, MoreHorizontal, Share2, SlidersHorizontal, Search, Send, Heart, MessageCircle, Pencil, Trash2, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { PostCommentSection } from '../../components/PostCommentSection';
 import { useSavedPostsViewModel } from '../../domains/saved/viewmodels/useSavedPostsViewModel';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { notify, confirmAsync, promptAsync } from '../../lib/notify';
 
 export default function SavedPostsPage() {
   const navigate = useNavigate();
@@ -47,12 +48,66 @@ export default function SavedPostsPage() {
     removeFromSaved,
     assignPostToCollection,
     createCollection,
+    renameCollection,
+    deleteCollection,
+    collectionCounts,
     openShareModal,
     confirmShare,
     fetchSaved,
     toggleLike,
     applyPostUpdater
   } = useSavedPostsViewModel(user);
+
+  const [collectionMenuId, setCollectionMenuId] = useState(null);
+
+  useEffect(() => {
+    const onDocClick = (event) => {
+      if (!event.target.closest('[data-saved-collection-menu]')) {
+        setCollectionMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const handleSubmitCreateCollection = () => {
+    const result = createCollection();
+    if (result.ok) {
+      notify(`Đã tạo bộ sưu tập "${result.name}"`);
+      return;
+    }
+    if (result.reason === 'empty') {
+      notify('Vui lòng nhập tên bộ sưu tập');
+    } else if (result.reason === 'duplicate') {
+      notify('Tên bộ sưu tập đã tồn tại');
+    }
+  };
+
+  const handleRenameCollection = async (collection) => {
+    setCollectionMenuId(null);
+    const next = await promptAsync(`Đổi tên bộ sưu tập "${collection.name}"`, collection.name);
+    if (next == null) return;
+    const result = renameCollection(collection.id, next);
+    if (result.ok) {
+      notify('Đã đổi tên bộ sưu tập');
+    } else if (result.reason === 'empty') {
+      notify('Tên không được để trống');
+    } else if (result.reason === 'duplicate') {
+      notify('Tên bộ sưu tập đã tồn tại');
+    }
+  };
+
+  const handleDeleteCollection = async (collection) => {
+    setCollectionMenuId(null);
+    const ok = await confirmAsync(
+      `Xoá bộ sưu tập "${collection.name}"? Các bài viết sẽ được chuyển về "Mặc định".`
+    );
+    if (!ok) return;
+    const result = deleteCollection(collection.id);
+    if (result.ok) {
+      notify('Đã xoá bộ sưu tập');
+    }
+  };
 
   const resolveAvatarUrl = (avatar, name, background = '3b82f6') => {
     if (avatar) {
@@ -80,7 +135,7 @@ export default function SavedPostsPage() {
       await removeFromSaved(postId);
     } catch (error) {
       console.error('Error unsaving post:', error);
-      alert('Lỗi khi bỏ lưu bài viết');
+      notify('Lỗi khi bỏ lưu bài viết');
     }
   };
 
@@ -98,6 +153,16 @@ export default function SavedPostsPage() {
   };
 
   const isVideoUrl = (url = '') => /\.(mp4|webm|mov|m4v|avi|mkv|ogv|mpeg|mpg)$/i.test(String(url).split('?')[0]);
+
+  const savedPostAttachmentUrl = (file) => resolveMediaUrl(file?.url || '');
+
+  const isSavedPostAttachmentVideo = (file) => {
+    const mime = file?.mimeType || '';
+    const name = file?.name || '';
+    const raw = file?.url || '';
+    if (String(mime).toLowerCase().startsWith('video/')) return true;
+    return /\.(mp4|webm|mov|mkv|avi|m4v|ogv)$/i.test(name) || /\.(mp4|webm|mov|mkv|avi|m4v|ogv)$/i.test(raw);
+  };
 
   const getPreviewMedia = (post) => {
     const firstImage = post?.images?.[0];
@@ -123,6 +188,11 @@ export default function SavedPostsPage() {
     const media = getPreviewMedia(post);
     if (media?.type === 'video') return 'Video';
     if (media?.type === 'image') return 'Ảnh';
+    const files = post?.files;
+    if (Array.isArray(files) && files.length > 0) {
+      const hasDoc = files.some((f) => !isSavedPostAttachmentVideo(f));
+      if (hasDoc) return 'Tài liệu';
+    }
     return 'Bài viết';
   };
 
@@ -137,11 +207,11 @@ export default function SavedPostsPage() {
     try {
       const sentCount = await confirmShare();
       if (sentCount > 0) {
-        alert(`Đã gửi tới ${sentCount} người bạn qua tin nhắn.`);
+        notify(`Đã gửi tới ${sentCount} người bạn qua tin nhắn.`);
       }
     } catch (error) {
       console.error('Share to friends failed:', error);
-      alert(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
     }
   };
 
@@ -171,22 +241,93 @@ export default function SavedPostsPage() {
                 </div>
               </div>
               <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
-                <div className="p-4 border-b border-[var(--fb-divider)]">
+                <div className="p-4 border-b border-[var(--fb-divider)] flex items-center justify-between">
                   <h3 className="font-semibold text-[var(--fb-text-primary)]">Bộ sưu tập của tôi</h3>
+                  <span className="text-xs text-[var(--fb-text-secondary)]">{collections.length}</span>
                 </div>
-                <div className="p-3 space-y-2">
-                  {collections.map((collection) => (
-                    <div
-                      key={collection.id}
-                      className="rounded-lg border border-[var(--fb-divider)] p-3 text-sm text-[var(--fb-text-secondary)]"
-                    >
-                      {collection.name}
-                    </div>
-                  ))}
+                <div className="p-3 space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setFilterCollectionId('all')}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      filterCollectionId === 'all'
+                        ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                        : 'text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <Bookmark className="w-4 h-4 shrink-0" />
+                      <span className="truncate">Tất cả</span>
+                    </span>
+                    <span className="text-xs text-[var(--fb-text-secondary)]">{collectionCounts.all || 0}</span>
+                  </button>
+                  {collections.map((collection) => {
+                    const isActive = filterCollectionId === collection.id;
+                    const isDefault = collection.id === 'default';
+                    return (
+                      <div
+                        key={collection.id}
+                        className={`relative flex items-stretch rounded-lg transition-colors ${
+                          isActive
+                            ? 'bg-[#E7F3FF] dark:bg-blue-900/35'
+                            : 'hover:bg-[var(--fb-hover)]'
+                        }`}
+                        data-saved-collection-menu
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setFilterCollectionId(collection.id)}
+                          className={`flex flex-1 min-w-0 items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium ${
+                            isActive ? 'text-[#1877F2] dark:text-blue-200' : 'text-[var(--fb-text-primary)]'
+                          }`}
+                        >
+                          <span className="truncate">{collection.name}</span>
+                          <span className={`text-xs ${isActive ? 'text-[#1877F2]/80 dark:text-blue-200/80' : 'text-[var(--fb-text-secondary)]'}`}>
+                            {collectionCounts[collection.id] || 0}
+                          </span>
+                        </button>
+                        {!isDefault && (
+                          <div className="relative flex items-center pr-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCollectionMenuId((id) => (id === collection.id ? null : collection.id));
+                              }}
+                              className="p-1.5 rounded-full text-[var(--fb-icon)] hover:bg-[var(--fb-input)]"
+                              title="Tuỳ chọn"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                            {collectionMenuId === collection.id && (
+                              <div className="absolute right-0 top-full z-[60] mt-1 w-40 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] py-1 shadow-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRenameCollection(collection)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
+                                >
+                                  <Pencil className="w-4 h-4 text-[var(--fb-icon)]" />
+                                  Đổi tên
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCollection(collection)}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Xoá
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={() => setShowCreateCollectionModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] text-sm font-medium transition-colors"
+                    className="mt-1 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] text-[var(--fb-text-primary)] text-sm font-medium transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     Tạo bộ sưu tập mới
@@ -200,7 +341,11 @@ export default function SavedPostsPage() {
             <div className="max-w-3xl mx-auto">
               <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-4 mb-4">
                 <div className="flex items-center justify-between">
-                  <h1 className="text-lg font-bold text-[var(--fb-text-primary)]">Tất cả</h1>
+                  <h1 className="text-lg font-bold text-[var(--fb-text-primary)]">
+                    {filterCollectionId === 'all'
+                      ? 'Tất cả'
+                      : collections.find((c) => c.id === filterCollectionId)?.name || 'Tất cả'}
+                  </h1>
                   <div className="relative" data-saved-filter-menu>
                     <button
                       type="button"
@@ -211,37 +356,64 @@ export default function SavedPostsPage() {
                       <SlidersHorizontal className="w-4 h-4 text-[var(--fb-text-primary)]" />
                     </button>
                     {showFilterMenu && (
-                      <div className="absolute right-0 top-full mt-2 w-72 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-xl p-3 z-[70]">
+                      <div className="absolute right-0 top-full mt-2 w-[min(calc(100vw-1rem),20rem)] rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-xl p-3 z-[70]">
                         <div className="space-y-3">
                           <div>
                             <label className="block text-xs text-[var(--fb-text-secondary)] mb-1">Bộ sưu tập</label>
-                            <select
-                              value={filterCollectionId}
-                              onChange={(e) => setFilterCollectionId(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-sm text-[var(--fb-text-primary)]"
-                            >
-                              <option value="all">Tất cả bộ sưu tập</option>
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setFilterCollectionId('all')}
+                                className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                                  filterCollectionId === 'all'
+                                    ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                                    : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                                }`}
+                              >
+                                Tất cả
+                              </button>
                               {collections.map((collection) => (
-                                <option key={collection.id} value={collection.id}>
-                                  {collection.name}
-                                </option>
+                                <button
+                                  key={collection.id}
+                                  type="button"
+                                  onClick={() => setFilterCollectionId(collection.id)}
+                                  className={`inline-flex max-w-full items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                    filterCollectionId === collection.id
+                                      ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                                      : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                                  }`}
+                                  title={collection.name}
+                                >
+                                  <span className="truncate max-w-[10rem]">{collection.name}</span>
+                                </button>
                               ))}
-                            </select>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs text-[var(--fb-text-secondary)] mb-1">Danh mục bài viết</label>
-                            <select
-                              value={filterCategory}
-                              onChange={(e) => setFilterCategory(e.target.value)}
-                              className="w-full px-3 py-2 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-sm text-[var(--fb-text-primary)]"
-                            >
-                              <option value="all">Tất cả danh mục</option>
-                              <option value="Học tập">Học tập</option>
-                              <option value="Tài liệu">Tài liệu</option>
-                              <option value="Thảo luận">Thảo luận</option>
-                              <option value="Sự kiện">Sự kiện</option>
-                              <option value="Khác">Khác</option>
-                            </select>
+                            <div className="flex flex-wrap gap-1.5">
+                              {[
+                                { value: 'all', label: 'Tất cả' },
+                                { value: 'Học tập', label: 'Học tập' },
+                                { value: 'Tài liệu', label: 'Tài liệu' },
+                                { value: 'Thảo luận', label: 'Thảo luận' },
+                                { value: 'Sự kiện', label: 'Sự kiện' },
+                                { value: 'Khác', label: 'Khác' },
+                              ].map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => setFilterCategory(opt.value)}
+                                  className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                                    filterCategory === opt.value
+                                      ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                                      : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                                  }`}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs text-[var(--fb-text-secondary)] mb-1">Từ khóa</label>
@@ -260,7 +432,7 @@ export default function SavedPostsPage() {
                                 setFilterCategory('all');
                                 setFilterKeyword('');
                               }}
-                              className="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50"
+                              className="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                             >
                               Xóa lọc
                             </button>
@@ -451,6 +623,53 @@ export default function SavedPostsPage() {
                   </div>
                 </div>
                 <p className="text-[var(--fb-text-primary)] whitespace-pre-wrap break-words">{livePreviewPost.content}</p>
+                {Array.isArray(livePreviewPost.files) && livePreviewPost.files.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {livePreviewPost.files.map((file, index) =>
+                      isSavedPostAttachmentVideo(file) ? (
+                        <div key={index}>
+                          <video
+                            src={savedPostAttachmentUrl(file)}
+                            controls
+                            playsInline
+                            className="h-auto w-full max-h-[min(50vh,420px)] rounded-lg bg-black object-contain"
+                          />
+                          {file.name ? (
+                            <p className="mt-1 truncate px-0.5 text-xs text-[var(--fb-text-secondary)]">{file.name}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div
+                          key={index}
+                          className="w-full flex items-center justify-between p-3 bg-[var(--fb-input)] rounded-lg border border-[var(--fb-divider)] hover:bg-[var(--fb-hover)] transition-colors"
+                        >
+                          <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
+                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <BookOpen className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[var(--fb-text-primary)] break-words leading-5">{file.name || 'Document'}</p>
+                              <p className="text-xs text-[var(--fb-text-secondary)]">{file.size || 'Unknown size'}</p>
+                            </div>
+                          </div>
+                          <a
+                            href={savedPostAttachmentUrl(file)}
+                            download={file.name || 'download'}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="px-3 py-1.5 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all text-sm font-medium flex items-center space-x-1 flex-shrink-0 shadow-md hover:shadow-lg"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span>Tải về</span>
+                          </a>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : null}
               </div>
               {(() => {
                 const media = getPreviewMedia(livePreviewPost);
@@ -594,7 +813,7 @@ export default function SavedPostsPage() {
                 placeholder="Đặt tên cho bộ sưu tập của bạn..."
                 className="w-full px-3 py-2 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-sm text-[var(--fb-text-primary)]"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') createCollection();
+                  if (e.key === 'Enter') handleSubmitCreateCollection();
                 }}
               />
             </div>
@@ -612,7 +831,7 @@ export default function SavedPostsPage() {
               <button
                 type="button"
                 disabled={!newCollectionName.trim()}
-                onClick={createCollection}
+                onClick={handleSubmitCreateCollection}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Tạo

@@ -3,6 +3,7 @@ import { Moon, Sun, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { notify } from '../../lib/notify';
 
 const THEME_KEY = 'dnu_theme';
 
@@ -96,7 +97,7 @@ const SettingsPage = () => {
     try {
       setPwSaving(true);
       await api.put('/users/profile', { currentPassword, newPassword });
-      alert('✅ Đổi mật khẩu thành công!');
+      notify('✅ Đổi mật khẩu thành công!');
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
       setPwError(error.response?.data?.message || 'Lỗi đổi mật khẩu');

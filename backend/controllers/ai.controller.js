@@ -1,6 +1,10 @@
+import mongoose from 'mongoose';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { retrieveRagContext } from '../utils/ragRetriever.js';
 import AIChatHistory from '../models/AIChatHistory.model.js';
+import Post from '../models/Post.model.js';
+import Event from '../models/Event.model.js';
+import { getTodayHomeFeedPostsSnapshotForAi } from './post.controller.js';
 
 // Lazy init to avoid reading env before dotenv is loaded in server bootstrap.
 const getGenAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -732,8 +736,40 @@ const normalizeForIntent = (value = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
 
+/** Câu hỏi kiểu “hôm nay có bài viết mới không” — bổ sung snapshot feed từ DB */
+const wantsTodayFeedNewPostsQuestion = (raw = '') => {
+  const n = normalizeForIntent(raw)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!n) return false;
+  const today =
+    n.includes('hom nay') || n.includes('trong ngay') || /\bhnay\b/.test(n);
+  const posts =
+    n.includes('bai viet') ||
+    n.includes('bai dang') ||
+    n.includes('bai moi') ||
+    n.includes('tin tuc') ||
+    n.includes('tin moi') ||
+    n.includes('dang bai') ||
+    n.includes('feed') ||
+    n.includes('bang tin') ||
+    (n.includes('bai') && (n.includes('moi') || n.includes('nao')));
+  if (!today || !posts) return false;
+  return (
+    n.includes('co') ||
+    n.includes('khong') ||
+    n.includes('may') ||
+    n.includes('the nao') ||
+    n.includes('nhu the nao') ||
+    n.includes('sao') ||
+    /\bgi\b/.test(n)
+  );
+};
+
 const sanitizeAIText = (value = '') =>
   String(value)
+    .normalize('NFC')
     .replace(/\*\*/g, '')
     .replace(/`/g, '')
     .replace(/"/g, '')
@@ -959,30 +995,53 @@ const buildOpenAIMessages = ({
   return messages;
 };
 
+const buildGeminiGenerationConfig = (modelName) => {
+  const rawMax = Number.parseInt(String(process.env.GEMINI_MAX_OUTPUT_TOKENS || '8192'), 10);
+  const maxOutputTokens = Number.isFinite(rawMax) ? Math.min(Math.max(rawMax, 512), 8192) : 8192;
+  const config = {
+    temperature: 0.4,
+    topK: 40,
+    topP: 0.9,
+    maxOutputTokens
+  };
+  // Gemini 2.5+ có thể dùng token "thinking" chung ngân sách với câu trả lời → dễ bị cắt giữa chừng khi maxOutputTokens thấp.
+  if (
+    /gemini-2\.5|gemini-3/i.test(String(modelName || '')) &&
+    String(process.env.GEMINI_SKIP_THINKING_CONFIG || '').trim() !== '1'
+  ) {
+    config.thinkingConfig = { thinkingBudget: 0 };
+  }
+  return config;
+};
+
 const callGeminiChat = async ({ modelName, history, requestParts }) => {
+  const generationConfig = buildGeminiGenerationConfig(modelName);
   const model = getGenAI().getGenerativeModel({
     model: modelName,
-    generationConfig: {
-      temperature: 0.4,
-      topK: 40,
-      topP: 0.9,
-      maxOutputTokens: 1024
-    }
+    generationConfig
   });
 
   const chat = model.startChat({
     history,
-    generationConfig: {
-      temperature: 0.4,
-      topK: 40,
-      topP: 0.9,
-      maxOutputTokens: 1024
-    }
+    generationConfig
   });
 
   const result = await chat.sendMessage(requestParts);
   const response = await result.response;
-  return response.text();
+  const finishReason = response?.candidates?.[0]?.finishReason || '';
+  if (finishReason === 'MAX_TOKENS') {
+    console.warn(
+      'Gemini response finished with MAX_TOKENS; answer may be truncated. Consider GEMINI_MAX_OUTPUT_TOKENS or shorter prompts.'
+    );
+  }
+  let rawText = '';
+  try {
+    rawText = typeof response.text === 'function' ? response.text() : '';
+  } catch (textErr) {
+    console.warn('Gemini response.text() failed:', textErr?.message || textErr);
+    rawText = '';
+  }
+  return { rawText, finishReason };
 };
 
 const callOpenAIChat = async ({ modelName, messages, timeoutMs = 12000 }) => {
@@ -1006,7 +1065,7 @@ const callOpenAIChat = async ({ modelName, messages, timeoutMs = 12000 }) => {
         model: modelName,
         messages,
         temperature: 0.4,
-        max_tokens: 800
+        max_tokens: 2048
       }),
       signal: controller.signal
     });
@@ -1066,6 +1125,97 @@ export const getAIChatHistory = async (req, res) => {
   }
 };
 
+const truncateForAiPrompt = (text = '', max = 8000) => {
+  const t = String(text || '').trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}\n... (đã rút gọn nội dung)`;
+};
+
+const viewerNetworkAuthorIds = (viewer) => {
+  const out = new Set();
+  if (!viewer) return out;
+  const push = (ref) => {
+    if (ref == null) return;
+    const id = typeof ref === 'object' && ref !== null && ref._id != null ? ref._id : ref;
+    out.add(String(id));
+  };
+  push(viewer._id || viewer.id);
+  (viewer.friends || []).forEach(push);
+  (viewer.following || []).forEach(push);
+  return out;
+};
+
+const viewerCanReferencePostInAi = async (post, viewer) => {
+  if (!post || !viewer) return false;
+  if (viewer.role === 'admin') return true;
+  const viewerId = String(viewer._id || viewer.id);
+  const authorId = String(post.author?._id || post.author || '');
+  if (authorId && authorId === viewerId) return true;
+  if (post.status === 'rejected') return false;
+  if (post.status === 'pending') return authorId === viewerId || viewer.role === 'admin';
+  if (post.isPublic === false && authorId !== viewerId) return false;
+
+  const gid = post.group?._id || post.group;
+  if (gid) {
+    const groups = (viewer.groups || []).map((g) => String(g?._id || g));
+    return groups.includes(String(gid));
+  }
+
+  const evId = post.event?._id || post.event;
+  if (evId) {
+    const ev = await Event.findById(evId).select('participants').lean();
+    const parts = (ev?.participants || []).map((p) => String(typeof p === 'object' && p?._id ? p._id : p));
+    return parts.includes(viewerId);
+  }
+
+  const network = viewerNetworkAuthorIds(viewer);
+  return authorId && network.has(authorId);
+};
+
+const loadReferencedPostContextText = async (rawPostId, viewer) => {
+  if (!rawPostId || !viewer) return '';
+  const idStr = String(rawPostId).trim();
+  if (!mongoose.Types.ObjectId.isValid(idStr)) return '';
+
+  const post = await Post.findById(idStr)
+    .populate('author', 'name studentRole major role')
+    .populate('group', 'name')
+    .populate('event', 'title')
+    .lean();
+
+  if (!post) return '';
+  const allowed = await viewerCanReferencePostInAi(post, viewer);
+  if (!allowed) return '';
+
+  const author = post.author || {};
+  const authorLabel = author.name || post.authorNameSnapshot || 'Thành viên';
+  const lines = [
+    '**BÀI VIẾT ĐANG THAM CHIẾU (dữ liệu nội bộ DNU Social — chỉ dùng để trả lời, không bịa thêm):**',
+    `- ID bài: ${post._id}`,
+    `- Tiêu đề: ${(post.title || '').trim() || '(Không có tiêu đề)'}`,
+    `- Tác giả: ${authorLabel}${author.studentRole ? ` (${author.studentRole})` : ''}`,
+    `- Danh mục: ${post.category || 'Khác'}`,
+    `- Thời gian đăng: ${post.createdAt ? new Date(post.createdAt).toISOString() : 'Không rõ'}`,
+    `- Tags: ${Array.isArray(post.tags) && post.tags.length ? post.tags.join(', ') : '(không có)'}`,
+    `- Số lượt thích: ${Array.isArray(post.likes) ? post.likes.length : 0}`,
+    `- Số bình luận: ${Array.isArray(post.comments) ? post.comments.length : 0}`,
+    `- Chia sẻ: ${typeof post.shares === 'number' ? post.shares : 0}`
+  ];
+  if (post.group?.name) lines.push(`- Nhóm: ${post.group.name}`);
+  if (post.event?.title) lines.push(`- Sự kiện: ${post.event.title}`);
+  lines.push(`- Nội dung văn bản:\n"""${truncateForAiPrompt(post.content)}"""`);
+  if (Array.isArray(post.files) && post.files.length) {
+    const names = post.files.map((f) => f?.name).filter(Boolean);
+    if (names.length) lines.push(`- File đính kèm (tên): ${names.join(', ')}`);
+  }
+  if (Array.isArray(post.images) && post.images.length) {
+    lines.push(
+      `- Ảnh đính kèm trong bài: ${post.images.length} ảnh (URL/metadata không nhúng đầy đủ ở đây; ảnh người dùng gửi kèm tin nhắn có thể là ảnh khác).`
+    );
+  }
+  return lines.join('\n');
+};
+
 export const clearAIChatHistory = async (req, res) => {
   try {
     await AIChatHistory.findOneAndUpdate(
@@ -1100,7 +1250,8 @@ export const clearAIChatHistory = async (req, res) => {
 
 export const chatWithGemini = async (req, res) => {
   try {
-    const { message, conversationHistory = [], studyMaterial = null, imageAttachment = null } = req.body;
+    const { message, conversationHistory = [], studyMaterial = null, imageAttachment = null, postId: bodyPostId } =
+      req.body;
     const user = req.user;
     const normalizedCurrentMessage = String(message || '').trim();
     const imageMimeType = String(imageAttachment?.mimeType || '').trim().toLowerCase();
@@ -1121,7 +1272,10 @@ export const chatWithGemini = async (req, res) => {
       });
     }
 
-    const quickAnswer = !hasImageAttachment ? getQuickIntentAnswer(normalizedCurrentMessage) : null;
+    const postIdRaw = bodyPostId != null ? String(bodyPostId).trim() : '';
+    const hasPostReference = Boolean(postIdRaw && mongoose.Types.ObjectId.isValid(postIdRaw));
+
+    const quickAnswer = !hasImageAttachment && !hasPostReference ? getQuickIntentAnswer(normalizedCurrentMessage) : null;
     if (quickAnswer && !hasImageAttachment) {
       const concise = compactAIText(quickAnswer, 260, 2);
       if (user?._id) {
@@ -1192,6 +1346,16 @@ export const chatWithGemini = async (req, res) => {
       console.error('RAG retrieval error:', ragError);
     }
 
+    let todayFeedSnapshotText = '';
+    if (user && wantsTodayFeedNewPostsQuestion(normalizedCurrentMessage)) {
+      try {
+        const snap = await getTodayHomeFeedPostsSnapshotForAi(user);
+        todayFeedSnapshotText = snap.contextText || '';
+      } catch (snapErr) {
+        console.warn('Today feed snapshot for AI:', snapErr?.message || snapErr);
+      }
+    }
+
     if (studyMaterial && studyMaterial.trim()) {
       // If study material is provided, add DNU Buddy instructions
       enhancedContext += `\n\n**TÀI LIỆU HỌC TẬP ĐƯỢC CUNG CẤP:**
@@ -1226,6 +1390,22 @@ ${studyMaterial}
 - Tuyệt đối không cắt cụt câu trả lời giữa chừng.`;
     }
 
+    let referencedPostContext = '';
+    if (hasPostReference) {
+      try {
+        referencedPostContext = await loadReferencedPostContextText(postIdRaw, user);
+      } catch (refErr) {
+        console.warn('Referenced post context error:', refErr?.message || refErr);
+      }
+    }
+    if (referencedPostContext) {
+      enhancedContext += `\n\n${referencedPostContext}\n\n**QUY TẮC (BÀI ĐANG THAM CHIẾU):** Khi câu hỏi liên quan tới bài viết (tác giả, tiêu đề, nội dung, thời gian, nhóm/sự kiện, lượt thích/bình luận), hãy ưu tiên khối "BÀI VIẾT ĐANG THAM CHIẾU" và không bịa thông tin ngoài dữ liệu đó. Nếu mâu thuẫn với nguồn RAG khác, ưu tiên bài tham chiếu. Ảnh người dùng đính kèm có thể không trùng với ảnh trong bài — nếu không chắc, nói rõ.\n`;
+    }
+
+    if (todayFeedSnapshotText) {
+      enhancedContext += `\n\n${todayFeedSnapshotText}\n**QUY TẮC (BÀI MỚI HÔM NAY):** Đây là dữ liệu truy vấn từ CSDL theo **ngày giờ Việt Nam** và **phạm vi bảng tin** của user (bạn bè / đang theo dõi / nhóm trên feed / sự kiện đã tham gia). Trả lời ngắn gọn: có hay không, tổng số, nêu vài tiêu đề & tác giả từ danh sách. Không bịa thêm. Nếu tổng = 0, có thể gợi ý làm mới trang chủ.\n`;
+    }
+
     if (ragContext.contextText) {
       enhancedContext += `\n\n**NGUỒN TRI THỨC RAG (ưu tiên dùng để trả lời):**
 ${ragContext.contextText}
@@ -1238,7 +1418,7 @@ ${ragContext.contextText}
       const normalizedMessage = normalizeForIntent(normalizedCurrentMessage);
       const looksLikeInternalDataQuestion =
         /(su kien|workshop|nhom|bai viet|tai lieu|lich thi|thong bao|dang ky|tham gia)/.test(normalizedMessage);
-      if (looksLikeInternalDataQuestion) {
+      if (looksLikeInternalDataQuestion && !referencedPostContext && !todayFeedSnapshotText) {
         enhancedContext += `\n\n**LƯU Ý BẮT BUỘC:** Hiện không tìm thấy nguồn dữ liệu nội bộ phù hợp từ RAG cho câu hỏi này.
 - KHÔNG trả lời chung chung kiểu giới thiệu tính năng.
 - Hãy nói rõ là chưa tìm thấy dữ liệu phù hợp trong hệ thống hiện tại.
@@ -1319,6 +1499,7 @@ ${ragContext.contextText}
     });
 
     let rawText = '';
+    let geminiFinishReason = '';
     let providerUsed = '';
     let lastProviderError = null;
     let hasTemporaryOverload = false;
@@ -1326,10 +1507,12 @@ ${ragContext.contextText}
     for (const provider of availableProviders) {
       try {
         if (provider === 'gemini') {
-          rawText = await runWithRetry(
+          const geminiResult = await runWithRetry(
             () => callGeminiChat({ modelName: geminiModelName, history, requestParts }),
             aiRetries
           );
+          rawText = geminiResult?.rawText ?? '';
+          geminiFinishReason = geminiResult?.finishReason || '';
           providerUsed = 'gemini';
           break;
         }
@@ -1360,7 +1543,10 @@ ${ragContext.contextText}
       throw lastProviderError || new Error('All AI providers failed');
     }
 
-    const text = sanitizeAIText(trimLeadGreeting(rawText));
+    let text = sanitizeAIText(trimLeadGreeting(rawText));
+    if (providerUsed === 'gemini' && geminiFinishReason === 'MAX_TOKENS' && text) {
+      text = `${text}\n\n(Mình vừa đạt giới hạn độ dài phản hồi — bạn thử hỏi ngắn hơn hoặc chia nhỏ câu hỏi nhé.)`;
+    }
 
     if (user?._id) {
       const storedUserContent = normalizedCurrentMessage || `Đã gửi ảnh${imageAttachment?.fileName ? `: ${imageAttachment.fileName}` : ''}`;

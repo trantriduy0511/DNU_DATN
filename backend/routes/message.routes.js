@@ -13,6 +13,7 @@ import {
   removeParticipant,
   getGroupParticipants,
   updateGroupAvatar,
+  updateGroupName,
   deleteMessage,
   deleteConversation,
   recallMessage
@@ -41,6 +42,7 @@ router.get('/groups/:conversationId/participants', getGroupParticipants);
 router.put('/groups/:conversationId/participants', addParticipants);
 router.delete('/groups/:conversationId/participants/:userId', removeParticipant);
 router.put('/groups/:conversationId/avatar', uploadImagesAndFiles, updateGroupAvatar);
+router.put('/groups/:conversationId/name', updateGroupName);
 
 // Delete a message (must be before /:conversationId routes to avoid conflict)
 router.delete('/delete/:messageId', deleteMessage);

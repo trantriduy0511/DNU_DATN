@@ -198,14 +198,14 @@ const Login = () => {
               Mật khẩu
             </label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Lock className="absolute z-10 pointer-events-none left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full pl-11 pr-11 py-3 rounded-xl bg-white border border-slate-200/90 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E85A24]/50 focus:border-[#E85A24] transition-all text-sm shadow-inner"
+                className="w-full pl-11 pr-11 py-3 rounded-xl bg-black/30 border border-white/20 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#E85A24]/50 focus:border-[#E85A24] transition-all text-sm"
                 placeholder="Mật khẩu"
                 autoComplete="current-password"
                 required
@@ -213,7 +213,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(prev => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors"
                 aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

@@ -1,632 +1,335 @@
-﻿# BÁO CÁO ĐỒ ÁN TỐT NGHIỆP
-Đề tài: Xây dựng hệ thống mạng xã hội học tập cho sinh viên DNU
-
-## MỞ ĐẦU
-
-Trong bối cảnh chuyển đổi số đang diễn ra mạnh mẽ trong giáo dục đại học, nhu cầu xây dựng những nền tảng trực tuyến có khả năng kết nối sinh viên, hỗ trợ học tập và quản trị thông tin ngày càng trở nên cấp thiết. Thực tế cho thấy sinh viên hiện nay thường sử dụng nhiều công cụ rời rạc để trao đổi tài liệu, thảo luận học thuật, theo dõi thông báo học tập và tham gia các hoạt động tập thể. Việc phân tán dữ liệu và tương tác trên nhiều kênh khiến quá trình phối hợp thiếu tính liên thông, khó kiểm soát và khó duy trì chất lượng thông tin. Từ yêu cầu đó, đề tài "Xây dựng hệ thống mạng xã hội học tập cho sinh viên DNU" được lựa chọn nhằm tạo ra một môi trường trực tuyến tập trung, đáp ứng đồng thời nhu cầu giao tiếp xã hội và nhu cầu học tập trong phạm vi nhà trường.
-
-Đề tài tập trung phát triển một ứng dụng web theo mô hình full-stack, trong đó phần giao diện người dùng được xây dựng bằng React và Vite, phần máy chủ được xây dựng bằng Node.js kết hợp Express, dữ liệu được lưu trữ trên MongoDB, đồng thời tích hợp Socket.IO để xử lý các tương tác thời gian thực. Hệ thống cho phép người dùng đăng ký và đăng nhập tài khoản, quản lý hồ sơ cá nhân, đăng bài viết, bình luận và tương tác, kết bạn, nhắn tin trực tiếp, tham gia nhóm học tập, theo dõi sự kiện, nhận thông báo tức thời, cũng như gửi báo cáo nội dung vi phạm. Ngoài ra, hệ thống còn hỗ trợ một số tính năng mở rộng như trò chuyện AI phục vụ tra cứu nhanh và khu vực quản trị để giám sát hoạt động chung.
-
-Điểm nổi bật của đề tài không chỉ nằm ở việc xây dựng đầy đủ các chức năng cơ bản của một nền tảng cộng đồng số, mà còn ở cách tiếp cận theo hướng ứng dụng thực tiễn trong môi trường đại học. Từ việc tổ chức mô hình dữ liệu, thiết kế API, phân quyền người dùng cho đến tối ưu luồng tương tác thời gian thực, toàn bộ hệ thống được triển khai với mục tiêu phục vụ trực tiếp cho hoạt động học tập, chia sẻ tri thức và xây dựng cộng đồng sinh viên văn minh, chủ động. Vì vậy, đề tài có ý nghĩa cả về mặt kỹ thuật lẫn mặt ứng dụng xã hội trong nhà trường.
-
-2. Lí do chọn đề tài
-
-Lí do đầu tiên xuất phát từ nhu cầu thực tế của sinh viên trong quá trình học tập và sinh hoạt tại trường đại học. Trong thực tế, thông tin liên quan đến học tập, nhóm học, sự kiện, thông báo hoặc tài liệu thường bị phân tán ở nhiều nền tảng khác nhau như mạng xã hội phổ thông, ứng dụng nhắn tin hoặc email cá nhân. Việc thiếu một hệ thống tập trung làm phát sinh nhiều bất cập như trùng lặp thông tin, khó truy vết lịch sử trao đổi, khó xác thực độ tin cậy của nội dung và giảm hiệu quả phối hợp giữa các thành viên. Một nền tảng được thiết kế riêng cho cộng đồng sinh viên sẽ góp phần giải quyết trực tiếp các hạn chế trên.
-
-Lí do thứ hai liên quan đến định hướng chuyên môn của người thực hiện đồ án. Đề tài tích hợp nhiều mảng kiến thức quan trọng của ngành Công nghệ thông tin như thiết kế cơ sở dữ liệu, phát triển web full-stack, xác thực và phân quyền người dùng, xử lý truyền thông thời gian thực, tích hợp dịch vụ ngoài và tổ chức kiến trúc phần mềm theo module. Quá trình triển khai đề tài giúp củng cố kỹ năng phân tích yêu cầu, kỹ năng thiết kế hệ thống và kỹ năng lập trình thực chiến, từ đó nâng cao năng lực nghề nghiệp trong lĩnh vực phát triển phần mềm.
-
-Lí do thứ ba là tính thời sự của việc ứng dụng trí tuệ nhân tạo trong các hệ thống hỗ trợ học tập. Việc tích hợp mô-đun trò chuyện AI vào nền tảng không nhằm thay thế tư duy học thuật của sinh viên mà nhằm tăng tốc quá trình tra cứu, định hướng câu hỏi, tóm tắt thông tin và gợi ý cách tiếp cận bài toán. Điều này phù hợp với xu hướng cá nhân hóa trải nghiệm học tập trên nền tảng số, đồng thời giúp đề tài có thêm chiều sâu về công nghệ và giá trị thực tiễn.
-
-Lí do thứ tư đến từ yêu cầu quản trị và an toàn nội dung trong môi trường trực tuyến. Một nền tảng cộng đồng dành cho sinh viên cần có cơ chế báo cáo nội dung, theo dõi hoạt động và công cụ quản trị phù hợp để đảm bảo môi trường tương tác lành mạnh. Việc triển khai các thành phần như vai trò quản trị viên, giới hạn truy cập, cấu hình bảo mật, kiểm soát yêu cầu truy cập và bảo vệ dữ liệu người dùng là những nội dung có ý nghĩa ứng dụng cao, giúp đề tài vượt ra ngoài mức mô phỏng cơ bản.
-
-Từ các lí do trên có thể thấy đề tài vừa có tính cấp thiết trong thực tế học đường, vừa phù hợp với mục tiêu đào tạo của đồ án tốt nghiệp, đồng thời có phạm vi đủ rõ ràng để triển khai thành một sản phẩm phần mềm hoàn chỉnh ở mức khả thi.
-
-3. Mục đích nghiên cứu
-
+﻿MỞ ĐẦU
+1	Giới thiệu đề tài
+Trong bối cảnh chuyển đổi số giáo dục đang diễn ra mạnh mẽ, nhu cầu về một nền tảng trực tuyến tập trung nhằm kết nối sinh viên và hỗ trợ quản trị thông tin học thuật tại trường Đại học Đại Nam (DNU) ngày càng trở nên cấp thiết. Thay vì sử dụng các công cụ rời rạc gây phân tán dữ liệu, đề tài "Xây dựng hệ thống mạng xã hội học tập cho sinh viên DNU" được thực hiện nhằm tạo ra một môi trường giao tiếp và học tập thống nhất, văn minh. Hệ thống được phát triển theo mô hình full-stack hiện đại với React/Vite cho giao diện người dùng, Node.js và Express cho phía máy chủ, kết hợp cơ sở dữ liệu MongoDB và công nghệ Socket.IO để tối ưu các tương tác thời gian thực. Không chỉ cung cấp đầy đủ các tính năng của một mạng xã hội như quản lý hồ sơ, tương tác bài viết, nhắn tin và tham gia nhóm học tập, ứng dụng còn gây ấn tượng với các tiện ích mở rộng như trò chuyện cùng AI hỗ trợ tra cứu nhanh và hệ thống quản trị nội dung chặt chẽ. Với mục tiêu kết hợp hài hòa giữa kỹ thuật lập trình chuyên sâu và tính ứng dụng thực tiễn cao, đề tài không chỉ là một sản phẩm công nghệ hoàn chỉnh mà còn góp phần quan trọng vào việc xây dựng cộng đồng sinh viên DNU chủ động, gắn kết trong kỷ nguyên số.
+2	Lí do chọn đề tài
+Việc lựa chọn đề tài "Xây dựng mạng xã hội học tập cho sinh viên DNU" xuất phát từ sự kết hợp giữa nhu cầu thực tiễn và mục tiêu phát triển chuyên môn trong lĩnh vực Công nghệ thông tin. Trước hết, đề tài giải quyết bài toán cấp thiết về việc tập trung hóa nguồn dữ liệu học tập, sự kiện và thông báo vốn đang bị phân tán trên nhiều nền tảng rời rạc, giúp sinh viên tương tác và phối hợp hiệu quả hơn trong môi trường đại học. Về mặt chuyên môn, quá trình triển khai hệ thống full-stack với các kỹ thuật phức tạp như xử lý real-time, xác thực bảo mật và quản trị nội dung là cơ hội để củng cố năng lực lập trình thực chiến và thiết kế hệ thống chuyên nghiệp. Đặc biệt, việc tích hợp trí tuệ nhân tạo (AI) không chỉ bắt kịp xu hướng cá nhân hóa giáo dục số, hỗ trợ sinh viên tra cứu và tóm tắt thông tin nhanh chóng, mà còn tạo ra điểm nhấn về công nghệ cho sản phẩm. Cuối cùng, với các cơ chế quản trị và an toàn dữ liệu được chú trọng, đề tài không chỉ dừng lại ở mức mô phỏng mà còn hướng tới một môi trường cộng đồng số lành mạnh, minh chứng cho một sản phẩm phần mềm hoàn chỉnh, có tính khả thi cao và đáp ứng trọn vẹn mục tiêu đào tạo của đồ án tốt nghiệp.
+3	Mục đích nghiên cứu
 Mục đích tổng quát của đề tài là nghiên cứu, thiết kế và xây dựng một hệ thống mạng xã hội học tập hoạt động trên nền tảng web, phục vụ cộng đồng sinh viên trong việc kết nối, trao đổi thông tin và phối hợp học tập một cách hiệu quả, đồng thời cung cấp công cụ quản trị phù hợp cho cán bộ phụ trách hệ thống.
-
 Để đạt mục tiêu tổng quát, đề tài đặt ra các mục tiêu cụ thể như sau. Trước hết, hệ thống phải đáp ứng được các chức năng cốt lõi của người dùng cuối, bao gồm tạo tài khoản, xác thực đăng nhập, quản lý hồ sơ, đăng tải nội dung, bình luận tương tác, thiết lập quan hệ bạn bè, nhắn tin trực tiếp, tham gia nhóm và sự kiện, nhận thông báo theo thời gian thực, cũng như gửi báo cáo đối với nội dung không phù hợp. Tiếp theo, hệ thống cần bảo đảm tính nhất quán dữ liệu và tính rõ ràng trong phân quyền giữa người dùng thông thường và tài khoản quản trị.
-
 Về mặt kỹ thuật, mục tiêu của đề tài là xây dựng được kiến trúc client-server ổn định, có khả năng mở rộng theo module, cho phép tích hợp thuận lợi các dịch vụ bổ sung trong tương lai. Phía backend cần tổ chức API theo hướng thống nhất, dễ bảo trì; phía frontend cần đảm bảo giao diện thân thiện, mạch điều hướng rõ ràng, tương thích nhiều kích thước màn hình và hỗ trợ trải nghiệm thao tác liền mạch. Bên cạnh đó, hệ thống cần triển khai giao tiếp realtime cho các tác vụ quan trọng như tin nhắn và thông báo để tăng tính tương tác của người dùng.
-
 Một mục tiêu quan trọng khác là tích hợp thành phần AI ở mức ứng dụng, giúp tăng giá trị sử dụng cho nền tảng mà vẫn đảm bảo kiểm soát phạm vi. Mô-đun AI được định hướng như một công cụ hỗ trợ học tập và tham khảo nhanh, không thay thế kết luận chuyên môn hay đánh giá chính thức của giảng viên. Cuối cùng, đề tài hướng đến việc tổng hợp kinh nghiệm triển khai một dự án phần mềm có tính ứng dụng thực tế, làm cơ sở cho việc mở rộng thành hệ thống quy mô lớn hơn trong các giai đoạn sau.
-
-4. Phương pháp nghiên cứu
-
+4	Phương pháp nghiên cứu
 Để thực hiện đề tài một cách có hệ thống, nhóm tác giả sử dụng kết hợp phương pháp nghiên cứu lý thuyết và phương pháp phát triển phần mềm thực nghiệm. Trước tiên, nghiên cứu lý thuyết được tiến hành thông qua việc thu thập tài liệu từ các nguồn chính thống như tài liệu công nghệ của React, Node.js, Express, MongoDB, Socket.IO và các tài liệu liên quan đến bảo mật web, tổ chức API, kiến trúc ứng dụng hiện đại. Quá trình này giúp xác định nền tảng công nghệ phù hợp, chuẩn hóa thuật ngữ và lựa chọn hướng thiết kế khả thi cho đồ án.
-
 Sau giai đoạn nghiên cứu tài liệu, đề tài tiến hành phân tích yêu cầu theo hướng người dùng trung tâm. Các tình huống sử dụng chính được xác định thông qua khảo sát thực tiễn hoạt động học tập của sinh viên, từ đó hình thành các nhóm chức năng ưu tiên như bảng tin, nhóm học tập, sự kiện, trò chuyện trực tiếp và thông báo. Trên cơ sở yêu cầu đã xác định, hệ thống được thiết kế theo mô hình module, tách biệt các thành phần người dùng, bài viết, bạn bè, tin nhắn, nhóm, sự kiện, thông báo, quản trị và AI nhằm tăng khả năng kiểm soát và mở rộng.
-
 Về phương pháp phát triển, đề tài áp dụng cách tiếp cận tăng dần theo từng giai đoạn. Ở mỗi giai đoạn, một nhóm chức năng được xây dựng, kiểm thử và hoàn thiện trước khi tích hợp sang giai đoạn tiếp theo. Cách làm này giúp giảm rủi ro, dễ theo dõi tiến độ và kịp thời xử lý lỗi khi hệ thống tăng độ phức tạp. Song song đó, kiểm thử chức năng được thực hiện theo các kịch bản người dùng điển hình; kiểm thử tích hợp được áp dụng cho các luồng cần đồng bộ dữ liệu giữa frontend, backend và realtime server; kiểm thử lỗi được thực hiện cho các trường hợp như token hết hạn, thiếu cấu hình môi trường, lỗi phân quyền hoặc dữ liệu đầu vào không hợp lệ.
-
 Ngoài ra, đề tài còn áp dụng phương pháp đánh giá thông qua đối chiếu mục tiêu ban đầu với kết quả triển khai thực tế. Các tiêu chí đánh giá bao gồm mức độ hoàn thiện chức năng, tính ổn định vận hành, độ mạch lạc của giao diện, mức độ nhất quán của dữ liệu và khả năng mở rộng trong tương lai. Từ kết quả đánh giá, nhóm tác giả rút ra các điểm mạnh, điểm còn hạn chế và đề xuất hướng cải tiến cho các phiên bản tiếp theo của hệ thống.
-
-5. Phạm vi nghiên cứu
-
+5	Phạm vi nghiên cứu
 Đề tài được thực hiện trong phạm vi xây dựng một hệ thống mạng xã hội học tập trên nền tảng web dành cho sinh viên và quản trị viên trong môi trường đại học. Về đối tượng sử dụng, người dùng chính là sinh viên có nhu cầu trao đổi học tập, tương tác cộng đồng và theo dõi hoạt động học đường; người dùng phụ là quản trị viên có nhiệm vụ kiểm soát nội dung, xử lý báo cáo và theo dõi vận hành hệ thống.
-
 Về phạm vi chức năng, hệ thống tập trung triển khai các tính năng cốt lõi gồm quản lý tài khoản và hồ sơ cá nhân, bài viết và bình luận, tương tác xã hội cơ bản, kết bạn, nhắn tin trực tiếp theo thời gian thực, nhóm học tập, sự kiện, thông báo, báo cáo nội dung và một số tiện ích AI ở mức hỗ trợ. Ngoài ra, hệ thống có khu vực quản trị nhằm phục vụ tác vụ quản lý người dùng và kiểm duyệt nội dung trong phạm vi đồ án.
-
 Về phạm vi công nghệ, đề tài sử dụng React và Vite cho giao diện, Node.js và Express cho backend, MongoDB cho lưu trữ dữ liệu, Socket.IO cho xử lý realtime, cùng các thư viện bổ trợ phục vụ xác thực, bảo mật và upload tệp. Mô hình triển khai chủ yếu ở môi trường phát triển cục bộ và có thể mở rộng lên máy chủ thực tế khi đủ điều kiện hạ tầng.
-
 Bên cạnh các nội dung đã thực hiện, đề tài cũng xác định rõ các giới hạn. Hệ thống chưa đi sâu vào các thành phần ngoài mục tiêu chính như tích hợp thanh toán điện tử, đồng bộ toàn diện với các hệ quản trị đào tạo của nhà trường, tối ưu vận hành ở quy mô rất lớn hoặc xây dựng mô hình AI tự huấn luyện chuyên biệt. Những nội dung này được xem là định hướng phát triển mở rộng trong tương lai, không nằm trong phạm vi bắt buộc của đồ án hiện tại.
 
-6. Kết cấu đồ án
-Ngoài phần Mở đầu, Kết luận và Tài liệu tham khảo, nội dung chính của đồ án được tổ chức thành các chương như sau:
-- Chương 1: Tổng quan đề tài
-- Chương 2: Cơ sở lý thuyết và công nghệ sử dụng
-- Chương 3: Phân tích và thiết kế hệ thống
-- Chương 4: Cài đặt và triển khai
-- Chương 5: Kiểm thử và đánh giá
 
 
 
-## CHƯƠNG 1. TỔNG QUAN ĐỀ TÀI
 
-### 1.1. Bối cảnh nghiên cứu và nhu cầu thực tiễn
-Trong bối cảnh chuyển đổi số giáo dục đại học, các nền tảng trực tuyến phục vụ học tập ngày càng trở nên cần thiết. Thực tế sinh viên thường sử dụng nhiều công cụ rời rạc (nhóm Facebook, Zalo, Google Drive...) khiến thông tin phân tán. Bối cảnh này đặt ra yêu cầu xây dựng một nền tảng tập trung, chính thống và chuyên biệt cho nhu cầu học tập, thảo luận.
 
-### 1.2. Bài toán đặt ra và các thách thức
 
-Bài toán cốt lõi là tạo ra sự kết nối xuyên suốt giữa các sinh viên, nhóm học tập và quản trị viên, đồng thời hỗ trợ tra cứu nhanh chóng kiến thức. Cụ thể, một sinh viên cần có khả năng tham gia vào nhiều nhóm học tập khác nhau, nhận thông báo ngay lập tức khi có người trả lời câu hỏi của mình, và có thể truy cập kho tài liệu chung mà không sợ bị trôi tin nhắn như trên các nền tảng chat thông thường.
 
-Tuy nhiên, việc xây dựng một hệ thống như vậy đi kèm với nhiều thách thức lớn về mặt kỹ thuật:
-- Thách thức về truyền thông thời gian thực (Realtime Communication): Làm sao để hàng trăm sinh viên đang online có thể nhận được tin nhắn và thông báo cùng lúc với độ trễ thấp nhất mà không làm quá tải máy chủ bằng các phương thức HTTP truyền thống.
-- Thách thức về thiết kế cơ sở dữ liệu: Mạng xã hội sinh ra một lượng dữ liệu phi cấu trúc khổng lồ mỗi ngày (bình luận, bài đăng, lượt thích). Việc thiết kế schema sao cho tối ưu truy vấn đọc (Read-heavy) là một bài toán khó.
-- Thách thức về tích hợp Trí tuệ nhân tạo (AI): AI cần hiểu được bối cảnh là mạng xã hội học tập, không trả lời các câu hỏi lan man, và có khả năng đọc hiểu các tệp tài liệu PDF dài do sinh viên tải lên.
-- Thách thức về bảo mật: Đảm bảo phiên đăng nhập an toàn, phân quyền rõ ràng giữa sinh viên và quản trị viên, chống lại các cuộc tấn công phổ biến như XSS, CSRF và DDoS dạng nhẹ.
 
-### 1.3. Mục tiêu và định hướng tiếp cận
 
-Mục tiêu chung: 
-Xây dựng thành công một mạng xã hội học tập mang thương hiệu nội bộ dành riêng cho sinh viên Đại học Đại Nam (DNU), tạo không gian an toàn, tập trung và hiện đại.
 
-Mục tiêu cụ thể:
-- Xây dựng phân hệ Quản lý tài khoản: Đăng ký, đăng nhập, quên mật khẩu, cập nhật hồ sơ cá nhân và thay đổi ảnh đại diện.
-- Xây dựng phân hệ Tương tác xã hội: Đăng bài viết kèm hình ảnh, bình luận, thả tim, và kết bạn.
-- Xây dựng phân hệ Giao tiếp: Hệ thống nhắn tin trực tiếp (1-1) theo thời gian thực (Realtime chat).
-- Xây dựng phân hệ Nhóm học tập: Cho phép tạo nhóm, thêm thành viên, chia sẻ tài liệu và tạo các sự kiện (Event) học thuật.
-- Xây dựng phân hệ Trợ lý ảo AI: Tích hợp AI để giải đáp câu hỏi và tóm tắt tài liệu PDF trực tiếp trên hệ thống.
-- Xây dựng phân hệ Quản trị (Admin): Thống kê số liệu, quản lý bài viết vi phạm, khóa tài khoản người dùng có hành vi xấu.
 
-Định hướng tiếp cận:
-Đề tài sử dụng mô hình Client-Server hiện đại, phân tách hoàn toàn Frontend và Backend (Kiến trúc SPA - Single Page Application kết hợp RESTful API). Phương pháp Agile/Scrum được áp dụng trong quá trình phát triển để liên tục cải tiến và cập nhật chức năng.
 
-### 1.4. Đề xuất giải pháp mạng xã hội học tập
 
-Hệ thống đề xuất là một ứng dụng Web Full-stack toàn diện được lắp ghép từ các công nghệ tiên tiến nhất hiện nay:
-- Lớp Giao diện (Frontend): Phát triển bằng thư viện React.js kết hợp công cụ build Vite giúp tối ưu tốc độ. Tailwind CSS được dùng để thiết kế giao diện đồng nhất, hỗ trợ tốt trên cả thiết bị di động (Responsive). Trạng thái ứng dụng được quản lý bằng Zustand.
-- Lớp Máy chủ (Backend): Xây dựng bằng Node.js kết hợp framework Express.js để xử lý logic nghiệp vụ, cung cấp các API chuẩn RESTful cho Frontend tiêu thụ.
-- Lớp Dữ liệu (Database): Mongoose và MongoDB được dùng để lưu trữ dữ liệu phi cấu trúc (NoSQL), phù hợp với đặc thù dữ liệu thay đổi liên tục của mạng xã hội.
-- Lớp Thời gian thực (Realtime Layer): Socket.IO đóng vai trò thiết lập kênh truyền song công (Full-duplex), xử lý các sự kiện chat và đẩy thông báo tức thời.
-- Lớp Trí tuệ nhân tạo (AI Layer): Tích hợp SDK `@google/generative-ai` để gọi Gemini API từ Google, đóng vai trò là "Trợ lý học tập DNU" thông minh.
-- Lớp Lưu trữ tệp (Cloud Storage): Cloudinary được tích hợp để chứa hình ảnh và tài liệu, giảm tải cho máy chủ chính.
 
-### 1.5. Kết luận chương 1
-Chương 1 đã phác họa bức tranh tổng quan về đề tài, từ bối cảnh thực tiễn, thách thức bài toán đến đề xuất giải pháp. Đây là tiền đề để chuyển sang Chương 2, nơi nghiên cứu chi tiết về cơ sở lý thuyết và các công nghệ cốt lõi cấu thành nên hệ thống.
 
-## CHƯƠNG 2. CƠ SỞ LÝ THUYẾT VÀ CÔNG NGHỆ SỬ DỤNG
 
-### 2.1. Tổng quan về kiến trúc và giao thức mạng
 
-#### 2.1.1. Khái niệm ứng dụng web và xu hướng phát triển full-stack
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+CHƯƠNG 1. CƠ SỞ LÝ THUYẾT VÀ CÔNG NGHỆ SỬ DỤNG
+1.1	T Tổng quan về kiến trúc và giao thức mạng
+1.1.1	K hái niệm ứng dụng web và xu hướng phát triển full-stack
 Ứng dụng web là một dạng phần mềm được triển khai trên nền tảng trình duyệt, truy cập thông qua giao thức HTTP hoặc HTTPS thay vì yêu cầu người dùng cài đặt trực tiếp như phần mềm desktop truyền thống. Ưu điểm lớn nhất của ứng dụng web là khả năng triển khai tập trung: khi cập nhật phiên bản mới, phần lớn thay đổi được áp dụng tại máy chủ và người dùng chỉ cần làm mới trang hoặc tải lại tài nguyên tĩnh, giúp giảm chi phí bảo trì và đồng bộ trải nghiệm trên nhiều thiết bị. Trong bối cảnh giáo dục, ứng dụng web còn phù hợp với mô hình học tập linh hoạt vì sinh viên có thể truy cập từ máy tính trong phòng lab, máy cá nhân hoặc thiết bị di động mà không phụ thuộc hệ điều hành cụ thể.
-
 Theo hướng phát triển hiện đại, nhiều hệ thống được xây dựng theo mô hình full-stack, tức là kết hợp đồng thời phần giao diện người dùng (frontend) và phần xử lý nghiệp vụ – dữ liệu (backend) trong cùng một kiến trúc sản phẩm. Mô hình này giúp đội phát triển kiểm soát trọn vẹn luồng dữ liệu từ khi người dùng thao tác trên giao diện cho đến khi dữ liệu được lưu trữ, truy vấn và phản hồi ngược lại. Trong đề tài, full-stack không chỉ là lựa chọn công nghệ mà còn phản ánh yêu cầu thực tế: hệ thống mạng xã hội học tập cần nhiều chức năng đồng thời (bài viết, nhóm, sự kiện, tin nhắn, thông báo, quản trị), do đó việc có một backend thống nhất và một frontend có khả năng mở rộng là điều kiện cần để duy trì chất lượng phần mềm theo thời gian.
-
 Một đặc điểm quan trọng của ứng dụng web hiện đại là sự phân tách trách nhiệm rõ ràng giữa lớp trình bày và lớp nghiệp vụ. Lớp trình bày chịu trách nhiệm hiển thị, điều hướng, tối ưu trải nghiệm người dùng; lớp nghiệp vụ chịu trách nhiệm kiểm tra tính hợp lệ dữ liệu, áp dụng quy tắc phân quyền, đảm bảo tính nhất quán khi ghi dữ liệu và phối hợp các dịch vụ phụ trợ như gửi email, lưu trữ tệp, xử lý tác vụ nền. Việc phân tách này không chỉ giúp mã nguồn dễ đọc mà còn tạo điều kiện kiểm thử độc lập: có thể kiểm thử API mà không cần giao diện hoàn chỉnh, hoặc kiểm thử giao diện với dữ liệu giả lập.
-
-#### 2.1.2. Mạng máy tính, mô hình phân lớp và vai trò của HTTP/HTTPS
-
+1.1.2	Mạng máy tính, mô hình phân lớp và vai trò của HTTP/HTTPS
 Để hiểu cách một ứng dụng web hoạt động, cần nắm khái niệm cơ bản về truyền thông mạng. Mạng máy tính là tập hợp các thiết bị được kết nối với nhau nhằm chia sẻ tài nguyên và trao đổi dữ liệu. Trong môi trường Internet, dữ liệu không được truyền “nguyên khối” mà được đóng gói theo các lớp giao thức. Mô hình phổ biến để mô tả quá trình này là mô hình TCP/IP, gồm các tầng như tầng liên kết mạng, tầng Internet, tầng giao vận và tầng ứng dụng. Ở tầng giao vận, giao thức TCP cung cấp cơ chế kết nối đáng tin cậy giữa hai đầu truyền nhận, đảm bảo dữ liệu đến đúng thứ tự và có cơ chế phát hiện mất gói để truyền lại. Điều này đặc biệt quan trọng với ứng dụng web vì nhiều tương tác dựa trên nhiều yêu cầu HTTP liên tiếp.
-
 HTTP (HyperText Transfer Protocol) là giao thức tầng ứng dụng phổ biến nhất cho web. Một phiên làm việc HTTP thường bắt đầu bằng yêu cầu (request) từ phía client gửi tới server, kèm phương thức như GET, POST, PUT, PATCH, DELETE, kèm đường dẫn tài nguyên và có thể kèm phần thân dữ liệu. Server xử lý và trả về phản hồi (response) gồm mã trạng thái, tiêu đề và nội dung. Mô hình này phù hợp với kiểu dịch vụ yêu cầu–phản hồi: client khởi tạo giao tiếp khi cần.
-
 HTTPS là HTTP được bảo vệ bằng lớp mã hóa TLS. Trong bối cảnh hệ thống có xác thực người dùng và dữ liệu cá nhân, HTTPS giúp giảm nguy cơ nghe lén và can thiệp dữ liệu trên đường truyền. Trong môi trường triển khai thực tế, HTTPS được xem là yêu cầu tối thiểu đối với ứng dụng lưu trữ thông tin nhạy cảm. Trong giai đoạn phát triển cục bộ, đôi khi người dùng vẫn dùng HTTP để thuận tiện, nhưng khi đưa lên môi trường production, việc cấu hình chứng chỉ TLS và chuyển hướng HTTP sang HTTPS là bước cần thiết để đảm bảo an toàn.
-
 Đối với đề tài, hiểu HTTP/HTTPS giúp lý giải các vấn đề như: vì sao cần cấu hình CORS khi frontend và backend khác miền; vì sao cookie có thuộc tính Secure và SameSite; vì sao cần giới hạn kích thước payload JSON khi upload tệp. Những nội dung này không chỉ là chi tiết kỹ thuật mà còn liên quan trực tiếp đến tính ổn định và an toàn của hệ thống khi số lượng người dùng tăng.
-
-#### 2.1.3. Kiến trúc client-server và phong cách thiết kế REST
-
+1.1.3	Kiến trúc client-server và phong cách thiết kế REST
 Kiến trúc client-server là mô hình trong đó client đóng vai trò gửi yêu cầu dịch vụ và server đóng vai trò cung cấp tài nguyên hoặc xử lý nghiệp vụ. Trong ứng dụng web hiện đại, client thường là trình duyệt chạy mã JavaScript (hoặc ứng dụng di động), còn server là máy chủ chạy mã backend. Sự tách biệt này cho phép mở rộng theo chiều ngang: có thể tăng số lượng instance server phía sau bộ cân bằng tải khi lưu lượng tăng, trong khi client vẫn giữ logic hiển thị.
-
 REST (Representational State Transfer) là một phong cách kiến trúc phổ biến để thiết kế API cho web. Ý tưởng cốt lõi là coi hệ thống như tập hợp các tài nguyên (resource) được định danh bằng URL, và thao tác với tài nguyên thông qua các phương thức HTTP phù hợp. Ví dụ, thao tác đọc danh sách có thể dùng GET; tạo mới có thể dùng POST; cập nhật có thể dùng PUT hoặc PATCH; xóa có thể dùng DELETE. REST khuyến khích các API “vô trạng thái” (stateless) ở mức HTTP: mỗi yêu cầu mang đủ thông tin để server xử lý mà không bắt buộc server phải lưu trạng thái phiên tại bộ nhớ cục bộ theo kết nối TCP. Trong thực tế, ứng dụng vẫn có khái niệm phiên đăng nhập, nhưng trạng thái xác thực thường được biểu diễn bằng token (ví dụ JWT) gửi kèm mỗi yêu cầu hoặc lưu trong cookie, thay vì phụ thuộc vào session lưu phía server theo kiểu truyền thống hoàn toàn.
-
 Một API REST tốt thường có quy ước rõ ràng về đường dẫn, dạng dữ liệu trả về (thường là JSON), mã lỗi thống nhất và thông điệp dễ hiểu. Điều này giúp frontend dự đoán được hành vi khi gọi API và giúp việc bảo trì lâu dài thuận lợi hơn. Trong đề tài, các nhóm chức năng như người dùng, bài viết, nhóm, sự kiện, tin nhắn, thông báo thường được tách thành các route API riêng, phù hợp với nguyên tắc module hóa.
-
-#### 2.1.4. Trọng tâm: Phân tích chi tiết HTTP, RESTful và mô hình SPA vs SSR
-
+1.1.4	Trọng tâm: Phân tích chi tiết HTTP, RESTful và mô hình SPA vs SSR
 Mặc dù người phát triển thường tập trung vào “gọi API thành công hay thất bại”, việc hiểu bản chất HTTP giúp thiết kế hệ thống bền vững hơn. Các phương thức phổ biến gồm GET (lấy tài nguyên), POST (tạo mới hoặc kích hoạt xử lý), PUT (thay thế tài nguyên theo cách idempotent trong nhiều thiết kế), PATCH (cập nhật một phần), DELETE (xóa). Khái niệm idempotent nghĩa là gọi lặp lại nhiều lần không làm thay đổi trạng thái cuối khác đi so với gọi đúng một lần; điều này quan trọng khi client bị timeout và tự retry.
-
 Mã trạng thái HTTP chia nhóm: nhóm 2xx là thành công; 4xx là lỗi phía client (ví dụ 400 bad request, 401 unauthorized, 403 forbidden, 404 not found, 429 too many requests); 5xx là lỗi phía server. Thiết kế API nên tránh lạm dụng 200 cho mọi trường hợp rồi trả success=false trong JSON, vì làm giảm giá trị của các công cụ gateway, cache và monitoring. Tuy nhiên trong thực tế đồ án, đôi khi vẫn có lớp wrapper JSON thống nhất; khi đó cần quy ước rõ ràng để frontend và logging không mâu thuẫn.
-
 Một số tiêu đề HTTP thường gặp gồm Content-Type (mô tả định dạng thân dữ liệu), Authorization (chứa token), Cookie (chứa cookie theo chính sách trình duyệt), Cache-Control và ETag liên quan caching. Với upload file, Content-Type thường là multipart/form-data kèm boundary. Với JSON, Content-Type là application/json. Sai Content-Type có thể khiến server parse sai hoặc middleware từ chối.
-
 Theo định nghĩa học thuật, REST gắn với một tập ràng buộc như giao tiếp stateless, interface thống nhất, hệ thống phân lớp, và khả năng cache. Trong thực tế dự án, nhiều API được gọi là RESTful vì dùng JSON và HTTP methods hợp lý, nhưng không nhất thiết đáp ứng đầy đủ mọi ràng buộc lý thuyết. Điều này không có nghĩa là sai, mà phản ánh “thực dụng kỹ thuật”: ưu tiên tính rõ ràng, khả năng triển khai nhanh và khả năng bảo trì.
-
 Ví dụ, một số thao tác như “gửi tin nhắn” có thể được mô hình hóa như tạo tài nguyên message; một số thao tác như “đánh dấu đã đọc thông báo” có thể là PATCH. Quan trọng là đội phát triển duy trì quy ước đặt tên endpoint, phương thức và phản hồi lỗi nhất quán. Trong báo cáo, sinh viên có thể minh họa bảng ánh xạ “chức năng – endpoint – phương thức – mã lỗi” để thể hiện tính có hệ thống.
-
 SPA là mô hình tải một lần khung ứng dụng, sau đó điều hướng nội bộ bằng JavaScript và cập nhật DOM theo state. Ưu điểm là trải nghiệm mượt, giảm tải lại toàn trang; nhược điểm là gánh nặng JS phía client, SEO kém hơn nếu không có giải pháp bổ sung, và phải quản lý state phức tạp hơn. SSR/SSG (Next.js…) cải thiện SEO và tải ban đầu nhưng tăng độ phức tạp triển khai.
-
 Đối với đề tài mạng xã hội nội bộ, SPA thường là lựa chọn hợp lý vì người dùng đăng nhập và tương tác nhiều, ưu tiên tốc độ điều hướng và cập nhật realtime. Nếu cần SEO mạnh cho trang công khai, có thể tách một website marketing riêng hoặc bổ sung meta phù hợp; đây thường là hướng mở rộng ngoài phạm vi đồ án cơ bản.
-
-#### 2.1.5. JSON và vai trò trong trao đổi dữ liệu
-
+1.1.5	JSON và vai trò trong trao đổi dữ liệu
 JSON (JavaScript Object Notation) là định dạng văn bản dùng để biểu diễn dữ liệu có cấu trúc dạng cặp khóa–giá trị và mảng. JSON phổ biến trong API hiện đại vì dễ đọc, dễ sinh và dễ phân tích bởi hầu hết ngôn ngữ lập trình. Trong kiến trúc đề tài, JSON thường là định dạng trao đổi giữa React và Express: client gửi JSON trong thân POST/PUT; server trả JSON trong response.
-
 Một số nguyên tắc thực hành khi dùng JSON gồm: chuẩn hóa cấu trúc phản hồi (ví dụ có trường success, message, data) để frontend xử lý thống nhất; hạn chế trả về dữ liệu nhạy cảm không cần thiết; kiểm tra kích thước payload để tránh tấn công từ chối dịch vụ do payload quá lớn. Trong mã nguồn backend, giới hạn kích thước JSON thường được cấu hình ở middleware parse body nhằm bảo vệ server khỏi các yêu cầu bất thường.
-
-#### 2.1.6. Các mô hình kiến trúc phần mềm: Monolithic vs Microservices
-
+1.1.6. Các mô hình kiến trúc phần mềm: Monolithic vs Microservices
 Trong phát triển phần mềm hiện đại, việc lựa chọn kiến trúc tổng thể quyết định cách thức ứng dụng được triển khai, mở rộng và bảo trì. Hai mô hình phổ biến nhất hiện nay là Monolithic (Kiến trúc nguyên khối) và Microservices (Kiến trúc vi dịch vụ). 
-
 Kiến trúc Monolithic là cách tiếp cận truyền thống, trong đó toàn bộ logic nghiệp vụ, giao diện người dùng và quyền truy cập cơ sở dữ liệu được gộp chung thành một cơ sở mã (codebase) và triển khai dưới dạng một ứng dụng duy nhất. Ưu điểm của Monolithic là dễ dàng phát triển trong giai đoạn đầu, dễ kiểm thử toàn diện (end-to-end testing) và quy trình triển khai đơn giản. Tuy nhiên, khi hệ thống phình to, Monolithic bộc lộ nhược điểm: mã nguồn trở nên cồng kềnh khó quản lý, một lỗi nhỏ ở một module có thể làm sập toàn bộ hệ thống, và việc mở rộng (scale) đòi hỏi phải nhân bản toàn bộ ứng dụng dù chỉ một chức năng bị quá tải.
-
 Ngược lại, kiến trúc Microservices chia nhỏ ứng dụng thành các dịch vụ độc lập, mỗi dịch vụ đảm nhận một nghiệp vụ cụ thể (ví dụ: dịch vụ người dùng, dịch vụ tin nhắn, dịch vụ thông báo). Các dịch vụ này giao tiếp với nhau qua API (thường là REST hoặc gRPC). Ưu điểm của Microservices là tính độc lập cao, cho phép sử dụng nhiều ngôn ngữ lập trình khác nhau cho từng dịch vụ và dễ dàng mở rộng cục bộ. Nhược điểm là chi phí vận hành lớn, yêu cầu hệ thống CI/CD phức tạp, và phải giải quyết bài toán giao dịch phân tán (distributed transactions).
-
 Đối với đề tài "Mạng xã hội học tập DNU", do quy mô ở mức đồ án tốt nghiệp và tập trung vào việc chứng minh tính khả thi của các luồng nghiệp vụ, kiến trúc Monolithic kết hợp phân tách Frontend/Backend (Modular Monolith) được lựa chọn. Cách tiếp cận này giúp tối ưu hóa thời gian phát triển, giảm thiểu độ phức tạp trong khâu triển khai, đồng thời vẫn giữ được sự rành mạch trong mã nguồn (nhờ chia nhỏ theo các thư mục domain), tạo tiền đề dễ dàng bóc tách thành Microservices nếu phát triển lên quy mô thương mại trong tương lai.
-
-#### 2.1.7. Các công nghệ giao tiếp thời gian thực: Polling, Long Polling, SSE và WebSockets
-
+1.1.7. Các công nghệ giao tiếp thời gian thực: Polling, Long Polling, SSE và WebSockets
 Mạng xã hội yêu cầu tính năng cập nhật tức thời (tin nhắn, thông báo, bình luận mới) mà không cần người dùng tải lại trang. Các giao thức truyền thống dựa trên HTTP gặp khó khăn trong việc đáp ứng yêu cầu này, dẫn đến sự ra đời của nhiều kỹ thuật khác nhau:
-
 - Short Polling: Client liên tục gửi request HTTP lên Server sau mỗi khoảng thời gian cố định (ví dụ 3 giây) để hỏi xem có dữ liệu mới không. Ưu điểm là dễ cài đặt, nhưng nhược điểm chí mạng là gây lãng phí tài nguyên mạng khổng lồ, tạo gánh nặng cực lớn cho Server khi đa số request trả về kết quả rỗng.
 - Long Polling: Cải tiến từ Short Polling, Client gửi request lên Server, nhưng Server không trả lời ngay nếu chưa có dữ liệu. Server sẽ giữ kết nối "treo" cho đến khi có dữ liệu mới xuất hiện hoặc hết thời gian chờ (timeout). Khi Client nhận được phản hồi, nó sẽ lập tức gửi một request Long Polling mới. Cách này giảm thiểu lượng request rỗng nhưng vẫn tiêu tốn tài nguyên quản lý kết nối HTTP.
 - Server-Sent Events (SSE): Dựa trên giao thức HTTP, cho phép Server chủ động đẩy (push) dữ liệu xuống Client thông qua một kết nối mở kéo dài. Ưu điểm là nhẹ và dễ triển khai, rất phù hợp cho các tính năng một chiều như bảng tỷ giá chứng khoán hay thông báo (Notification). Tuy nhiên, SSE chỉ hỗ trợ giao tiếp một chiều (Server -> Client).
 - WebSockets: Là một giao thức hoàn toàn khác biệt so với HTTP, cung cấp kênh truyền thông song công (full-duplex), hai chiều liên tục qua một kết nối TCP duy nhất. Sau khi thực hiện bước "bắt tay" (handshake) qua HTTP, kết nối được nâng cấp lên WebSocket. Khi đó, cả Client và Server có thể tự do gửi dữ liệu cho nhau vào bất kỳ lúc nào với độ trễ tính bằng mili-giây và kích thước header (overhead) cực kỳ nhỏ gọn.
-
 Trong đồ án này, WebSockets được lựa chọn làm công nghệ cốt lõi cho phân hệ Chat và Notification, được hiện thực hóa thông qua thư viện Socket.IO. Sự kết hợp giữa RESTful API cho các tác vụ tải dữ liệu nặng và WebSockets cho tương tác thời gian thực mang lại hiệu năng và trải nghiệm tối ưu nhất cho nền tảng.
+1.2	Công nghệ phát triển phía Máy chủ (Backend)
+1.2.1	Node.js và mô hình I/O phi tuyến
+ 
 
-### 2.2. Công nghệ phát triển phía Máy chủ (Backend)
+Hình : Node.js
 
-#### 2.2.1. Node.js và mô hình I/O phi tuyến
-
+An ninh mạng là một trong những thách thức hàng đầu trong kỷ nguyên số, khi mà các cuộc tấn công mạng ngày càng trở nên tinh vi, phức tạp và gây ra những thiệt hại to lớn. Hệ thống phát hiện xâm nhập (Intrusion Detection System - IDS) đã trở thành một thành phần không thể thiếu trong kiến trúc bảo mật của bất kỳ tổ chức nào, đóng vai trò như một "người lính gác" giám sát và cảnh báo các hoạt động đáng ngờ hoặc các hành vi vi phạm chính sách an ninh.
 Node.js là môi trường thực thi JavaScript phía server, xây dựng trên engine V8. Khác với mô hình xử lý đa luồng truyền thống cho mọi yêu cầu, Node.js thường sử dụng mô hình đơn luồng kết hợp vòng lặp sự kiện (event loop) để xử lý I/O không chặn (non-blocking I/O). Ý nghĩa thực tiễn là các thao tác tốn thời gian như đọc/ghi mạng, truy vấn cơ sở dữ liệu, đọc tệp thường được thực hiện dạng bất đồng bộ, giúp server có khả năng phục vụ nhiều kết nối đồng thời hơn trong một số kịch bản điển hình.
-
 Tuy nhiên, Node.js không phải lựa chọn tối ưu cho mọi bài toán. Các tác vụ CPU-bound nặng (ví dụ xử lý ảnh cực lớn, mã hóa phức tạp) có thể làm “nghẽn” event loop nếu xử lý không cẩn thận. Do đó trong kiến trúc thực tế, người ta thường tách tác vụ nặng sang worker thread, tiến trình riêng hoặc hàng đợi xử lý nền. Trong đề tài, một số tác vụ như phân tích tài liệu có thể được đưa vào cơ chế hàng đợi để tránh ảnh hưởng đến độ phản hồi của API chính.
-
 Ưu điểm của Node.js trong phát triển web là thống nhất ngôn ngữ giữa frontend (JavaScript) và backend (JavaScript), giúp team chia sẻ kiến thức và tái sử dụng một phần logic. Ngoài ra, hệ sinh thái npm rất lớn, hỗ trợ nhanh các nhu cầu như xác thực, validation, upload, realtime.
-
-#### 2.2.2. Express.js – framework web tối giản và khả năng mở rộng
+1.2.2	Express.js – framework web tối giản và khả năng mở rộng
+ 
+Hình : Express.js
 
 Express là framework web cho Node.js theo hướng tối giản, cung cấp lớp định tuyến (routing), middleware và tiện ích xử lý request/response. Khái niệm middleware đóng vai trò trung tâm: mỗi request đi qua chuỗi các hàm middleware theo thứ tự, mỗi hàm có thể chấm dứt chuỗi, chuyển lỗi hoặc chuyển tiếp cho middleware kế tiếp. Mô hình này phù hợp với các nhu cầu như ghi log, xác thực, giới hạn tốc độ, parse body, xử lý lỗi tập trung.
-
 Trong đề tài, Express thường được tổ chức theo module route tương ứng từng miền nghiệp vụ. Cách tiếp cận này giúp mã nguồn không tập trung vào một file quá lớn, đồng thời giúp phân công trong nhóm rõ ràng hơn. Ngoài ra, Express dễ tích hợp với nhiều thư viện bảo mật và validation, phù hợp với yêu cầu xây dựng API ổn định.
-
 Một điểm cần lưu ý là Express không “ép” kiến trúc theo một pattern cố định; do đó người phát triển cần chủ động áp dụng các nguyên tắc tổ chức mã (layered architecture) để tránh tình trạng logic nghiệp vụ lẫn lộn giữa controller và tầng truy cập dữ liệu. Thực hành tốt là tách controller xử lý HTTP, service xử lý quy tắc nghiệp vụ, và model/repository xử lý truy vấn dữ liệu.
+1.2.3	Quản lý cấu hình môi trường và Validate dữ liệu (dotenv, express-validator)
+Trong các ứng dụng web hiện đại, cấu hình môi trường cần được tách khỏi mã nguồn để đảm bảo an toàn và linh hoạt khi triển khai. Thư viện dotenv cho phép nạp biến cấu hình từ file `.env` trong quá trình phát triển, ví dụ: cổng chạy server, chuỗi kết nối MongoDB, khóa JWT, khóa dịch vụ AI, cấu hình OAuth và thông số dịch vụ upload media.
+Nguyên tắc quan trọng là không đưa thông tin nhạy cảm vào kho mã nguồn công khai. Mỗi môi trường (development, staging, production) cần có bộ biến riêng, tránh dùng chung secret giữa các môi trường. Khi phát hiện nguy cơ lộ khóa, cần thực hiện rotation (thay mới secret) và triển khai lại hệ thống để vô hiệu giá trị cũ.
 
-#### 2.2.3. Quản lý cấu hình môi trường và Validate dữ liệu (dotenv, express-validator)
-
-dotenv nạp biến môi trường từ file .env trong quá trình phát triển. Nguyên tắc là không commit secret lên kho mã; mỗi môi trường (dev/staging/prod) có bộ biến riêng; rotation secret định kỳ khi có nghi ngờ lộ.
-
-Dữ liệu đầu vào từ client không được tin tưởng tuyệt đối. express-validator giúp định nghĩa rule kiểm tra field, chuẩn hóa dữ liệu và trả lỗi rõ ràng. Validation giảm lỗi logic, giảm nguy cơ injection ở mức ứng dụng và cải thiện chất lượng API.
-
-### 2.3. Hệ quản trị Cơ sở dữ liệu và Quản lý lưu trữ
-
-#### 2.3.1. Cơ sở dữ liệu NoSQL và đặc trưng của mô hình document
-
+Song song với quản lý cấu hình, kiểm tra dữ liệu đầu vào là lớp phòng vệ bắt buộc ở tầng API. Dữ liệu từ client luôn có khả năng sai định dạng hoặc mang nội dung không hợp lệ, do đó không thể tin tưởng trực tiếp. `express-validator` hỗ trợ định nghĩa rule theo từng field (bắt buộc, độ dài tối thiểu/tối đa, định dạng email, whitelist giá trị enum), chuẩn hóa dữ liệu trước khi đi vào tầng nghiệp vụ và trả lỗi nhất quán cho frontend.
+Việc validate tốt giúp giảm lỗi logic, hạn chế nguy cơ tấn công injection ở mức ứng dụng, đồng thời cải thiện khả năng bảo trì hệ thống vì thông điệp lỗi rõ ràng và thống nhất. Trong bối cảnh đề tài có nhiều endpoint (auth, bài viết, nhóm, sự kiện, AI), chiến lược validate tập trung theo middleware còn giúp tái sử dụng rule và giảm trùng lặp mã nguồn.
+1.3	Hệ quản trị Cơ sở dữ liệu và Quản lý lưu trữ
+1.3.1 Cơ sở dữ liệu NoSQL và đặc trưng của mô hình document
 NoSQL là thuật ngữ chỉ các hệ cơ sở dữ liệu không chỉ giới hạn trong mô hình quan hệ truyền thống (bảng–khóa–quan hệ). Trong đó, cơ sở dữ liệu dạng document lưu trữ bản ghi dưới dạng tài liệu JSON/BSON, phù hợp với dữ liệu có cấu trúc linh hoạt và khả năng mở rộng theo chiều ngang. Đặc trưng thường gặp của NoSQL gồm: schema linh hoạt hơn, mô hình nhất quán eventual consistency trong một số hệ phân tán, và tối ưu cho một số truy vấn đặc thù.
-
 Việc lựa chọn NoSQL không đồng nghĩa với việc “tốt hơn SQL” trong mọi trường hợp; đó là sự đánh đổi phù hợp bối cảnh. Với ứng dụng mạng xã hội, dữ liệu như hồ sơ người dùng, bài viết, nhóm, thông báo thường biểu diễn tự nhiên dưới dạng tài liệu có trường lồng nhau. Tuy nhiên, các quan hệ phức tạp và yêu cầu giao dịch đa bảng nghiêm ngặt đôi khi vẫn phù hợp SQL hơn. Trong phạm vi đề tài, MongoDB được lựa chọn như một giải pháp document phổ biến, có cộng đồng lớn và công cụ hỗ trợ tốt trên Node.js.
-
-#### 2.3.2. So sánh mô hình SQL và NoSQL trong bối cảnh ứng dụng
-
+1.3.2 So sánh mô hình SQL và NoSQL trong bối cảnh ứng dụng
 Mô hình quan hệ (SQL) tổ chức dữ liệu thành bảng, khóa chính, khóa ngoại và thường mạnh về tính toàn vẹn tham chiếu, giao dịch ACID và truy vấn phức tạp bằng JOIN. Điều này rất phù hợp các hệ thống tài chính, kế toán hoặc báo cáo chuẩn hóa cao. Ngược lại, mô hình document (NoSQL) thường ưu tiên biểu diễn “đối tượng nghiệp vụ” dưới dạng tài liệu lồng nhau, giảm số lần join và tăng tốc một số pattern đọc theo đơn vị người dùng.
-
 Trong mạng xã hội, một bài viết có thể chứa metadata phong phú (ảnh đính kèm, trạng thái hiển thị, số lượt tương tác…) và có thể phát triển theo thời gian; document model thường cho phép biến đổi linh hoạt hơn so với việc phải thêm cột và migration liên tục trong một số tình huống. Tuy nhiên, khi cần báo cáo tổng hợp đa chiều hoặc ràng buộc dữ liệu cực chặt giữa nhiều thực thể, SQL đôi khi dễ biểu diễn hơn. Vì vậy, trong thực tế doanh nghiệp, kiến trúc hỗn hợp (polyglot persistence) không hiếm: SQL cho báo cáo và tài chính, NoSQL cho dữ liệu tương tác lớn.
-
 Trong phạm vi đồ án, lựa chọn MongoDB nhằm tối ưu tốc độ phát triển và phù hợp đặc thù dữ liệu người dùng/bài viết/thông báo. Điểm cần lưu ý là sinh viên vẫn phải thiết kế schema có kiểm soát: “schema-less” không đồng nghĩa “không cần thiết kế”, mà đúng hơn là “linh hoạt hơn nhưng dễ hỗn loạn nếu không có quy ước”.
-
-#### 2.3.3. MongoDB – document, collection và các nguyên tắc thiết kế chỉ mục (index)
+1.3.3. MongoDB – document, collection và các nguyên tắc thiết kế chỉ mục (index)
+ 
+Hình : Mongodb atlas
 
 MongoDB lưu trữ dữ liệu trong database, bên trong là các collection. Mỗi collection chứa nhiều document. Document là đơn vị dữ liệu tương tự “bản ghi”, nhưng có thể chứa trường lồng nhau và mảng. Mỗi document thường có trường _id là định danh duy nhất; nếu không cung cấp, MongoDB có thể tự sinh ObjectId.
-
 Một số khái niệm quan trọng khi làm việc với MongoDB gồm: chỉ mục (index) để tăng tốc truy vấn; aggregation pipeline để xử lý thống kê phức tạp; replica set để tăng độ sẵn sàng; sharding để phân mảnh dữ liệu khi quy mô lớn. Trong đồ án, phần lớn thao tác tập trung vào CRUD và truy vấn có điều kiện; tuy nhiên hiểu index vẫn quan trọng vì truy vấn không chỉ mục trên tập lớn sẽ chậm và tốn tài nguyên.
-
 MongoDB cũng đặt ra yêu cầu thiết kế dữ liệu hợp lý: embedding (nhúng dữ liệu con vào document) giảm số lần join/truy vấn nhưng có thể làm document phình to; referencing (tham chiếu id) giúp chuẩn hóa nhưng cần nhiều truy vấn hơn. Người thiết kế cần cân nhắc theo pattern đọc/ghi thực tế của ứng dụng.
-
 Index trong MongoDB tương tự “mục lục” giúp truy vấn theo trường thường dùng nhanh hơn. Compound index hỗ trợ truy vấn theo nhiều trường theo thứ tự nhất định. explain() giúp phân tích kế hoạch truy vấn. Thiết kế sai index có thể làm ghi chậm và tốn RAM.
-
 Trong mạng xã hội, các pattern truy vấn như “lấy bài viết theo thời gian”, “lấy tin nhắn theo hội thoại”, “lấy thông báo theo user” đều là ứng viên cần index. Ngược lại, truy vấn không có điều kiện lọc hợp lý trên tập lớn sẽ gây chậm. Do đó, cơ sở lý thuyết về index không chỉ phục vụ thi cử mà còn là công cụ tư duy khi hệ thống lớn dần.
-
-#### 2.3.4. Mongoose – ODM và lợi ích trong mô hình lập trình ứng dụng
-
+1.3.4. Mongoose – ODM và lợi ích trong mô hình lập trình ứng dụng
 Mongoose là thư viện ODM (Object Document Mapping) cho MongoDB trong môi trường Node.js. Mongoose cung cấp schema để mô tả cấu trúc document, middleware để can thiệp trước/sau các thao tác, và các phương thức truy vấn bổ trợ. Lợi ích lớn nhất là giảm lỗi do dữ liệu không đồng nhất và giúp mã nguồn mang tính mô hình hóa rõ ràng hơn.
-
 Schema trong Mongoose cho phép định nghĩa kiểu dữ liệu, giá trị mặc định, ràng buộc bắt buộc, và validate cơ bản. Điều này không thay thế hoàn toàn validation tầng API (vì validation tầng API còn mang tính ngữ cảnh), nhưng giúp lớp persistence nhất quán hơn. Ngoài ra, Mongoose hỗ trợ populate để thực hiện các thao tác tương tự join trong một số trường hợp.
-
 Trong đề tài, việc dùng Mongoose giúp các model như người dùng, bài viết, nhóm, thông báo được biểu diễn thành các module rõ ràng, thuận tiện bảo trì và mở rộng.
-
-#### 2.3.5. Giao dịch (Transaction) và tính nhất quán dữ liệu trong MongoDB
-
+1.3.5. Giao dịch (Transaction) và tính nhất quán dữ liệu trong MongoDB
 MongoDB hỗ trợ giao dịch đa document trong nhiều kịch bản (đặc biệt từ phiên bản 4.x trở đi với replica set). Với đồ án, không phải lúc nào cũng cần transaction, nhưng các thao tác liên quan ví dụ “tăng số lượng thành viên nhóm và ghi log” có thể cần cân nhắc atomicity để tránh lệch dữ liệu khi lỗi giữa chừng.
-
 Khái niệm CAP (Consistency, Availability, Partition tolerance) và eventual consistency giúp hiểu hành vi hệ phân tán, dù đồ án thường ở quy mô nhỏ. Việc nêu các khái niệm này trong chương lý thuyết thể hiện tư duy hệ thống.
-
-### 2.4. Công nghệ phát triển Giao diện Người dùng (Frontend)
-
-#### 2.4.1. React – thư viện xây dựng giao diện theo hướng component
-
+1.4	Công nghệ phát triển Giao diện Người dùng (Frontend)
+1.4.1. React – thư viện xây dựng giao diện theo hướng component
 React là thư viện JavaScript phổ biến để xây dựng UI theo mô hình component. Ý tưởng cốt lõi là chia giao diện thành các khối có thể tái sử dụng, mỗi khối quản lý phần hiển thị dựa trên state và props. React sử dụng Virtual DOM để tối ưu cập nhật giao diện khi dữ liệu thay đổi, giảm thao tác thao tác trực tiếp DOM tốn kém.
-
 React phù hợp với ứng dụng có nhiều màn hình tương tác, cần cập nhật cục bộ theo sự kiện người dùng và dữ liệu từ server. Trong đề tài, các thành phần như bảng tin, khung chat, danh sách thông báo là những nơi React phát huy lợi thế.
-
-#### 2.4.2. Hooks, Virtual DOM và tối ưu hóa hiệu năng giao diện
-
+1.4.2. Hooks, Virtual DOM và tối ưu hóa hiệu năng giao diện
 React Hooks cho phép sử dụng state và side-effect trong function component. useState giúp lưu trạng thái cục bộ; useEffect giúp xử lý tác vụ phụ thuộc vào thay đổi state/props như gọi API, đăng ký listener; các hook khác như useMemo/useCallback có thể tối ưu hiệu năng khi cần.
-
 Việc hiểu hooks quan trọng vì lỗi thường gặp như vòng lặp vô hạn do dependency không đúng, hoặc rò rỉ bộ nhớ do không hủy subscription.
-
 React cập nhật UI bằng cách so sánh virtual DOM mới và cũ để tối thiểu hóa thao tác DOM thật. Tuy nhiên virtual DOM không đồng nghĩa với “luôn nhanh”; nếu component re-render quá nhiều do state thay đổi không cần thiết, hiệu năng vẫn giảm. Thực hành tốt gồm chia nhỏ component, memo hóa khi cần, ổn định props, tránh tạo object/array mới trong render nếu gây re-render dây chuyền.
-
 Với màn hình danh sách dài (bảng tin, tin nhắn), kỹ thuật windowing/virtualized list có thể được xem xét ở giai đoạn tối ưu. Trong đồ án, có thể chưa cần triển khai sâu, nhưng nêu trong cơ sở lý thuyết thể hiện hiểu biết về giới hạn hiệu năng phía client.
-
-#### 2.4.3. React Router – điều hướng đơn trang và bảo vệ route
-
+1.4.3. React Router – điều hướng đơn trang và bảo vệ route
 React Router cung cấp định tuyến phía client cho SPA. Người dùng chuyển trang mà không cần tải lại toàn bộ HTML từ server như mô hình web cổ điển. Điều này cải thiện trải nghiệm nhưng đặt ra yêu cầu bảo vệ route: một số trang chỉ nên truy cập khi đã đăng nhập hoặc khi có quyền admin.
-
 Thực hành phổ biến là tạo component PrivateRoute/AdminRoute hoặc loader kiểm tra token trước khi render. Nếu không có cơ chế này, người dùng có thể truy cập URL trực tiếp dù chưa đăng nhập, gây trải nghiệm xấu và lộ giao diện không mong muốn (dù backend vẫn phải chặn dữ liệu).
-
-#### 2.4.4. Quản lý trạng thái toàn cục với Zustand
-
+1.4.4. Quản lý trạng thái toàn cục với Zustand
 Trong ứng dụng lớn, việc truyền props qua nhiều cấp có thể cồng kềnh. Các thư viện quản lý trạng thái giúp tập trung state dùng chung như thông tin người dùng hiện tại, theme, hoặc trạng thái thông báo. Zustand là một lựa chọn nhẹ, API đơn giản, phù hợp dự án vừa và nhỏ.
-
 Nguyên tắc thực hành là chỉ đưa vào store những state thật sự cần chia sẻ; tránh đưa toàn bộ dữ liệu vào store khiến component khó tối ưu re-render.
-
-#### 2.4.5. Vite – công cụ build và dev server hiện đại
-
-Vite là công cụ build frontend tập trung vào tốc độ khởi động và hot module replacement trong môi trường phát triển. Với ứng dụng lớn, thời gian reload nhanh giúp tăng năng suất. Vite sử dụng esbuild để bundle nhanh và Rollup cho production build.
-
-Trong đề tài, Vite đi kèm plugin React, giúp cấu hình tối thiểu và trải nghiệm dev mượt. Biến môi trường VITE_ thường dùng để cấu hình URL API phía frontend.
-
-#### 2.4.6. Axios – HTTP client và xử lý lỗi tập trung
-
+1.4.5. Vite – công cụ build và dev server hiện đại
+Vite là công cụ build frontend thế hệ mới, nổi bật ở tốc độ khởi động dự án nhanh và khả năng cập nhật nóng module (HMR - Hot Module Replacement) gần như tức thời trong quá trình phát triển. Thay vì bundle toàn bộ ứng dụng ngay từ đầu như một số công cụ cũ, Vite tận dụng native ES Modules ở môi trường dev để nạp đúng phần mã cần thiết, từ đó rút ngắn đáng kể thời gian chờ mỗi lần chạy dự án.
+Ở chế độ production, Vite sử dụng Rollup để tạo bản build tối ưu, hỗ trợ tách gói (code splitting), nén tài nguyên và tối ưu đường dẫn tải tệp tĩnh. Điều này giúp cải thiện hiệu năng tải trang ban đầu, đặc biệt quan trọng với ứng dụng SPA có nhiều màn hình và thành phần tương tác như hệ thống mạng xã hội học tập trong đề tài.
+Trong quá trình thực hiện đồ án, Vite được dùng cùng plugin React để giảm độ phức tạp cấu hình và tăng tốc độ phát triển frontend. Bên cạnh đó, cơ chế biến môi trường theo tiền tố `VITE_` hỗ trợ tách rõ cấu hình theo môi trường (development/production), ví dụ `VITE_API_BASE_URL` dùng để trỏ tới backend khi triển khai thực tế. Cách tiếp cận này giúp hệ thống dễ bảo trì hơn, hạn chế lỗi cấu hình khi chuyển từ môi trường cục bộ lên cloud.
+1.4.6. Axios – HTTP client và xử lý lỗi tập trung
 Axios là thư viện gọi HTTP phổ biến, hỗ trợ interceptors để gắn token, xử lý lỗi 401/403, và chuẩn hóa base URL. Trong kiến trúc frontend gọi REST backend, axios giúp giảm boilerplate so với fetch thuần trong một số kịch bản.
-
-#### 2.4.7. Kiến trúc CSS và các nguyên lý thiết kế UI/UX hiện đại
-
+1.4.7. Kiến trúc CSS và các nguyên lý thiết kế UI/UX hiện đại
 Thiết kế giao diện người dùng (UI) và trải nghiệm người dùng (UX) đóng vai trò quyết định đến sự thành công của một ứng dụng mạng xã hội. Đối với đồ án này, các nguyên lý thiết kế được áp dụng bao gồm:
-
 - Hệ thống Lưới (Grid System): Sử dụng hệ thống lưới 12 cột linh hoạt để phân bổ không gian hợp lý, đảm bảo tính nhất quán trên nhiều kích thước màn hình khác nhau. Các khu vực nội dung chính (Bảng tin) thường chiếm 6-8 cột ở giữa, trong khi các cột hai bên dành cho menu điều hướng và gợi ý bạn bè.
 - Phân cấp thị giác (Visual Hierarchy): Các thành phần quan trọng như nút "Đăng bài mới" hay "Nhắn tin" được làm nổi bật thông qua màu sắc tương phản và kích thước typography lớn hơn. Tiêu đề (Headings) và văn bản nội dung (Body text) được chọn lọc từ các bộ font không chân (Sans-serif) như Inter hoặc Roboto để đảm bảo độ nét trên màn hình số.
 - Tính phản hồi (Responsive Design): Thiết kế ưu tiên thiết bị di động (Mobile-First Approach). Giao diện trên điện thoại sẽ tự động ẩn các thanh sidebar rườm rà vào trong một menu Hamburger (dấu ba gạch), đồng thời phóng to các khu vực tương tác (Touch targets) để chống bấm nhầm.
-
 Để hiện thực hóa các nguyên lý trên một cách tối ưu trong hệ sinh thái React, Tailwind CSS được lựa chọn thay thế cho các phương pháp CSS truyền thống (Vanilla CSS) hay các bộ Component UI đóng gói sẵn (như Bootstrap hay Material UI). 
-
 Tailwind CSS là một framework CSS theo trường phái "Utility-First". Thay vì phải viết các class mang tính ngữ nghĩa như `.btn-primary`, nhà phát triển sẽ ghép các class tiện ích nhỏ như `bg-blue-500`, `text-white`, `px-4`, `py-2`. Lợi ích cực kỳ to lớn của kiến trúc này là:
 1. Giảm thiểu độ phình của CSS: Bằng cơ chế quét mã nguồn (PurgeCSS), Tailwind chỉ đóng gói các class nào thực sự được sử dụng, giúp file CSS cuối cùng cực kỳ nhỏ nhẹ (thường dưới 10KB nén gzip).
 2. Loại bỏ rủi ro xung đột class: CSS truyền thống thường bị tình trạng "Ghi đè không kiểm soát" (Specificity issues) do phạm vi global. Tailwind CSS gắn chặt style vào JSX, giải quyết triệt để bài toán này.
 3. Phát triển tốc độ cao: Việc định hình giao diện ngay trên file JavaScript mà không cần chuyển đổi tab liên tục sang file CSS giúp tăng tốc đáng kể tiến độ hoàn thành đồ án.
-
-### 2.5. Bảo mật và Quản lý truy cập trong Ứng dụng Web
-
-#### 2.5.1. Cơ chế xác thực và phân quyền trong ứng dụng web
-
+1.5	Bảo mật và Quản lý truy cập trong Ứng dụng Web
+1.5.1. Cơ chế xác thực và phân quyền trong ứng dụng web
 Xác thực (authentication) là quá trình chứng minh người dùng là ai, thường thông qua tài khoản và mật khẩu hoặc các phương thức khác. Phân quyền (authorization) là quá trình quyết định người dùng được phép thực hiện hành động gì sau khi đã xác thực. Hai khái niệm này thường bị nhầm lẫn nhưng khác nhau về mặt chức năng: xác thực trả lời “đúng người”, phân quyền trả lời “được phép làm gì”.
-
 Trong hệ thống có vai trò quản trị viên và người dùng thường, phân quyền cần được kiểm tra ở tầng backend cho mọi endpoint nhạy cảm, không chỉ ẩn nút trên giao diện. Việc chỉ dựa vào frontend để “chặn” thao tác là không đủ vì client có thể giả mạo yêu cầu.
-
 Một số nguyên tắc thực hành gồm: tối thiểu quyền (least privilege), tách biệt quyền theo vai trò, kiểm tra quyền theo từng tài nguyên (ví dụ chỉ chủ sở hữu hoặc admin mới được xóa), và ghi nhật ký hành động quan trọng trong môi trường vận hành.
-
-#### 2.5.2. JWT (JSON Web Token) và chiến lược lưu trữ an toàn (Cookie, Header)
-
+1.5.2. JWT (JSON Web Token) và chiến lược lưu trữ an toàn (Cookie, Header)
 JWT là chuỗi token gồm ba phần header, payload và chữ ký, thường mã hóa theo chuẩn Base64URL. Payload chứa các claim như định danh người dùng, vai trò, thời hạn hiệu lực (exp). Chữ ký nhằm đảm bảo token không bị sửa đổi mà không bị phát hiện, với secret chỉ server biết (hoặc cặp khóa trong mô hình bất đối xứng).
-
 Ưu điểm của JWT trong kiến trúc phân tán là server không nhất thiết phải lưu session server-side cho mỗi phiên; điều này giúp mở rộng theo chiều ngang dễ hơn. Tuy nhiên, nhược điểm là khó “thu hồi” token trước hạn hết hạn nếu không có cơ chế bổ sung (danh sách đen, rotation, phiên bản secret). Do đó trong thực tế, người ta thường kết hợp thời hạn ngắn, refresh token, hoặc cơ chế logout với danh sách token bị vô hiệu.
-
 Trong đề tài, JWT thường được truyền qua header Authorization dạng Bearer hoặc qua cookie HttpOnly tùy thiết kế. Việc lựa chọn phương thức truyền token ảnh hưởng đến khả năng bị tấn công XSS và CSRF, cần cân nhắc kỹ.
-
 Cookie là cơ chế trình duyệt lưu nhỏ dữ liệu theo miền (domain), thường dùng để duy trì phiên đăng nhập hoặc lưu tùy chọn. Cookie có các thuộc tính quan trọng như HttpOnly (giảm rủi ro đọc cookie từ script nếu kết hợp đúng), Secure (chỉ gửi qua HTTPS), SameSite (giảm một số dạng CSRF).
-
 Trong kiến trúc frontend/backend tách miền, cookie cross-site và cấu hình CORS cần phối hợp chặt chẽ. Nếu thiết kế không đồng nhất, có thể dẫn đến lỗi “không gửi được cookie” hoặc “bị chặn CORS”.
-
-#### 2.5.3. Băm mật khẩu (bcrypt) và phòng chống lạm dụng API (Rate Limiting)
-
+1.5.3. Băm mật khẩu (bcrypt) và phòng chống lạm dụng API (Rate Limiting)
 Lưu mật khẩu dạng văn bản thuần là sai lầm nghiêm trọng. Thực hành đúng là lưu chuỗi băm một chiều kèm muối (salt) để chống tấn công bảng rainbow. bcrypt là thuật toán băm chậm có chủ đích, làm tăng chi phí tính toán cho kẻ tấn công dò mật khẩu.
-
 Khi người dùng đăng nhập, hệ thống băm mật khẩu nhập vào và so sánh với giá trị lưu trong cơ sở dữ liệu theo cơ chế an toàn do thư viện cung cấp. Việc chọn cost factor hợp lý cần cân bằng giữa bảo mật và hiệu năng server.
-
 Rate limiting là cơ chế giới hạn số lượng request từ một client trong một khoảng thời gian nhằm giảm nguy cơ brute-force đăng nhập, spam API, hoặc tấn công làm quá tải. Thực tế triển khai thường dùng địa chỉ IP, token người dùng hoặc kết hợp.
-
 Trong hệ thống có AI và xác thực, có thể áp dụng nhiều lớp limiter: limiter tổng cho /api, limiter riêng cho /api/auth để chống thử mật khẩu, limiter riêng cho /api/ai để tránh lạm dụng tài nguyên dịch vụ ngoài. Một số endpoint đọc nhẹ có thể được loại trừ hợp lý để tránh ảnh hưởng thao tác realtime của giao diện, nhưng cần cân nhắc kỹ để không tạo “lỗ hổng” bị lạm dụng.
-
-#### 2.5.4. Các rủi ro phổ biến (OWASP, CSRF, XSS) và biện pháp phòng vệ (Helmet, CORS)
-
+1.5.4. Các rủi ro phổ biến (OWASP, CSRF, XSS) và biện pháp phòng vệ (Helmet, CORS)
 OWASP cung cấp các tài liệu về rủi ro bảo mật ứng dụng web như injection, broken authentication, sensitive data exposure, XSS, CSRF, insecure deserialization, security misconfiguration, và các vấn đề logging/monitoring. Không phải rủi ro nào cũng áp dụng giống nhau cho mọi hệ thống, nhưng với ứng dụng có đăng nhập và tải file, các chủ đề XSS, CSRF, upload nguy hiểm, và lộ thông tin đặc biệt đáng chú ý.
-
 Đối với MongoDB, injection dạng NoSQL có thể xảy ra nếu developer ghép truy vấn thô từ input không kiểm soát. Mongoose và validation giúp giảm rủi ro, nhưng không thay thế hoàn toàn tư duy “không tin tưởng input”. Đối với JWT, rủi ro gồm lộ token qua XSS, hoặc token bị đánh cắp trên kênh không mã hóa nếu không dùng HTTPS.
-
 XSS cho phép chèn script độc hại vào ngữ cảnh trang web, từ đó có thể đọc dữ liệu nhạy cảm nếu token nằm trong JS-accessible storage. HttpOnly cookie giảm khả năng đọc cookie từ script, nhưng không giải quyết mọi dạng XSS nếu ứng dụng vẫn lộ token theo cách khác. CSRF lừa trình duyệt gửi request kèm cookie phiên hợp lệ; SameSite cookie và token CSRF là các biện pháp phổ biến.
-
 Trong kiến trúc SPA + API, chiến lược bảo vệ phải nhất quán: nếu dùng JWT trong memory/localStorage thì rủi ro XSS tăng; nếu dùng cookie HttpOnly thì phải xử lý CSRF cẩn thận khi cookie được gửi cross-site. Đây là minh chứng vì sao bảo mật là “bộ giải pháp”, không phải một thư viện đơn lẻ.
-
 Helmet là middleware giúp thiết lập các HTTP header bảo mật nhằm giảm một số rủi ro như XSS, clickjacking (tùy cấu hình), và lộ thông tin phiên bản server. Helmet không thay thế toàn bộ biện pháp bảo mật, nhưng là lớp “phòng thủ mặc định tốt” cho ứng dụng Express.
-
 Trong triển khai có frontend/backend khác origin, một số header liên quan chính sách tài nguyên chéo cần tinh chỉnh để tránh chặn tài nguyên hợp lệ. Đây là ví dụ điển hình cho việc bảo mật phải đi kèm cấu hình đúng bối cảnh triển khai.
-
 CORS (Cross-Origin Resource Sharing) là cơ chế trình duyệt áp dụng để kiểm soát việc một trang web ở origin A có được phép đọc phản hồi từ origin B hay không, đối với request có đặc điểm “cross-origin”. Server phản hồi bằng các header như Access-Control-Allow-Origin, Access-Control-Allow-Credentials, Access-Control-Allow-Methods…
-
 Trong môi trường phát triển, frontend chạy tại ví dụ cổng 5173 và backend cổng 5000 là hai origin khác nhau, do đó cần cấu hình CORS cho phép origin frontend và cho phép credentials nếu dùng cookie. Cấu hình sai là một trong những lỗi phổ biến khiến ứng dụng “chạy được một phần” nhưng không gọi API thành công.
-
-#### 2.5.5. Quản lý bí mật và Khái niệm DevSecOps (Bảo mật shift-left)
-
+1.5.5. Quản lý bí mật và Khái niệm DevSecOps (Bảo mật shift-left)
 Thực hành triển khai tốt yêu cầu tách biến môi trường: dev cho lập trình, staging gần giống production để kiểm thử, production cho người dùng thật. Mỗi môi trường có URL API, khóa kết nối database, khóa JWT, khóa email và khóa AI khác nhau. Không được tái sử dụng secret production trong môi trường dev công khai.
-
 Quản lý bí mật có thể dùng vault hoặc biến môi trường trên nền tảng triển khai. Trong đồ án, file .env thường được dùng cục bộ nhưng phải được liệt kê trong .gitignore và có file .env.example không chứa giá trị nhạy cảm để hướng dẫn cài đặt.
-
 DevSecOps là sự mở rộng của DevOps, đưa bảo mật vào sớm trong quy trình: phân tích rủi ro khi thiết kế, rà soát dependency, kiểm tra SAST/DAST khi có điều kiện, và cấu hình bảo mật triển khai. Shift-left nghĩa là phát hiện lỗi bảo mật càng sớm càng rẻ để sửa.
-
 Trong đồ án, có thể áp dụng ở mức tối thiểu: kiểm tra phiên bản thư viện, tránh commit secret, cấu hình helmet/cors/ratelimit đúng, validate input, và kiểm tra quyền trên endpoint nhạy cảm. Đây là những hành động mang tính “thực hành DevSecOps nhẹ” nhưng hiệu quả.
-
-### 2.6. Các dịch vụ tiện ích và Truyền thông thời gian thực
-
-#### 2.6.1. Giao tiếp thời gian thực: WebSocket, Socket.IO và cơ chế fallback
-
+1.6	Các dịch vụ tiện ích và Truyền thông thời gian thực
+1.6.1. Giao tiếp thời gian thực: WebSocket, Socket.IO và cơ chế fallback
 WebSocket cung cấp kênh hai chiều, duy trì kết nối, phù hợp sự kiện đẩy từ server (push) như tin nhắn mới, thông báo. Polling là client hỏi định kỳ “có gì mới không”, đơn giản nhưng tốn tài nguyên và độ trễ cao hơn. SSE (Server-Sent Events) phù hợp một chiều server→client nhưng không thay thế hoàn toàn nhu cầu chat hai chiều.
-
 Socket.IO bổ sung lớp trừu tượng: hỗ trợ room, namespace, tự động reconnect, và fallback khi môi trường chặn WebSocket. Trong triển khai thực tế, cần chú ý scaling: khi có nhiều instance server, cần adapter Redis để broadcast đúng phòng giữa các instance. Trong phạm vi đồ án một instance, vấn đề này có thể chưa phát sinh nhưng vẫn là hướng mở rộng quan trọng.
-
 Socket.IO cung cấp lớp trừu tượng trên WebSocket (và có cơ chế fallback) để giao tiếp realtime giữa client và server. Trong mạng xã hội, realtime phục vụ tin nhắn, thông báo, trạng thái online, giúp trải nghiệm gần với các ứng dụng chat hiện đại.
-
 Khác với mô hình request–response, realtime yêu cầu xác thực kết nối (ví dụ gửi token lúc handshake), phân room/channel hợp lý, và xử lý reconnect khi mạng không ổn định. Ngoài ra cần tránh broadcast dữ liệu nhạy cảm tới sai người nhận.
-
-#### 2.6.2. Xử lý hàng đợi tác vụ nền với BullMQ và Redis
-
+1.6.2. Xử lý hàng đợi tác vụ nền với BullMQ và Redis
 Một số tác vụ như phân tích tài liệu dài, sinh báo cáo, gửi hàng loạt thông báo nên thực hiện bất đồng bộ để không chặn request người dùng. BullMQ là thư viện hàng đợi dựa trên Redis, cho phép worker xử lý job theo lịch, retry khi lỗi, và giới hạn đồng thời.
-
 Redis đóng vai trò broker lưu job; worker chạy trong tiến trình Node riêng hoặc cùng tiến trình tùy triển khai. Mô hình này nâng độ tin cậy và khả năng mở rộng so với việc xử lý đồng bộ toàn bộ trong request.
-
 ioredis là client Redis cho Node.js, hỗ trợ cluster/sentinel trong các kịch bản lớn. Trong phạm vi đồ án, Redis thường chạy cục bộ hoặc container phục vụ queue và cache đơn giản.
-
-#### 2.6.3. Xử lý và lưu trữ file: Multer, Cloud Storage và xử lý ảnh với Sharp
-
+1.6.3. Xử lý và lưu trữ file: Multer, Cloud Storage và xử lý ảnh với Sharp4
 Upload tệp thường dùng multipart/form-data. Ở phía Express, Multer là middleware phổ biến để nhận file từ request và lưu tạm hoặc chuyển tiếp. Với ảnh đại diện, tài liệu học tập, việc kiểm tra loại file, kích thước, và quét cơ bản là cần thiết để giảm rủi ro phần mềm độc hại.
-
 Dịch vụ lưu trữ đám mây như Cloudinary giúp giảm gánh nặng lưu trữ trực tiếp trên server, đồng thời hỗ trợ biến đổi ảnh (resize, nén) nhằm tối ưu băng thông. Trong đề tài, việc tách lưu trữ khỏi server logic giúp triển khai linh hoạt hơn.
-
 Sharp là thư viện xử lý ảnh hiệu năng cao trên Node.js, thường dùng để resize, chuyển định dạng, nén ảnh trước khi lưu hoặc upload. Pipeline xử lý ảnh giúp giảm dung lượng và cải thiện tốc độ tải trang, đặc biệt với mạng xã hội có nhiều hình ảnh.
-
-#### 2.6.4. Tích hợp gửi email tự động (Nodemailer)
-
+1.6.4. Tích hợp gửi email tự động (Nodemailer)
 Nodemailer hỗ trợ gửi email qua SMTP. Trong hệ thống có đăng ký/đặt lại mật khẩu, email là kênh xác minh quan trọng. Việc cấu hình SMTP đúng, bảo vệ biến môi trường, và xử lý lỗi gửi email là phần không thể bỏ qua.
-
-### 2.7. Tích hợp Trí tuệ Nhân tạo (AI) trong học tập
-
-#### 2.7.1. Generative AI và mô hình ngôn ngữ lớn (LLM)
-
+1.7	Tích hợp Trí tuệ Nhân tạo (AI) trong học tập
+1.7.1. Generative AI và mô hình ngôn ngữ lớn (LLM)
 Generative AI là lớp mô hình có khả năng sinh nội dung mới (văn bản, hình ảnh, âm thanh) dựa trên dữ liệu huấn luyện. Trong bối cảnh hỗ trợ học tập, LLM có thể hỗ trợ giải thích khái niệm, gợi ý hướng tiếp cận bài tập, hoặc tóm tắt tài liệu. Tuy nhiên, LLM có thể “ảo giác” (hallucination) và đưa ra thông tin sai; do đó trong hệ thống giáo dục, AI nên được định vị là công cụ hỗ trợ, không phải nguồn đánh giá chính thức.
-
-#### 2.7.2. Tích hợp Google Generative AI (Gemini) và các vấn đề vận hành
-
+1.7.2. Tích hợp Google Generative AI (Gemini) và các vấn đề vận hành
 Google cung cấp API cho các mô hình Gemini thông qua thư viện @google/generative-ai. Việc tích hợp yêu cầu khóa API được bảo vệ trong biến môi trường, giới hạn rate để tránh chi phí và lạm dụng, và xử lý lỗi khi dịch vụ ngoài không sẵn sàng.
-
 Từ góc độ kiến trúc, nên tách lớp “AI service” khỏi controller để dễ thay đổi nhà cung cấp hoặc mô hình trong tương lai mà không phải sửa toàn bộ hệ thống.
-
-#### 2.7.3. Kỹ thuật phân tích tài liệu (PDF/DOCX) và pipeline trích xuất văn bản
-
+1.7.3. Kỹ thuật phân tích tài liệu (PDF/DOCX) và pipeline trích xuất văn bản
 Trong các tính năng hỗ trợ học tập, hệ thống có thể cho phép tải tài liệu lên và trích xuất nội dung để phân tích. Các thư viện như pdf-parse hay mammoth phục vụ trích xuất văn bản từ PDF hoặc DOCX. Pipeline hợp lý gồm: lưu trữ an toàn, trích xuất văn bản, chunking (chia nhỏ) nếu văn bản quá dài, và gửi phần phù hợp cho AI xử lý.
-
-#### 2.7.4. Đạo đức và trách nhiệm khi ứng dụng AI trong môi trường giáo dục
-
+1.7.4. Đạo đức và trách nhiệm khi ứng dụng AI trong môi trường giáo dục
 AI có thể giúp học tập hiệu quả hơn nhưng cũng có thể khuyến khích gian lận học thuật nếu không có quy chế sử dụng. Trong hệ thống học đường, cần nhấn mạnh: AI là công cụ hỗ trợ, người học chịu trách nhiệm về sản phẩm học thuật; cần minh bạch khi nội dung được AI hỗ trợ; cần tránh nhập dữ liệu cực kỳ nhạy cảm vào dịch vụ bên thứ ba nếu không được phép.
-
 Mặt khác, nhà phát triển cần ghi nhận giới hạn pháp lý và điều khoản dịch vụ của nhà cung cấp AI, cũng như chính sách lưu trữ log để tránh lưu dữ liệu không cần thiết.
-
-### 2.8. Vận hành, Kiểm thử và Chất lượng phần mềm
-
-#### 2.8.1. Kiểm thử API, Kiểm thử giao diện và Quan sát hiệu năng (Logging)
-
+1.8	Vận hành, Kiểm thử và Chất lượng phần mềm
+1.8.1. Kiểm thử API, Kiểm thử giao diện và Quan sát hiệu năng (Logging)
 Kiểm thử API có thể dùng Postman/Insomnia hoặc automated tests để xác minh mã trạng thái, schema JSON, và quyền truy cập. Kiểm thử giao diện tập trung luồng người dùng: đăng nhập, đăng bài, nhắn tin, nhận thông báo. Việc phân tầng kiểm thử giúp phát hiện lỗi sớm theo từng lớp.
-
 Logging giúp theo dõi lỗi và hành vi hệ thống. Ở mức đồ án, logging có thể gồm request quan trọng, lỗi exception, và trạng thái kết nối database. Tuy nhiên cần tránh ghi log chứa dữ liệu nhạy cảm.
-
-#### 2.8.2. Tiêu chuẩn chất lượng phần mềm (ISO/IEC 25010) áp dụng cho hệ thống
-
+1.8.2. Tiêu chuẩn chất lượng phần mềm (ISO/IEC 25010) áp dụng cho hệ thống
 Chuẩn phẩm về chất lượng phần mềm thường nhắc tới các đặc tính như tính phù hợp chức năng, hiệu năng, tương thích, khả năng sử dụng, độ tin cậy, bảo mật, bảo trì và khả năng chuyển giao. Với hệ thống mạng xã hội học tập, một số thuộc tính nổi bật gồm:
-
 Tính phù hợp chức năng: đáp ứng đúng các luồng đăng bài, nhắn tin, thông báo, nhóm, sự kiện và quản trị. Khả năng sử dụng: giao diện dễ học, thao tác không quá nhiều bước cho tác vụ thường gặp. Hiệu năng: thời gian phản hồi API trong ngưỡng chấp nhận được khi số người dùng đồng thời tăng ở mức đồ án. Độ tin cậy: hạn chế lỗi crash; khi lỗi phải có thông báo rõ ràng. Bảo mật: bảo vệ tài khoản, token, dữ liệu cá nhân và chống lạm dụng API. Khả năng bảo trì: mã nguồn module hóa, dễ mở rộng tính năng mới.
-
 Việc liên hệ lý thuyết chất lượng với đồ án giúp phần đánh giá sau này không chỉ “mô tả chức năng” mà còn giải thích vì sao một thiết kế được coi là tốt hay cần cải thiện.
-
-#### 2.8.3. Mô hình triển khai (Reverse Proxy), CI/CD và Chiến lược tính khả dụng (Retry)
-
+1.8.3. Mô hình triển khai (Reverse Proxy), CI/CD và Chiến lược tính khả dụng (Retry)
 Trong triển khai thực tế, Nginx hoặc tương đương thường đóng vai trò reverse proxy: chấm dứt TLS, phân phối request tới Node, phục vụ file tĩnh, và giới hạn kích thước request. Hiểu mô hình này giúp giải thích trust proxy khi ứng dụng nằm sau proxy.
-
 CI/CD (Continuous Integration/Continuous Delivery) là quy trình tự động hóa build, test và triển khai. Lợi ích gồm giảm lỗi do thao tác tay, tăng tốc phản hồi, và đảm bảo chất lượng qua kiểm thử lặp lại. Trong đồ án, có thể chưa triển khai pipeline đầy đủ, nhưng nêu khái niệm cho thấy hiểu quy trình nghề nghiệp: push code → chạy lint/test → build artifact → deploy.
-
 Hệ thống phụ thuộc nhiều dịch vụ: database, redis, email, AI API, lưu trữ đám mây. Khi một dịch vụ tạm thời lỗi, chiến lược retry có backoff giúp tránh làm quá tải dịch vụ đang gặp sự cố. Ở phía server, kết nối database có thể có cơ chế reconnect; ở phía client, gọi API có thể hiển thị trạng thái “đang tải” và cho phép thử lại.
-
 Tuy nhiên retry không được áp dụng mù quáng cho mọi thao tác: các thao tác không idempotent nếu retry có thể gây trùng lặp dữ liệu nếu không có idempotency key. Do đó, trong thiết kế API, cần phân biệt rõ thao tác an toàn khi lặp lại và thao tác cần cơ chế chống trùng.
-
-#### 2.8.4. Tổng hợp sơ đồ phân lớp và kiến trúc công nghệ toàn hệ thống
-
+1.8.4. Tổng hợp sơ đồ phân lớp và kiến trúc công nghệ toàn hệ thống
 Một cách trình bày phổ biến trong báo cáo là chia kiến trúc thành các lớp: (1) Presentation layer: React UI; (2) Application/API layer: Express routes/controllers; (3) Domain/service layer: nghiệp vụ; (4) Data access layer: Mongoose models; (5) Infrastructure: MongoDB, Redis, email, cloud storage, AI API; (6) Realtime channel: Socket.IO. Cách phân lớp giúp người đọc hiểu luồng dữ liệu và trách nhiệm từng thành phần, đồng thời giúp nhóm phát triển giảm coupling.
-
 Để hệ thống mạng xã hội học tập hoạt động trọn vẹn, các công nghệ đóng vai trò như sau: React/Vite/React Router/Zustand/Axios đảm nhiệm UI, điều hướng, trạng thái và gọi API; Express/Mongoose/MongoDB đảm nhiệm nghiệp vụ và persistence; JWT/bcrypt thực hiện xác thực an toàn; Socket.IO phục vụ realtime; Cloudinary/Sharp/Multer phục vụ upload và tối ưu media; Nodemailer phục vụ email; BullMQ/Redis phục vụ tác vụ nền; Google Generative AI phục vụ chat/ phân tích tài liệu; Helmet/CORS/rate limit nâng mức an toàn vận hành.
+1.9	Kết luận chương 	
+Chương này đã trình bày các cơ sở lý thuyết nền tảng về ứng dụng web, giao thức HTTP/HTTPS, kiến trúc client-server và phong cách REST, đồng thời hệ thống hóa các công nghệ cụ thể được sử dụng trong đề tài như Node.js, Express, MongoDB/Mongoose, React/Vite, Socket.IO, các biện pháp bảo mật, cơ chế hàng đợi và tích hợp AI. Ngoài ra, chương còn bổ sung các nội dung mang tính mở rộng như phân tích HTTP chi tiết hơn, ràng buộc REST, hiệu năng React, cơ chế realtime, chỉ mục MongoDB, rủi ro OWASP và trách nhiệm khi ứng dụng AI trong giáo dục; đồng thời nêu thêm các khía cạnh chất lượng phần mềm, so sánh SQL và NoSQL, DevSecOps và chiến lược retry khi hệ thống phụ thuộc nhiều dịch vụ phụ trợ. Việc nắm vững các khái niệm này tạo nền tảng để chương sau phân tích thiết kế chi tiết và chương cài đặt mô tả cụ thể các module trong hệ thống. 
+CHƯƠNG 2. PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
+2.1	.Phân tích yêu cầu hệ thống
+ 
+Hình : Sơ đồ Kiến trúc hệ thống (System Architecture)
 
-### 2.9. Kết luận chương 2
+2.1.1	Yêu cầu chức năng
+Hệ thống Người dùng (Sinh viên, Giảng viên):
+- Quản lý tài khoản và hồ sơ: Cho phép đăng ký bằng email, đăng nhập bảo mật qua JWT. Người dùng có thể cập nhật thông tin cá nhân (ảnh đại diện, ảnh bìa, chuyên ngành, mã sinh viên, tiểu sử). Có cơ chế quên mật khẩu và xác thực email.
+- Quản lý nội dung (Bảng tin): Người dùng có thể tạo bài viết mới (kèm ảnh, tệp tin, chọn chuyên mục như Học tập, Sự kiện, Thảo luận). Hỗ trợ tương tác thả tim, bình luận và chia sẻ. Có tính năng lưu bài viết (Saved Posts) để xem lại sau.
+- Tương tác xã hội và Kết bạn: Cho phép gửi yêu cầu kết bạn, chấp nhận/từ chối, hủy kết bạn. Người dùng có thể theo dõi (Follow) tài khoản khác để cập nhật hoạt động.
+- Trò chuyện trực tiếp (Chat): Hỗ trợ nhắn tin theo thời gian thực 1-1, gửi văn bản, hình ảnh, tài liệu đính kèm. 
+- Nhóm học tập và Sự kiện: Cho phép tạo và tham gia nhóm học tập. Trong nhóm có các tab riêng biệt: Thảo luận, Chia sẻ tài liệu (File), Hỏi đáp (Q&A). Tạo sự kiện và mời thành viên tham gia.
+- Hỗ trợ học tập bằng AI: Tích hợp Chatbot AI (Gemini) để giải đáp thắc mắc chuyên môn, phân tích tài liệu học tập (PDF/DOCX) và tóm tắt nội dung.
+- Hệ thống thông báo (Notification): Nhận thông báo realtime khi có người bình luận, thích bài viết, gửi lời mời kết bạn hoặc có thông báo nhóm mới.
+- Báo cáo vi phạm: Báo cáo các bài viết, bình luận hoặc người dùng có hành vi không chuẩn mực để chờ kiểm duyệt.
+Hệ thống Quản trị viên (Admin Dashboard):
+- Quản lý người dùng: Xem danh sách, tìm kiếm, khóa (ban) hoặc mở khóa tài khoản vi phạm.
+- Kiểm duyệt nội dung: Quản lý tất cả bài viết, xóa các bài viết vi phạm tiêu chuẩn cộng đồng. Xử lý các "Báo cáo vi phạm" do người dùng gửi lên.
+- Thống kê và AI Analytics: Thống kê số lượng người dùng, bài viết, lượt truy cập. Xem báo cáo từ module AI Analytics để nắm bắt xu hướng thảo luận học tập.
+- Cấu hình hệ thống: Thiết lập các thông số chung (System Settings).
+2.1.2	Yêu cầu phi chức năng
+- Hiệu năng: Hệ thống phải phản hồi nhanh (dưới 500ms cho các API thông thường). SPA Frontend tải trang ban đầu mượt mà, chuyển trang không cần reload.
+- Bảo mật: Mật khẩu phải băm (bcrypt) trước khi lưu. Các API nhạy cảm yêu cầu JWT Token. Phòng chống XSS, CSRF, NoSQL Injection.
+- Khả năng mở rộng: Kiến trúc phân lớp rành mạch, dễ dàng thêm tính năng mới hoặc mở rộng theo chiều ngang (scale horizontal) khi lượng truy cập tăng.
 
-Chương này đã trình bày các cơ sở lý thuyết nền tảng về ứng dụng web, giao thức HTTP/HTTPS, kiến trúc client-server và phong cách REST, đồng thời hệ thống hóa các công nghệ cụ thể được sử dụng trong đề tài như Node.js, Express, MongoDB/Mongoose, React/Vite, Socket.IO, các biện pháp bảo mật, cơ chế hàng đợi và tích hợp AI. Ngoài ra, chương còn bổ sung các nội dung mang tính mở rộng như phân tích HTTP chi tiết hơn, ràng buộc REST, hiệu năng React, cơ chế realtime, chỉ mục MongoDB, rủi ro OWASP và trách nhiệm khi ứng dụng AI trong giáo dục; đồng thời nêu thêm các khía cạnh chất lượng phần mềm, so sánh SQL và NoSQL, DevSecOps và chiến lược retry khi hệ thống phụ thuộc nhiều dịch vụ phụ trợ. Việc nắm vững các khái niệm này tạo nền tảng để chương sau phân tích thiết kế chi tiết và chương cài đặt mô tả cụ thể các module trong hệ thống.
 
 
 
-## CHƯƠNG 3. PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
 
-### 3.1. Phân tích yêu cầu hệ thống
 
-Hệ thống mạng xã hội học tập DNU được định hướng xây dựng để trở thành một nền tảng tập trung, phục vụ nhu cầu trao đổi học thuật, tương tác xã hội và quản lý hoạt động ngoại khóa của sinh viên và giảng viên tại trường Đại học Đại Nam. Dựa trên việc khảo sát nhu cầu thực tế, các yêu cầu của hệ thống được phân rã thành yêu cầu chức năng và yêu cầu phi chức năng.
 
-#### 3.1.1. Yêu cầu chức năng
 
-Yêu cầu chức năng mô tả những gì hệ thống phải làm, được chia theo từng nhóm người dùng (Actor) cụ thể.
 
-A. Nhóm chức năng dành cho Khách (Guest) - Người chưa đăng nhập:
-1. Đăng ký tài khoản (Register): Cho phép người dùng mới tạo tài khoản bằng địa chỉ email sinh viên (có đuôi @st.dnu.edu.vn hoặc @dnu.edu.vn). Hệ thống phải gửi email chứa mã OTP hoặc link xác thực để kích hoạt tài khoản.
-2. Đăng nhập (Login): Đăng nhập bằng Email và Mật khẩu. Hỗ trợ cơ chế "Nhớ mật khẩu" thông qua việc lưu trữ phiên bản JWT dài hạn an toàn.
-3. Quên mật khẩu (Forgot Password): Cung cấp quy trình đặt lại mật khẩu an toàn thông qua email xác minh.
+  
+2.2	Phân tích quy trình nghiệp vụ và Đặc tả Use case
+2.2.1	Biểu đồ Use case tổng quát
+ 
+Hình : Sơ đồ Use Case tổng quát (Chức năng người dùng)
 
-B. Nhóm chức năng dành cho Sinh viên / Giảng viên (User):
-1. Quản lý hồ sơ cá nhân (Profile Management):
-   - Xem và chỉnh sửa thông tin cá nhân: Ảnh đại diện (Avatar), Ảnh bìa (Cover), Tiểu sử (Bio), Chuyên ngành, Số điện thoại.
-   - Quản lý danh sách thiết bị đang đăng nhập và lịch sử hoạt động.
-2. Quản lý nội dung và Bảng tin (Feed & Content):
-   - Tạo bài viết mới: Cung cấp trình soạn thảo văn bản phong phú (Rich Text Editor). Hỗ trợ đính kèm hình ảnh (tối đa 5 ảnh), tệp tin (PDF, DOCX, ZIP tối đa 10MB). Phân loại bài viết theo các danh mục: Học tập, Câu lạc bộ, Sự kiện, Thảo luận chung.
-   - Tương tác bài viết: Thích (Like/React), Bình luận đa cấp (Nested Comments), Chia sẻ bài viết (Share) vào nhóm khác hoặc qua tin nhắn.
-   - Lưu bài viết (Bookmark): Lưu các bài viết quan trọng vào bộ sưu tập cá nhân để xem lại sau.
-3. Tương tác xã hội và Bạn bè (Social Connection):
-   - Tìm kiếm người dùng khác theo tên, mã sinh viên hoặc chuyên ngành.
-   - Gửi, Chấp nhận, Từ chối và Hủy yêu cầu kết bạn.
-   - Theo dõi (Follow) giảng viên hoặc các cá nhân có sức ảnh hưởng trong trường để cập nhật bài viết mà không cần kết bạn.
-4. Hệ thống Nhắn tin trực tiếp (Realtime Chat):
-   - Nhắn tin 1-1 theo thời gian thực với độ trễ tối thiểu.
-   - Nhắn tin nhóm (Group Chat).
-   - Hỗ trợ gửi ảnh, biểu tượng cảm xúc (Emoji), tệp tài liệu và tin nhắn thoại (Voice message).
-   - Trạng thái tin nhắn: Đang gửi, Đã gửi, Đã nhận, Đã đọc (Read Receipts). Hiển thị trạng thái "Đang gõ..." (Typing indicator).
-5. Nhóm học tập và Câu lạc bộ (Groups):
-   - Tạo nhóm mới (Công khai, Kín, hoặc Bí mật).
-   - Quản lý thành viên nhóm (Thêm, Xóa, Phân quyền Quản trị viên/Người kiểm duyệt nhóm).
-   - Không gian nhóm được chia làm 3 phân hệ chính: Thảo luận (Feed riêng của nhóm), Tài liệu (Kho lưu trữ file dùng chung), và Hỏi Đáp (Dạng forum/thread).
-6. Sự kiện học đường (Events):
-   - Tạo sự kiện, thiết lập thời gian bắt đầu/kết thúc, địa điểm (Online/Offline).
-   - Sinh viên có thể xác nhận tham gia (Going) hoặc quan tâm (Interested).
-   - Nhắc nhở trước khi sự kiện diễn ra 24h và 1h.
-7. Trợ lý AI hỗ trợ học tập (AI Assistant):
-   - Khung chat với AI để giải đáp câu hỏi học thuật.
-   - Tính năng "Phân tích tài liệu": Sinh viên tải lên file PDF, hệ thống sẽ trích xuất nội dung, AI sẽ đọc hiểu và cho phép sinh viên hỏi các câu hỏi liên quan đến nội dung file đó (ví dụ: "Tóm tắt chương 1 của tài liệu này").
-8. Hệ thống Thông báo (Notifications):
-   - Nhận thông báo đẩy (Push Notifications) trên trình duyệt khi có sự kiện mới (tin nhắn, bình luận, lời mời kết bạn).
-   - Trung tâm thông báo (Notification Center) lưu trữ lịch sử các thông báo, cho phép đánh dấu "Đã đọc tất cả".
-9. Báo cáo và Kiểm duyệt (Report):
-   - Cung cấp nút "Báo cáo" ở mọi bài viết, bình luận, và trang cá nhân.
-   - Người dùng có thể chọn lý do (Spam, Xúc phạm, Thông tin sai lệch) để gửi cho Admin xử lý.
-
-C. Nhóm chức năng dành cho Quản trị viên (Admin):
-1. Bảng điều khiển thống kê (Dashboard): Hiển thị các chỉ số theo thời gian thực: Số lượng người dùng đang online, Tổng bài viết trong ngày, Số lượng người dùng mới, Biểu đồ lưu lượng truy cập.
-2. Quản lý Người dùng (User Management): Cấp quyền, khóa tài khoản (Ban) tạm thời hoặc vĩnh viễn, đặt lại mật khẩu cho sinh viên khi có yêu cầu hợp lệ.
-3. Kiểm duyệt Nội dung (Content Moderation): Xem xét các "Báo cáo" từ người dùng. Xóa bài viết vi phạm, gửi cảnh báo (Warning) cho người đăng. 
-4. Cấu hình Hệ thống (System Configuration): Tùy chỉnh các tham số hệ thống như: Dung lượng upload tối đa, Từ khóa cấm (Banned words) để tự động lọc nội dung, Bật/Tắt tính năng đăng ký mới.
-
-#### 3.1.2. Yêu cầu phi chức năng
-
-Yêu cầu phi chức năng là các tiêu chuẩn về chất lượng mà hệ thống phải đáp ứng để đảm bảo trải nghiệm người dùng tốt nhất và khả năng vận hành ổn định.
-
-1. Hiệu năng và Tốc độ (Performance & Speed):
-   - Thời gian tải trang (Page Load Time): Trang chủ (Bảng tin) phải được tải xong và hiển thị nội dung đầu tiên (First Contentful Paint) trong vòng dưới 2.0 giây trên kết nối mạng 4G tiêu chuẩn.
-   - Thời gian phản hồi API (API Response Time): Các API thông thường (GET, POST đơn giản) phải phản hồi dưới 300ms. Các API phức tạp (Upload file, Search) không vượt quá 2 giây. API gọi AI phụ thuộc vào bên thứ 3 nhưng cần có trạng thái loading rõ ràng.
-   - Khả năng chịu tải (Concurrency): Hệ thống phải hỗ trợ tối thiểu 1000 người dùng truy cập đồng thời (CCU - Concurrent Users) mà không bị suy giảm hiệu năng đáng kể.
-2. Tính Bảo mật (Security):
-   - Mật khẩu phải được mã hóa bằng thuật toán băm mạnh (bcrypt với cost factor >= 10). Tuyệt đối không lưu mật khẩu dạng plaintext.
-   - Xác thực API sử dụng JWT (JSON Web Token) với thời gian hết hạn ngắn (Short-lived access token) kết hợp Refresh Token lưu trong HttpOnly Cookie để phòng chống tấn công XSS và CSRF.
-   - Triển khai Rate Limiting để chống tấn công Brute-force vào form Đăng nhập và chống Spam API.
-   - Làm sạch dữ liệu đầu vào (Input Sanitization) để ngăn chặn NoSQL Injection và Cross-Site Scripting (XSS).
-3. Tính Khả dụng và Chịu lỗi (Availability & Fault Tolerance):
-   - Hệ thống được thiết kế hướng tới thời gian hoạt động (Uptime) đạt 99.9%.
-   - Trong trường hợp một service bên thứ 3 (như Cloudinary hoặc Google Gemini) gặp sự cố, phần lõi của hệ thống (Đăng bài, Chat) vẫn phải hoạt động bình thường, các tính năng lỗi phải có cơ chế Fallback và thông báo thân thiện cho người dùng.
-4. Khả năng Bảo trì và Mở rộng (Maintainability & Scalability):
-   - Mã nguồn được phân chia thành các module độc lập (Modular Monolith), tài liệu hóa đầy đủ (JSDoc hoặc Swagger) để các nhà phát triển sau có thể dễ dàng tiếp quản.
-   - Kiến trúc Stateless cho tầng API, đảm bảo có thể mở rộng theo chiều ngang (Horizontal Scaling) bằng cách chạy nhiều instance của Node.js sau một Load Balancer khi lượng người dùng tăng đột biến.
-5. Trải nghiệm Người dùng và Giao diện (UI/UX & Usability):
-   - Responsive Design: Giao diện hiển thị tốt trên Desktop, Tablet và Mobile. Các phần tử UI không bị vỡ bố cục khi thay đổi kích thước màn hình.
-   - Tuân thủ các nguyên tắc thiết kế Heuristic của Jakob Nielsen (ví dụ: Cung cấp phản hồi trạng thái hệ thống qua Spinner/Toast, Ngăn ngừa lỗi qua Validation trước khi Submit).
-
----
-
-### 3.2. Phân tích quy trình nghiệp vụ và Đặc tả Use case
-
-Phân tích quy trình nghiệp vụ giúp định hình cách các chức năng tương tác với nhau để giải quyết một bài toán cụ thể của người dùng. Mô hình Use case là công cụ trực quan và logic nhất để thể hiện điều này.
-
-#### 3.2.1. Biểu đồ Use case tổng quát
-
-Hệ thống có 3 tác nhân (Actors) chính:
-- Guest (Khách vãng lai): Những người truy cập vào domain của ứng dụng nhưng chưa xác thực. Quyền hạn của họ bị giới hạn ở mức xem trang giới thiệu (Landing Page), Đăng ký, Đăng nhập và Yêu cầu khôi phục mật khẩu.
-- User (Sinh viên / Giảng viên): Tác nhân trung tâm của hệ thống. Họ có toàn quyền sử dụng các tính năng mạng xã hội: Quản lý hồ sơ, Đăng bài, Tương tác (Like/Comment), Nhắn tin, Tham gia nhóm, Sử dụng Trợ lý AI và Gửi báo cáo vi phạm.
-- Admin (Quản trị viên): Là các cán bộ quản lý hệ thống của nhà trường. Họ kế thừa quyền của User nhưng có thêm các Use case đặc quyền: Quản lý toàn bộ người dùng, Quản lý nội dung (xóa bài, duyệt bài), Xử lý báo cáo vi phạm và Xem thống kê.
-
-*(Sinh viên có thể vẽ sơ đồ UML Use Case tại đây để đưa vào báo cáo bản Word. Trong sơ đồ, các mũi tên `<<include>>` và `<<extend>>` cần được sử dụng để thể hiện các chức năng phụ thuộc, ví dụ: Use case "Đăng bài" `<<include>>` "Xác thực đăng nhập").*
-
-#### 3.2.2. Đặc tả các Use case chi tiết
-
-Để lập trình viên hiểu rõ yêu cầu hệ thống, các Use case quan trọng nhất được đặc tả chi tiết dưới dạng bảng hoặc luồng sự kiện.
-
-Use Case 1: Đăng ký tài khoản (Register)
-- Tác nhân: Guest.
-- Điều kiện tiên quyết: Người dùng có một địa chỉ email hợp lệ (ưu tiên đuôi trường đại học).
-- Luồng sự kiện chính:
-  1. Người dùng truy cập trang Đăng ký.
-  2. Hệ thống hiển thị Form đăng ký gồm: Họ tên, Email, Mật khẩu, Xác nhận mật khẩu.
-  3. Người dùng nhập thông tin và nhấn "Đăng ký".
-  4. Hệ thống kiểm tra tính hợp lệ của dữ liệu (Email đúng định dạng, Mật khẩu > 8 ký tự, 2 mật khẩu khớp nhau).
-  5. Hệ thống kiểm tra xem Email đã tồn tại trong CSDL chưa.
-  6. Hệ thống băm mật khẩu, tạo tài khoản mới ở trạng thái "Chưa kích hoạt" (Pending) và gửi một email chứa mã xác thực (OTP) tới email người dùng.
-  7. Người dùng nhập mã OTP để kích hoạt tài khoản. Hệ thống chuyển trạng thái thành "Hoạt động" (Active).
-- Luồng ngoại lệ: 
-  - Nếu email đã tồn tại: Thông báo "Email đã được sử dụng".
-  - Nếu OTP sai hoặc hết hạn: Yêu cầu gửi lại mã OTP.
-
-Use Case 2: Đăng bài viết chia sẻ kiến thức (Create Post)
+Hệ thống xoay quanh các Actor: Guest (Khách), User (Người dùng đã đăng nhập), Admin (Quản trị viên).
+- Guest: Đăng ký, Đăng nhập, Quên mật khẩu.
+- User: Quản lý hồ sơ, Quản lý bài viết, Gửi tin nhắn, Quản lý nhóm, Tương tác bạn bè, Sử dụng AI, Báo cáo vi phạm.
+- Admin: Đăng nhập (với quyền admin), Quản lý người dùng, Kiểm duyệt bài viết, Xử lý báo cáo, Thống kê.
+2.2.2	Đặc tả các Use case chính
+1. Use case: Quản lý bài viết (Tạo và Tương tác)
 - Tác nhân: User.
-- Điều kiện tiên quyết: Người dùng đã đăng nhập thành công.
+- Mô tả: User viết bài mới chia sẻ kiến thức hoặc câu hỏi.
 - Luồng sự kiện chính:
-  1. Từ trang chủ (Bảng tin), người dùng click vào vùng "Bạn đang nghĩ gì về học tập?".
-  2. Một Modal Editor xuất hiện, người dùng nhập nội dung văn bản.
-  3. Người dùng có thể click biểu tượng hình ảnh để chọn file ảnh từ máy tính.
-  4. Người dùng chọn Chuyên mục (Học tập, Thảo luận...).
-  5. Nhấn nút "Đăng bài".
-  6. Hệ thống hiển thị thanh tiến trình (Loading) và gửi dữ liệu lên Server.
-  7. Nếu có ảnh, Server (hoặc Client) tải ảnh lên Cloudinary lấy URL.
-  8. Server lưu trữ toàn bộ thông tin bài viết vào CSDL MongoDB.
-  9. Hệ thống đóng Modal, cập nhật bài viết vừa đăng lên đầu Bảng tin bằng thao tác thêm vào State nội bộ (không cần reload trang).
-- Luồng ngoại lệ: Kích thước file ảnh vượt quá 5MB, hệ thống chặn lại và hiện thông báo lỗi bằng Toast ngay lập tức.
+  1. User nhấn "Tạo bài viết".
+  2. Hệ thống hiển thị form (Nội dung, Hình ảnh đính kèm, Tệp tài liệu, Chuyên mục).
+  3. User điền thông tin và nhấn "Đăng".
+  4. Hệ thống kiểm tra hợp lệ (validator), upload file lên Cloudinary, lưu URL, lưu thông tin vào CSDL.
+  5. Hệ thống hiển thị bài viết lên Bảng tin, gửi thông báo tới các follower (nếu có).
+- Ngoại lệ: Form trống hoặc file vượt quá kích thước cho phép -> Thông báo lỗi.
 
-Use Case 3: Trò chuyện trực tiếp (Realtime Chat)
-- Tác nhân: User A (Người gửi), User B (Người nhận).
-- Điều kiện tiên quyết: Cả hai đều có tài khoản và đã đăng nhập.
-- Luồng sự kiện chính:
-  1. User A mở hộp thoại chat với User B.
-  2. Hệ thống fetch lịch sử tin nhắn cũ từ Server thông qua API RESTful.
-  3. User A gõ tin nhắn vào ô input. Khi A đang gõ, hệ thống phát sự kiện `typing` qua Socket.io để User B nhìn thấy "A đang gõ...".
-  4. User A nhấn "Gửi".
-  5. Giao diện của A ngay lập tức hiển thị tin nhắn ở trạng thái mờ (Optimistic UI - Đang gửi).
-  6. Client A gửi dữ liệu tin nhắn lên Server qua sự kiện `send_message`.
-  7. Server xác thực, lưu tin nhắn vào CSDL, sau đó phát sự kiện `receive_message` tới phòng (room) của User B.
-  8. Giao diện của A cập nhật thành trạng thái "Đã gửi". Giao diện của B ngay lập tức hiển thị tin nhắn mới kèm âm thanh thông báo "Ting".
-
-Use Case 4: Tương tác với Trợ lý AI (Use AI Assistant)
+2. Use case: Nhắn tin trực tiếp (Realtime Chat)
 - Tác nhân: User.
-- Điều kiện tiên quyết: Hệ thống đã được cấu hình API Key của Google Gemini.
+- Mô tả: Gửi tin nhắn tức thời tới một người bạn.
 - Luồng sự kiện chính:
-  1. User mở tab "Trợ lý AI".
-  2. User tải lên một tài liệu định dạng PDF chứa nội dung bài giảng.
-  3. Hệ thống phía Server dùng thư viện đọc và bóc tách toàn bộ Text trong file PDF, sau đó lưu tạm vào bộ nhớ.
-  4. User nhập câu hỏi: "Hãy tóm tắt 3 ý chính của tài liệu này".
-  5. Backend tổng hợp Context (Nội dung PDF) + Prompt hệ thống + Câu hỏi của User thành một Payload gửi sang Google Gemini API.
-  6. Gemini API trả về kết quả. Backend định dạng lại và trả về cho Client.
-  7. Giao diện hiển thị câu trả lời dạng Markdown cực kỳ trực quan (Có in đậm, danh sách).
+  1. User mở cửa sổ chat với một người dùng khác.
+  2. Gõ nội dung và gửi.
+  3. Client phát sự kiện `send_message` qua Socket.IO.
+  4. Server nhận, lưu vào CSDL (collection Messages) để lưu trữ.
+  5. Server dùng Socket.IO emit sự kiện `receive_message` tới socket id của người nhận.
+  6. Giao diện người nhận hiển thị tin nhắn ngay lập tức.
 
-Use Case 5: Xử lý Báo cáo vi phạm (Resolve Reports)
-- Tác nhân: Admin.
-- Điều kiện tiên quyết: Tài khoản có role là 'admin'.
+3. Use case: Sử dụng AI hỗ trợ học tập
+- Tác nhân: User.
+- Mô tả: Tải tài liệu lên để AI phân tích và trả lời câu hỏi.
 - Luồng sự kiện chính:
-  1. Admin truy cập "Dashboard" -> Mục "Quản lý Báo cáo".
-  2. Hệ thống hiển thị danh sách các bài viết/bình luận bị User report, sắp xếp theo thời gian hoặc số lượng bị report.
-  3. Admin click vào một report để xem chi tiết bài viết gốc.
-  4. Admin đưa ra quyết định bằng cách bấm nút "Xóa bài viết" hoặc "Từ chối báo cáo" (Bỏ qua).
-  5. Nếu Xóa, hệ thống thực hiện hard-delete (hoặc soft-delete) bài viết, gửi thông báo hệ thống (System Notification) cho người đăng bài báo cho họ biết lý do bài bị xóa, và chuyển trạng thái report thành "Đã giải quyết" (Resolved).
+  1. User upload file tài liệu (PDF).
+  2. Hệ thống trích xuất văn bản (Text extraction).
+  3. User gõ câu hỏi liên quan đến tài liệu.
+  4. Hệ thống gọi Gemini API, cung cấp văn bản tài liệu làm ngữ cảnh (context) kèm câu hỏi.
+  5. AI trả về câu trả lời, hệ thống render hiển thị cho User. 
 
----
+2.3	Thiết kế cơ sở dữ liệu
+Với kiến trúc NoSQL, dữ liệu được tổ chức dưới dạng các Document trong các Collection linh hoạt, tối ưu cho tốc độ đọc và khả năng mở rộng.
+ 
+Hình : Sơ đồ Cơ sở dữ liệu (ERD - Entity Relationship Diagram)
+2.3.1	Sơ đồ thực thể liên kết (ERD) và Mối quan hệ
+Sơ đồ ERD của hệ thống được xây dựng nhằm mô tả cấu trúc dữ liệu tổng thể và mối liên hệ giữa các thực thể nghiệp vụ trong nền tảng mạng xã hội học tập. Các thực thể chính gồm: `User`, `Post`, `Comment`, `Conversation`, `Message`, `Group`, `Event`, `Notification`, `Report`. Đây là tập thực thể cốt lõi phản ánh đầy đủ luồng hoạt động của người dùng từ tương tác cá nhân, học nhóm đến quản trị hệ thống.
 
-### 3.3. Thiết kế Cơ sở dữ liệu (Database Design)
+Trong mô hình này, `User` là thực thể trung tâm và có quan hệ với hầu hết các thực thể còn lại. Một người dùng có thể tạo nhiều bài viết (`Post`), gửi nhiều bình luận (`Comment`), tham gia nhiều hội thoại (`Conversation`), nhận nhiều thông báo (`Notification`) và tham gia quy trình báo cáo vi phạm (`Report`). Quan hệ giữa `Post` và `Comment` được tổ chức theo hướng một-nhiều, trong đó mỗi bài viết có thể có nhiều bình luận; đồng thời bình luận hỗ trợ cấu trúc phản hồi thông qua `parentCommentId`.
 
-Việc thiết kế cơ sở dữ liệu quyết định đến 70% hiệu năng và khả năng mở rộng của một hệ thống mạng xã hội. Đối với đặc thù dữ liệu phân tán, cấu trúc không đồng nhất và yêu cầu tốc độ đọc/ghi cao như mạng xã hội, MongoDB (NoSQL) là một lựa chọn tối ưu hơn so với các CSDL quan hệ (SQL) như MySQL.
+Đối với phân hệ nhắn tin, mô hình tách thành hai thực thể `Conversation` và `Message` để tối ưu hiệu năng truy vấn. `Conversation` lưu thông tin hội thoại và danh sách thành viên, còn `Message` lưu nội dung chi tiết theo thời gian. Cách tách này giúp việc lấy lịch sử chat nhanh hơn và dễ mở rộng khi số lượng tin nhắn tăng cao. Với phân hệ cộng đồng học tập, `Group` và `Event` liên kết với `User` theo mô hình thành viên tham gia (`members`, `attendees`), cho phép quản lý hoạt động học thuật theo từng ngữ cảnh.
 
-Lý do chọn NoSQL cho dự án:
-1. Schema linh hoạt: Một bài viết (Post) có thể chỉ có chữ, hoặc có ảnh, có video, có poll bình chọn. Mongoose cho phép định nghĩa schema nhưng vẫn giữ được sự linh hoạt khi cấu trúc dữ liệu thay đổi.
-2. Khả năng nhúng (Embedding): Các dữ liệu nhỏ như danh sách người đã Like bài viết có thể được lưu trực tiếp dưới dạng một mảng (Array) bên trong Document của bài viết đó. Việc này giúp giảm thiểu thao tác JOIN đắt đỏ như trong SQL, giúp truy vấn Bảng tin diễn ra cực nhanh.
-3. Mở rộng theo chiều ngang (Sharding): Khi lượng dữ liệu lớn (ví dụ hàng triệu tin nhắn), MongoDB dễ dàng phân mảnh dữ liệu ra nhiều server khác nhau.
-
-#### 3.3.1. Thiết kế chi tiết các Collections chính
-
+Về thiết kế NoSQL, các mối quan hệ được kết hợp giữa tham chiếu (`ObjectId`) và nhúng dữ liệu (embedding) tùy theo tần suất truy vấn. Dữ liệu cần truy xuất độc lập hoặc có khả năng tăng lớn như bình luận và tin nhắn được tách thành collection riêng; dữ liệu nhỏ và thường đọc cùng ngữ cảnh như `likes`, trạng thái đã đọc có thể lưu dạng mảng nhúng để giảm số lần truy vấn. Cách tiếp cận này giúp hệ thống cân bằng giữa hiệu năng đọc/ghi, tính nhất quán dữ liệu và khả năng mở rộng khi triển khai thực tế.
+2.3.2	Thiết kế chi tiết các Collection
 Hệ thống bao gồm các Collection cốt lõi được đặc tả chi tiết như sau:
 
 1. Collection: Users (Người dùng)
@@ -662,8 +365,8 @@ Lưu trữ nội dung bảng tin và các bài trong nhóm.
 *(Index chiến lược: Tạo index giảm dần trên `createdAt` kết hợp với `author` `{ author: 1, createdAt: -1 }` để tối ưu việc tải trang cá nhân của một người dùng).*
 
 3. Collection: Comments (Bình luận)
-Bình luận được tách thành một collection riêng thay vì nhúng toàn bộ vào Post, vì một bài viết có thể có hàng ngàn bình luận, vượt quá giới hạn 16MB của một Document MongoDB.
-- `_id`: ObjectId.
+Bình luận được tách thành một collection riêng thay vì nhúng toàn bộ vào Post, vì một bài viết có thể có hàng ngàn bình luận, vượt quá giới hạn 16MB của một Document MongoDB
+.- `_id`: ObjectId.
 - `postId`: ObjectId (Tham chiếu đến Posts).
 - `author`: ObjectId (Tham chiếu đến Users).
 - `content`: String (Nội dung bình luận).
@@ -696,134 +399,121 @@ Việc thiết kế CSDL cho Chat realtime đòi hỏi tối ưu cho cả thao t
 - `type`: String (Enum: `['LIKE_POST', 'COMMENT', 'FRIEND_REQUEST', 'MENTION', 'SYSTEM']`).
 - `referenceId`: ObjectId (ID của Bài viết hoặc User liên quan để khi click vào thông báo sẽ chuyển hướng đúng chỗ).
 - `isRead`: Boolean (Mặc định `false`).
+2.4. Thiết kế Kiến trúc Hệ thống (System Architecture)
+	Dự án áp dụng mô hình phân lớp (Layered Architecture) kết hợp với kiến trúc Client-Server hiện đại. Sự phân tách hoàn toàn giữa Frontend và Backend thông qua HTTP API và WebSockets giúp hệ thống có tính linh hoạt cao, dễ dàng mở rộng để làm thêm ứng dụng Mobile sau này.
 
----
-
-### 3.4. Thiết kế Kiến trúc Hệ thống (System Architecture)
-
-Dự án áp dụng mô hình phân lớp (Layered Architecture) kết hợp với kiến trúc Client-Server hiện đại. Sự phân tách hoàn toàn giữa Frontend và Backend thông qua HTTP API và WebSockets giúp hệ thống có tính linh hoạt cao, dễ dàng mở rộng để làm thêm ứng dụng Mobile sau này.
-
-#### 3.4.1. Kiến trúc Tổng thể (Client - Server)
-Toàn bộ hệ thống được vận hành dựa trên 3 khối kiến trúc chính:
-1. Presentation Layer (Tầng Trình bày - Frontend): Được xây dựng dưới dạng một ứng dụng SPA (Single Page Application) sử dụng React.js và Vite. Khối này chịu trách nhiệm 100% về UI/UX, điều hướng (Routing bằng React-Router-DOM) và duy trì Trạng thái toàn cục (State Management bằng Zustand). 
-2. Business Logic Layer (Tầng Nghiệp vụ - Backend): Máy chủ Node.js + Express. Đóng vai trò như một bộ脑, tiếp nhận các yêu cầu HTTP từ Client, xác thực bảo mật, xử lý logic phức tạp (ví dụ: bóc tách file PDF, giao tiếp với AI API), và tương tác với cơ sở dữ liệu.
-3. Data Layer (Tầng Dữ liệu): Bao gồm MongoDB Atlas (Cloud Database) để lưu trữ dữ liệu vĩnh viễn và Cloudinary để làm CDN phân phối các tệp tin hình ảnh/tài liệu tốc độ cao.
-
-#### 3.4.2. Kiến trúc API (RESTful Design Principles)
-
-Các Endpoint của hệ thống được thiết kế tuân thủ nghiêm ngặt theo mô hình REST. Các URI (Uniform Resource Identifier) được định danh rõ ràng dưới dạng các Danh từ (Nouns), và các thao tác nghiệp vụ được gắn với các động từ HTTP chuẩn (GET, POST, PUT, PATCH, DELETE).
-
-Mọi request API đều được định dạng tiền tố phiên bản: `https://api.dnu-network.com/api/v1/...` để dễ dàng nâng cấp hệ thống trong tương lai mà không làm hỏng ứng dụng cũ.
-
-*Bảng minh họa thiết kế một số API cốt lõi:*
-
-| Phương thức | Endpoint | Chức năng nghiệp vụ | Xác thực Token |
-| :--- | :--- | :--- | :--- |
-| POST | `/api/v1/auth/register` | Đăng ký tài khoản mới | Không |
-| POST | `/api/v1/auth/login` | Đăng nhập, cấp phát JWT | Không |
-| GET | `/api/v1/users/me` | Lấy thông tin hồ sơ cá nhân hiện tại | Có |
-| GET | `/api/v1/posts` | Lấy danh sách bài viết (Bảng tin) hỗ trợ `?page=1&limit=10` | Có |
-| POST | `/api/v1/posts` | Tạo bài viết mới kèm dữ liệu Multipart (Ảnh/Text) | Có |
-| PATCH | `/api/v1/posts/:id/like` | Thả tim/Bỏ thả tim bài viết | Có |
-| DELETE | `/api/v1/posts/:id` | Xóa bài viết (Chỉ chủ bài viết hoặc Admin) | Có |
-| GET | `/api/v1/chats/:conversationId` | Lấy lịch sử 50 tin nhắn gần nhất của phòng chat | Có |
-| POST | `/api/v1/ai/ask` | Gửi câu hỏi cho Trợ lý AI và nhận câu trả lời | Có |
-
-Dữ liệu phản hồi (Response Payload) từ Server luôn được chuẩn hóa theo một cấu trúc JSON duy nhất để Frontend dễ dàng viết hàm đón lõng (Interceptor):
-```json
-{
-  "success": true,
-  "message": "Lấy danh sách thành công",
-  "data": { ... },
-  "meta": { "totalItems": 100, "totalPages": 10 } // Dành cho phân trang
-}
-```
-
-#### 3.4.3. Kiến trúc Realtime với Socket.IO
-
-Với một mạng xã hội, giao thức HTTP truyền thống (Request - Response) là không đủ vì nó là luồng một chiều (Client phải chủ động hỏi Server). Để giải quyết bài toán Nhắn tin và Thông báo tức thời, kiến trúc WebSocket (qua thư viện Socket.IO) được thiết lập song song cùng Express.
-
-Vòng đời hoạt động của Socket.io trong hệ thống:
-1. Kết nối (Handshake & Authentication): Ngay sau khi User đăng nhập thành công và load xong giao diện, React Client lập tức khởi tạo một kết nối WebSocket tới Server `const socket = io('wss://api.domain.com')`. Kèm theo kết nối này là chuỗi JWT Token để Server xác thực định danh.
-2. Khởi tạo phòng cá nhân (Room Join): Khi kết nối thành công, Server Node.js sẽ ép Socket hiện tại join vào một "Room" đặc biệt có tên chính là `User._id`. Ý đồ kiến trúc ở đây là: Bất cứ khi nào hệ thống muốn gửi thông báo cho User A, nó chỉ cần phát lệnh `io.to(A_id).emit(...)`.
-3. Luồng phát sóng sự kiện (Event Broadcasting): 
-   - Khi User A gửi tin nhắn cho User B, Client A thực hiện lệnh HTTP POST `/api/messages` để lưu tin nhắn bền vững vào CSDL.
-   - Ngay sau khi lưu CSDL thành công, Controller ở Server kích hoạt biến toàn cục Socket: `req.io.to(B_id).emit("new_message", messageData)`.
-   - Client B (đang lắng nghe sự kiện `new_message`) ngay lập tức nhận được `messageData` và cập nhật thư viện trạng thái Zustand. UI của B re-render xuất hiện tin nhắn mới mà không hề phải f5 trình duyệt.
-
-#### 3.4.4. Kiến trúc Xử lý Lỗi và Ghi nhật ký (Error Handling & Logging)
-
-Để đảm bảo hệ thống vận hành trơn tru và dễ dàng tìm ra nguyên nhân khi bị "sập", một kiến trúc bắt lỗi tập trung (Global Error Handler) được xây dựng.
-
-Cơ chế bắt lỗi (Error Catcher):
-Thay vì viết các khối `try...catch` dài dòng lặp đi lặp lại ở mọi API Controller, dự án sử dụng một hàm Higher-Order Function mang tên `catchAsync`. Hàm này sẽ tự động bọc (wrap) các lời hứa (Promises) của Controller. Bất cứ khi nào có lỗi xảy ra (ví dụ: mất kết nối Database, User nhập sai ID định dạng), lỗi đó sẽ rơi thẳng vào một Middleware cuối cùng trong chu trình của Express (Nằm ở cuối file `app.js`).
-
-Tại Middleware xử lý lỗi tổng, hệ thống được thiết kế khéo léo để phân tách môi trường:
-- Môi trường Development (Dev Mode): Phản hồi API sẽ chứa toàn bộ chuỗi Stack Trace và thông tin lỗi chi tiết của MongoDB để lập trình viên nhanh chóng debug.
-- Môi trường Production (Môi trường thực tế): Hệ thống lọc bỏ Stack Trace để tránh rò rỉ cấu trúc thư mục Server cho Hacker. Nó phân loại các lỗi điển hình (ví dụ: `MongoServerError code 11000` là lỗi trùng lặp dữ liệu) và biến nó thành những câu từ thân thiện cho người dùng cuối (ví dụ: *"Email này đã được sử dụng"*). Đối với các lỗi nghiêm trọng (mã 500 - Internal Server Error), hệ thống trả về thông báo chung *"Hệ thống đang bảo trì, vui lòng thử lại sau"*.
-
-Ghi nhật ký (Logging):
-Sử dụng thư viện `Morgan` để ghi lại mọi request truy cập API (IP, Thời gian phản hồi, Endpoint) xuất ra cửa sổ Terminal. Ở quy mô nâng cao, các lỗi nghiêm trọng có thể được đẩy vào file `error.log` qua thư viện `Winston` để Audit sau này.
-
----
-
-### 3.5. Thiết kế Giao diện người dùng (UI/UX Design)
-
-Quá trình thiết kế giao diện được đặt lên hàng đầu bởi đối tượng sử dụng là sinh viên Gen Z - những người đòi hỏi một trải nghiệm thị giác hiện đại, mượt mà và trực quan.
-
-#### 3.5.1. Sơ đồ điều hướng (User Journey & Sitemap)
-
-Hệ thống được thiết kế với cấu trúc phân cấp nông (Shallow Navigation), giúp người dùng chạm đến bất kỳ tính năng nào chỉ sau tối đa 3 lần click chuột.
-
-- Khu vực Public: Landing Page (Giới thiệu dự án) -> Form Đăng nhập/Đăng ký.
-- Khu vực Authenticated (Đã đăng nhập) - Giao diện chia 3 cột kinh điển:
-  - Cột trái (Sidebar Navigation): Chứa Menu điều hướng chính: Trang chủ, Hồ sơ, Bạn bè, Nhóm học tập, Sự kiện, Trợ lý AI, Đã lưu, Cài đặt.
-  - Cột giữa (Main Content): Không gian hiển thị trọng tâm. Hiển thị Form tạo bài viết, Dòng thời gian (Bảng tin) dạng cuộn vô tận (Infinite Scroll). Khi bấm vào một nhóm, cột giữa sẽ thay đổi thành không gian của nhóm đó.
-  - Cột phải (Widgets & Chat): Hiển thị danh sách Người liên hệ (bạn bè đang online), Gợi ý kết bạn, Các sự kiện sắp diễn ra, và các Pop-up chat bong bóng (tương tự Facebook Messenger) góc dưới cùng bên phải.
-
-#### 3.5.2. Hệ thống Thiết kế (Design System & Branding)
-
-Để đảm bảo tính đồng nhất, dự án xây dựng một Design System nhỏ gọn, triển khai cụ thể thông qua cấu hình của Tailwind CSS (`tailwind.config.js`).
-
-1. Màu sắc chủ đạo (Color Palette): 
-   - Màu thương hiệu (Primary): Xanh dương hoàng gia (`#2563EB` - Blue 600) mang lại cảm giác học thuật, đáng tin cậy. Dùng cho Nút bấm chính, Link, Icon kích hoạt.
-   - Màu phụ (Secondary): Trắng (`#FFFFFF`) và Xám nhạt (`#F3F4F6`) dùng làm màu nền (Background) để tạo không gian sạch sẽ (Clean Design), giúp nội dung bài viết/hình ảnh nổi bật lên.
-   - Màu ngữ nghĩa (Semantic Colors): Xanh lá (`#10B981`) cho thông báo thành công, Đỏ (`#EF4444`) cho cảnh báo/lỗi và thao tác Xóa, Vàng (`#F59E0B`) cho các trạng thái chờ.
-   - Hỗ trợ Chế độ tối (Dark Mode) cho những sinh viên có thói quen học tập và truy cập hệ thống vào ban đêm, giúp giảm mỏi mắt.
-
-2. Nghệ thuật chữ (Typography):
-   - Sử dụng font chữ Inter (bộ font sans-serif của Google) cho toàn bộ hệ thống. Đây là bộ font được thiết kế chuyên biệt cho hiển thị màn hình máy tính, các chữ số và ký tự rất rõ ràng, rất phù hợp với một ứng dụng đọc hiểu tài liệu nhiều như mạng xã hội học tập.
-
-3. Nguyên tắc bố cục và Tương tác (Layout & Interaction):
-   - Các khối thông tin (Bài viết, Bình luận) được đặt trong các "Thẻ" (Cards) có bo góc nhẹ (`rounded-lg`) và hiệu ứng đổ bóng mờ (`shadow-sm`) tạo cảm giác nổi khối 3D nhẹ nhàng (Glassmorphism / Soft UI).
-   - Tích hợp các Micro-animations: Nút bấm khi di chuột vào (hover) sẽ đổi màu nhẹ và có hiệu ứng phóng to nội dung (`scale-105`), mang lại cảm giác "sống động" và phản hồi xúc giác cho người dùng.
-   - Sử dụng các hiệu ứng "Skeleton Loading" (Bộ khung hiển thị trạng thái đang tải) thay vì vòng tròn quay tròn truyền thống (Spinner) để giảm bớt cảm giác chờ đợi khi tải dữ liệu trang chủ.
-
-#### 3.5.3. Trải nghiệm đa màn hình (Responsive & Accessibility)
-
-Nhận thấy sinh viên sử dụng điện thoại di động (Smartphone) để truy cập mạng xã hội lên tới 80%, hệ thống được áp dụng triết lý thiết kế Mobile-First (Ưu tiên di động).
-
-- Trên màn hình nhỏ (Mobile < 768px): Sidebar bên trái bị ẩn đi và gom vào một nút Hamburger Menu (3 gạch) ở góc màn hình. Cột phải bị ẩn hoàn toàn. Thanh điều hướng chính (Home, Chat, Notification) được gắn cố định xuống cạnh đáy màn hình (Bottom Navigation Bar) để thuận tiện thao tác bằng một ngón tay cái.
-- Trên màn hình Tablet (768px - 1024px): Giao diện chuyển thành 2 cột.
-- Trên màn hình Desktop (> 1024px): Trải nghiệm đầy đủ 3 cột để tận dụng tối đa không gian màn hình rộng.
-
-Ngoài ra, yếu tố Accessibility (Khả năng truy cập - a11y) cũng được chú trọng. Mọi hình ảnh đính kèm đều có thuộc tính `alt` (văn bản thay thế), mọi nút bấm biểu tượng (Icon Buttons) đều có `aria-label` để hỗ trợ các phần mềm đọc màn hình cho người khiếm thị, thể hiện tính nhân văn và chuyên nghiệp của một sản phẩm phần mềm giáo dục.
-
-### 3.6. Kết luận chương 3
-
-Chương 3 đã hoàn thành việc phác họa toàn bộ kiến trúc lõi của hệ thống mạng xã hội học tập DNU. Từ việc thu thập và chuẩn hóa yêu cầu của các nhóm người dùng, đề tài đã thiết lập một hệ thống Use Case mạch lạc. Cơ sở dữ liệu MongoDB được thiết kế theo hướng tối ưu hóa các thao tác đọc và nhúng dữ liệu để phù hợp với tốc độ của một mạng xã hội. Đặc biệt, sự kết hợp giữa mô hình RESTful API cho luồng dữ liệu chuẩn và WebSockets cho luồng giao tiếp thời gian thực tạo ra một kiến trúc Client-Server mạnh mẽ, mở rộng tốt. Cùng với hệ thống thiết kế giao diện UI/UX lấy người dùng làm trung tâm, tất cả đã tạo thành một bản thiết kế (Blueprint) hoàn hảo, sẵn sàng cho công tác lập trình cài đặt thực tế ở Chương 4.
+ 
+Hình : Sơ đồ Tuần tự (Sequence Diagram)
 
 
-## CHƯƠNG 4. CÀI ĐẶT VÀ TRIỂN KHAI
+2.4.1. Kiến trúc tổng thể Client - Server
+Hệ thống được cấu thành từ ba khối tương tác chính: Giao diện người dùng (Frontend), Backend xử lý nghiệp vụ (Node.js/Express) và tầng dữ liệu/dịch vụ hạ tầng (MongoDB, Cloudinary, Redis nếu bật). Luồng hoạt động bắt đầu từ thao tác của người dùng trên Frontend, gửi yêu cầu tới Backend qua REST API hoặc Socket.IO, sau đó Backend xử lý nghiệp vụ, truy cập dữ liệu và trả kết quả về giao diện.
+Hệ thống áp dụng mô hình phân tán 3 lớp:
+1. Presentation Layer (Client): Ứng dụng SPA viết bằng React.js + Vite. Quản lý State với Zustand. Gọi API qua Axios.
+2. Application Layer (Server): Node.js + Express. Xử lý logic nghiệp vụ qua các Controllers (Auth, Post, Chat, AI). Socket.IO mở kênh truyền realtime.
+3. Data Layer: MongoDB làm CSDL chính. Redis/BullMQ (nếu có) hỗ trợ Message Queue. Cloudinary lưu trữ Media.
+2.4.2. Kiến trúc API (RESTful API)
+Các Endpoint tuân thủ nguyên tắc RESTful, dữ liệu trả về dạng JSON chuẩn hóa:
+- Base URL: `/api/v1/`
+- Auth: `POST /auth/login`, `POST /auth/register`, `GET /auth/me`
+- Posts: `GET /posts` (lấy bảng tin, có pagination), `POST /posts` (đăng bài), `PUT /posts/:id/like`.
+- Users: `GET /users/:id`, `POST /users/friend-request/:id`.
+- AI: `POST /ai/chat`, `POST /ai/analyze-document`.
+- Bảo mật: Các route nghiệp vụ đều đi qua Middleware `verifyToken` để parse JWT ra `req.user`.
+2.4.3. Kiến trúc Realtime với Socket.IO
+Để đáp ứng yêu cầu tương tác tức thời của nền tảng mạng xã hội học tập, hệ thống triển khai kiến trúc realtime dựa trên Socket.IO chạy song song với API Express. Mô hình này cho phép duy trì kết nối hai chiều giữa client và server, giúp dữ liệu như tin nhắn, thông báo hoặc trạng thái hoạt động được cập nhật ngay khi phát sinh mà không cần tải lại trang.
 
-Chương này trình bày chi tiết về quá trình hiện thực hóa hệ thống từ thiết kế logic thành mã nguồn cụ thể. Nội dung bao gồm cách tổ chức thư mục mã nguồn, cài đặt các phân hệ chức năng lõi ở phía Backend, tích hợp giao diện Frontend và đưa ra quy trình triển khai hệ thống lên môi trường thực tế.
+Trong quy trình kết nối, sau khi người dùng đăng nhập thành công bằng JWT, client khởi tạo socket và gửi thông tin xác thực trong phiên handshake. Server kiểm tra token hợp lệ trước khi cho phép tham gia các kênh trao đổi. Mỗi người dùng được gán vào một room riêng theo `userId`, nhờ đó server có thể phát sự kiện đúng đối tượng (ví dụ thông báo cá nhân hoặc tin nhắn trực tiếp) thay vì broadcast toàn hệ thống.
 
-### 4.1. Tổ chức mã nguồn và môi trường phát triển
+Các nhóm sự kiện realtime chính trong đề tài gồm:
+- Sự kiện chat: gửi/nhận tin nhắn, trạng thái đang nhập (`typing`), đồng bộ hội thoại đang mở.
+- Sự kiện thông báo: thông báo khi có bình luận mới, thích bài viết, lời mời kết bạn, báo cáo được xử lý.
+- Sự kiện trạng thái: cập nhật online/offline và đồng bộ số lượng thông báo chưa đọc.
 
+Về kiến trúc dữ liệu, Socket.IO không thay thế cơ chế lưu trữ bền vững mà hoạt động như kênh truyền thời gian thực. Mỗi sự kiện quan trọng (như gửi tin nhắn) vẫn được ghi vào MongoDB trước hoặc đồng thời với thao tác emit về client để đảm bảo tính nhất quán khi người dùng tải lại trang hoặc đăng nhập từ thiết bị khác. Cách kết hợp "Realtime channel + Persistent storage" giúp hệ thống vừa phản hồi nhanh vừa bảo toàn lịch sử dữ liệu.
+
+Để tăng độ ổn định, Socket.IO tận dụng cơ chế tự động reconnect khi mất kết nối tạm thời. Ở phía client, các store trạng thái (ví dụ Zustand) tiếp nhận dữ liệu socket và cập nhật giao diện tức thì. Ở phía server, việc chuẩn hóa tên sự kiện, payload và cơ chế kiểm soát lỗi giúp giảm xung đột giữa các phân hệ khi hệ thống mở rộng.
+
+Trong phạm vi đồ án một instance backend, mô hình hiện tại đáp ứng tốt yêu cầu thực tế. Khi mở rộng nhiều instance trong tương lai, hệ thống có thể bổ sung Redis adapter cho Socket.IO để đồng bộ room và broadcast sự kiện giữa các node, đảm bảo tính liên tục của trải nghiệm realtime ở quy mô lớn hơn.
+2.4.4. Kiến trúc quản lý ngoại lệ và bắt lỗi (Error Handling)
+Một trong những tiêu chí quan trọng của một hệ thống Backend mạnh mẽ là khả năng xử lý các trường hợp ngoại lệ (Exceptions) mà không làm sập tiến trình Node.js (Crash server). Đồ án áp dụng mô hình "Global Error Handler" (Xử lý lỗi tập trung) thay vì đặt các khối `try...catch` rải rác một cách vô kỷ luật.
+Các nguyên tắc thiết kế mã lỗi được tuân thủ nghiêm ngặt:
+- Bất kỳ lỗi nghiệp vụ nào cũng được ném ra dưới dạng một đối tượng `AppError` tùy chỉnh kế thừa từ lớp `Error` gốc của JavaScript, có chứa `statusCode` và `message`.
+- Tại tầng Route, một hàm bọc (wrapper function) mang tên `catchAsync` được dùng để tự động bắt các Lời hứa bị từ chối (Rejected Promises) do hàm bất đồng bộ sinh ra, sau đó chuyển lỗi thẳng tới Global Error Middleware.
+- Middleware bắt lỗi này nằm ở cuối cùng của file `app.js`. Nó có nhiệm vụ kiểm tra loại lỗi:
+  + Nếu là lỗi cơ sở dữ liệu (ví dụ: `CastError` do sai định dạng ObjectId, `MongoServerError` do trùng lặp email khi đăng ký), middleware sẽ tự động định dạng lại thông báo lỗi sao cho thân thiện với người dùng (ví dụ: "Tài khoản email này đã được đăng ký, vui lòng sử dụng email khác").
+  + Nếu là lỗi xác thực (ví dụ: `TokenExpiredError`), sẽ trả về mã `401 Unauthorized`.
+  + Đối với môi trường Development (Đang phát triển), API sẽ trả về toàn bộ Stack Trace để sinh viên dễ dàng debug.
+  + Đối với môi trường Production (Đưa vào sử dụng), API chỉ trả về một thông điệp an toàn duy nhất để tránh rò rỉ cấu trúc bên trong của hệ thống ra ngoài.
+2.5. Thiết kế giao diện (UI/UX)
+2.5.1. Sơ đồ điều hướng (Sitemap)
+- Guest (chưa đăng nhập):
+  - Landing Page -> Đăng nhập / Đăng ký.
+  - Quên mật khẩu -> Nhập email -> Nhận hướng dẫn đặt lại mật khẩu.
+  - Sau khi xác thực thành công -> chuyển vào Trang chủ người dùng.
+- Sinh viên/Người dùng đã đăng nhập:
+  - Trang chủ (Bảng tin):
+    -> Xem danh sách bài viết -> Mở chi tiết bài viết -> Bình luận/Thả tim/Chia sẻ.
+    -> Tạo bài viết mới (văn bản, ảnh, tệp) -> Đăng bài.
+  - Hồ sơ cá nhân:
+    -> Xem thông tin cá nhân -> Chỉnh sửa hồ sơ (avatar, ảnh bìa, bio).
+    -> Danh sách bạn bè/follow -> Bài viết đã lưu (Saved Posts).
+  - Nhóm học tập:
+    -> Danh sách nhóm -> Tạo nhóm / Tham gia nhóm.
+    -> Chi tiết nhóm theo tab (Thảo luận / Tài liệu / Q&A).
+  - Sự kiện:
+    -> Danh sách sự kiện -> Chi tiết sự kiện -> Tham gia sự kiện.
+  - Chat:
+    -> Danh sách hội thoại -> Khung chat trực tiếp -> Gửi tin nhắn/tệp.
+  - Trợ lý AI:
+    -> Khung trò chuyện AI.
+    -> Tải tài liệu (PDF/DOCX) -> Phân tích/tóm tắt tài liệu.
+  - Thông báo:
+    -> Xem thông báo realtime -> Mở nội dung liên quan từ thông báo.
+- Quản trị viên (Admin):
+  - Admin Dashboard -> Tổng quan chỉ số hệ thống.
+  - Quản lý người dùng -> Tìm kiếm -> Khóa/Mở khóa tài khoản.
+  - Quản lý bài viết -> Kiểm duyệt -> Xóa nội dung vi phạm.
+  - Xử lý báo cáo vi phạm -> Xem chi tiết -> Ra quyết định xử lý.
+  - Thống kê và AI Analytics -> Theo dõi xu hướng nội dung và trạng thái vận hành.
+2.5.2. Giao diện người dùng và Quản trị viên	
+- Hệ thống áp dụng phong cách thiết kế hiện đại, màu sắc chủ đạo đồng nhất với nhận diện thương hiệu học thuật.
+- Sử dụng Responsive Design để giao diện tự tương thích tốt trên cả Desktop và thiết bị di động (Mobile).
+- Có thanh Sidebar điều hướng nhanh, thanh Topbar hiển thị thông báo thời gian thực và ô tìm kiếm tổng hợp.
+- Khu vực Admin có hệ thống biểu đồ trực quan (Charts) để hiển thị số liệu thống kê.
+Ngoài giao diện trực quan, đề tài cũng chú trọng tính nhất quán luồng thao tác giữa các vai trò người dùng. Với sinh viên, các thao tác quan trọng như đăng bài, bình luận, tham gia nhóm, nhắn tin được thiết kế theo nguyên tắc "ít bước - phản hồi nhanh - có trạng thái rõ ràng". Với quản trị viên, giao diện ưu tiên khả năng quan sát dữ liệu và xử lý nhanh các tình huống kiểm duyệt. Việc đồng bộ trải nghiệm giữa giao diện người dùng và giao diện quản trị giúp hệ thống giảm thời gian học sử dụng ban đầu, đồng thời hạn chế sai sót thao tác trong quá trình vận hành thực tế.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CHƯƠNG 3. CÀI ĐẶT, TRIỂN KHAI VÀ ĐÁNH GIÁ HỆ THỐNG 
+3.1	Tổ chức mã nguồn và môi trường phát triển
 Hệ thống được phát triển theo mô hình Monorepo (hoặc chia 2 thư mục rõ ràng) để thuận tiện cho việc quản lý mã nguồn. Môi trường phát triển bao gồm Node.js cho Backend và Vite (React) cho Frontend.
-
-#### 4.1.1. Cấu trúc thư mục Backend & Frontend
-
+3.1.1	Cấu trúc thư mục Backend & Frontend
 Cấu trúc Backend:
 Được tổ chức theo mô hình MVC (Model-View-Controller) kết hợp Layered Architecture.
 - `/controllers`: Chứa logic xử lý của từng API endpoint (vd: `post.controller.js`, `user.controller.js`).
@@ -841,28 +531,25 @@ Cấu trúc Frontend:
 - `/src/store`: Quản lý Global State sử dụng Zustand (vd: `useAuthStore`, `useChatStore`).
 - `/src/utils`: Chứa cấu hình Axios interceptor để gắn JWT Token vào header.
 - `/src/domains`: Chứa các logic cụ thể theo từng nghiệp vụ (Domain-Driven).
-
-#### 4.1.2. Cấu hình môi trường
+3.1.2	Cấu hình môi trường
 Biến môi trường (Environment Variables) được sử dụng để bảo mật các thông tin nhạy cảm.
 - Backend (`.env`): `PORT`, `MONGODB_URI`, `JWT_SECRET`, `CLOUDINARY_URL`, `GEMINI_API_KEY`, `REDIS_URL`.
 - Frontend (`.env`): `VITE_API_URL` (trỏ về server Node.js), `VITE_SOCKET_URL`.
-
-### 4.2. Cài đặt hệ thống Backend
-
-#### 4.2.1. Xây dựng phân hệ Xác thực, Phân quyền và Hồ sơ người dùng
-Xác thực sử dụng JWT. Khi người dùng đăng nhập, backend kiểm tra hash password qua `bcrypt.compare`. Nếu đúng, tạo JWT token chứa `userId` và `role`. Token được gửi về client và lưu trữ an toàn (bảo vệ khỏi XSS).
-Middleware `verifyToken` sẽ chặn các request không có token hợp lệ.
-Ở phần Hồ sơ (Profile), người dùng có thể upload ảnh đại diện và ảnh bìa. Multer nhận file, đẩy lên Cloudinary để lấy URL tĩnh lưu vào database.
-
-#### 4.2.2. Xây dựng phân hệ Quản lý nội dung (Bài viết, Bình luận, Lưu bài viết)
-Controller `post.controller.js` cung cấp hàm lấy Bảng tin (Feed). Hệ thống sử dụng Mongoose `populate` để join dữ liệu tác giả (Tên, Avatar) và bình luận. Tính năng phân trang (Pagination) được cài đặt để tránh nghẽn mạng khi load hàng trăm bài viết.
-Chức năng "Lưu bài viết": Người dùng gọi API `/posts/:id/save`, hệ thống sẽ push `postId` vào mảng `savedPosts` trong schema User.
-
-#### 4.2.3. Xây dựng phân hệ Tương tác xã hội và Realtime (Kết bạn, Tin nhắn, Thông báo)
-- Tương tác xã hội: Controller `friend.controller.js` quản lý logic Gửi yêu cầu, Chấp nhận và Hủy kết bạn thông qua mảng `friendRequests` và `friends`. Khi có người gửi lời mời, hệ thống sẽ kiểm tra trùng lặp trước khi thêm vào DB.
-- Nhắn tin trực tiếp (Chat): Controller `message.controller.js` lấy danh sách Conversation. Khi user A nhắn cho user B, ngoài việc lưu xuống DB để đảm bảo tính bền vững của dữ liệu, hệ thống sử dụng Socket.IO để phát luồng sự kiện (emit event) giúp thiết bị của User B hiện tin nhắn ngay lập tức.
-- Thông báo (Notification): Khi user A comment bài của user B, backend lưu 1 record vào bảng Notification, sau đó dùng Socket.IO emit thông báo realtime.
-
+3.2. Cài đặt hệ thống Backend
+3.2.1. Xây dựng phân hệ Xác thực, Phân quyền và Hồ sơ người dùng
+Xác thực của hệ thống được thiết kế theo luồng chuẩn gồm đăng ký, đăng nhập, kiểm tra phiên và phân quyền theo vai trò. Khi người dùng đăng nhập, backend kiểm tra mật khẩu đã băm bằng `bcrypt.compare`; nếu hợp lệ sẽ phát hành JWT chứa `userId`, `role` và thời hạn hiệu lực. Token được gửi về client để dùng cho các request tiếp theo và được kiểm soát theo cơ chế hết hạn nhằm giảm rủi ro lạm dụng phiên.
+Ở tầng bảo vệ API, middleware `verifyToken` có nhiệm vụ giải mã token, kiểm tra chữ ký, kiểm tra thời hạn và gắn thông tin người dùng vào `req.user`. Nhờ đó các controller nghiệp vụ không cần lặp lại logic xác thực ở mỗi endpoint. Với các route quản trị, hệ thống kết hợp thêm middleware kiểm tra vai trò để đảm bảo chỉ tài khoản admin mới được phép thực thi thao tác nhạy cảm.
+Đối với phân hệ hồ sơ người dùng (Profile), hệ thống hỗ trợ cập nhật thông tin cá nhân như họ tên, tiểu sử, chuyên ngành, ảnh đại diện và ảnh bìa. Media được tiếp nhận qua Multer, sau đó upload lên Cloudinary để lấy URL tĩnh lưu vào MongoDB. Cách tổ chức này giúp giảm tải lưu trữ tại server ứng dụng, đồng thời tăng khả năng mở rộng khi số lượng ảnh người dùng tăng.
+Ngoài thao tác cập nhật thông tin, hệ thống cũng chuẩn hóa xử lý lỗi cho các trường hợp thường gặp như token hết hạn, dữ liệu đầu vào không hợp lệ, file vượt dung lượng cho phép hoặc sai định dạng. Việc chuẩn hóa mã lỗi và thông điệp phản hồi giúp frontend hiển thị thông báo rõ ràng, tăng trải nghiệm người dùng khi thao tác tài khoản.
+3.2.2. Xây dựng phân hệ Quản lý nội dung (Bài viết, Bình luận, Lưu bài viết)
+Phân hệ quản lý nội dung được tổ chức xoay quanh ba nhóm chức năng chính: tạo và phân phối bài viết, tương tác bình luận/thả tim, và lưu bài viết để xem lại. Controller `post.controller.js` chịu trách nhiệm xử lý các nghiệp vụ feed, bao gồm truy vấn bài viết theo thứ tự thời gian, nạp dữ liệu tác giả qua `populate`, và trả về kết quả phân trang để tối ưu băng thông ở phía client.
+Khi người dùng tạo bài viết, hệ thống kiểm tra dữ liệu đầu vào (nội dung, chuyên mục, media/tài liệu đính kèm), sau đó lưu bản ghi bài viết kèm thông tin tác giả. Đối với thao tác tương tác, mỗi hành động như bình luận hoặc thả tim đều được cập nhật theo hướng nhất quán dữ liệu: tăng/giảm bộ đếm liên quan, lưu trạng thái người dùng đã tương tác và phát sinh thông báo khi cần.
+Phần bình luận được tách collection riêng để đảm bảo hiệu năng khi bài viết có số lượng bình luận lớn. Hệ thống hỗ trợ mô hình bình luận gốc và trả lời bình luận thông qua `parentCommentId`, giúp mở rộng theo dạng hội thoại phân cấp mà không làm phình document bài viết.
+Tính năng "Lưu bài viết" được hiện thực qua API `/posts/:id/save`, lưu `postId` vào mảng `savedPosts` của người dùng và cho phép hủy lưu theo cơ chế toggle. Nhờ đó người dùng có thể đánh dấu các nội dung học tập quan trọng để truy cập nhanh về sau. Phân hệ này góp phần tăng giá trị sử dụng lâu dài của nền tảng, không chỉ dừng ở tương tác tức thời.
+3.2.3. Xây dựng phân hệ Tương tác xã hội và Realtime (Kết bạn, Tin nhắn, Thông báo)
+- Tương tác xã hội: Controller `friend.controller.js` quản lý logic Gửi yêu cầu, Chấp nhận và Hủy kết bạn thông qua mảng `friendRequests` và `friends`.
+- Nhắn tin trực tiếp: Controller `message.controller.js` lấy danh sách Conversation. Khi user A nhắn cho user B, ngoài việc lưu xuống DB, Socket.IO sẽ `socket.to(B_id).emit('receive_message', data)`.
+- Thông báo (Notification): Khi user A comment bài của user B, backend lưu 1 record vào bảng Notification, sau đó dùng Socket.IO emit thông báo realtime cho user B.
 Dưới đây là đoạn mã minh họa việc khởi tạo Server Socket.IO và lắng nghe các luồng sự kiện nhắn tin:
 ```javascript
 const socketIo = require('socket.io');
@@ -902,17 +589,17 @@ module.exports = function(server) {
     });
 };
 ```
-
-#### 4.2.4. Xây dựng phân hệ Nhóm học tập (Thảo luận, Tài liệu, Q&A) và Sự kiện
-- Nhóm học tập: Được tổ chức tinh gọn. `group.controller.js` quản lý thành viên. `groupFile.controller.js` hỗ trợ upload và lưu trữ tài liệu môn học. Tính năng Q&A (`groupQuestion.controller.js`) giúp sinh viên đặt câu hỏi và giảng viên/bạn học trả lời.
-- Sự kiện: `event.controller.js` lưu thông tin sự kiện (thời gian, địa điểm). Thành viên bấm "Tham gia" sẽ được đưa vào mảng `attendees`.
-
-#### 4.2.5. Tích hợp module AI (Chatbot AI, Phân tích tài liệu, AI Analytics)
+3.2.4. Xây dựng phân hệ Nhóm học tập (Thảo luận, Tài liệu, Q&A) và Sự kiện
+- Nhóm học tập: Phân hệ nhóm được thiết kế để phục vụ đúng nhu cầu học theo môn/chủ đề. `group.controller.js` phụ trách vòng đời nhóm (tạo nhóm, cập nhật thông tin, thêm/xóa thành viên, phân quyền quản trị nhóm). Mỗi nhóm có không gian riêng cho thảo luận, chia sẻ tài liệu và hỏi đáp, giúp tách biệt luồng trao đổi học thuật khỏi bảng tin công khai.
+- Tài liệu nhóm và Q&A: `groupFile.controller.js` xử lý upload tài liệu lên Cloudinary, lưu metadata tệp để thành viên có thể tìm và tải lại. Song song, `groupQuestion.controller.js` quản lý câu hỏi và câu trả lời theo ngữ cảnh nhóm, tạo môi trường hỗ trợ học tập cộng tác giữa sinh viên và người hướng dẫn.
+- Kiểm soát truy cập nhóm: Hệ thống áp dụng kiểm tra quyền theo thành viên trước khi cho phép thao tác tài nguyên nhóm (xem tài liệu nội bộ, đăng thảo luận, chỉnh sửa thông tin nhóm). Cơ chế này giúp hạn chế rò rỉ dữ liệu học tập ở các nhóm có tính riêng tư cao.
+- Sự kiện: `event.controller.js` quản lý thông tin sự kiện gồm tiêu đề, thời gian bắt đầu/kết thúc, địa điểm, mô tả và danh sách người tham gia. Thành viên bấm "Tham gia" sẽ được đưa vào mảng `attendees`, đồng thời hệ thống có thể dùng dữ liệu này để nhắc lịch và thống kê mức độ quan tâm theo từng sự kiện.
+- Về nghiệp vụ thời gian, hệ thống kiểm tra điều kiện đầu vào để tránh tạo sự kiện với mốc thời gian không hợp lệ (ví dụ thời gian kết thúc nhỏ hơn thời gian bắt đầu), qua đó giảm lỗi dữ liệu ngay từ tầng API.
+3.2.5. Tích hợp module AI (Chatbot AI, Phân tích tài liệu, AI Analytics)
 Hệ thống sử dụng `@google/generative-ai` SDK để gọi Gemini API.
 - Chatbot AI: Nằm trong `ai.controller.js`. Prompt được tối ưu để đóng vai trò là "Trợ lý học tập DNU", từ chối trả lời các câu hỏi không liên quan đến giáo dục.
 - Phân tích tài liệu: `aiDocument.controller.js` tiếp nhận file PDF từ client, dùng thư viện pdf-parse trích xuất text, sau đó gửi text cho AI kèm câu hỏi để tóm tắt hoặc giải thích ngữ nghĩa.
 - AI Analytics: AI phân tích cảm xúc (Sentiment) và từ khóa (Keywords) của các bài viết trong hệ thống để xuất báo cáo.
-
 Dưới đây là đoạn mã minh họa thuật toán thiết lập ngữ cảnh (Prompt Engineering) cho trợ lý AI:
 ```javascript
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -938,240 +625,244 @@ exports.chatWithAI = async (req, res) => {
     }
 };
 ```
+3.2.6. Xây dựng phân hệ Quản trị hệ thống (Báo cáo vi phạm, Cấu hình hệ thống)
+Phân hệ quản trị hệ thống đóng vai trò lớp kiểm soát cuối cùng nhằm duy trì môi trường cộng đồng học tập an toàn. Toàn bộ route quản trị được bảo vệ bằng middleware xác thực và middleware vai trò (`verifyAdmin`), đảm bảo chỉ tài khoản có thẩm quyền mới truy cập được chức năng kiểm duyệt.
+Trong nghiệp vụ xử lý báo cáo vi phạm, `report.controller.js` tiếp nhận danh sách report, phân loại theo trạng thái (chờ xử lý/đã xử lý), mức độ ưu tiên và đối tượng vi phạm (bài viết, bình luận, người dùng). Quản trị viên có thể xem chi tiết bằng chứng, lý do báo cáo, lịch sử xử lý trước đó để đưa ra quyết định phù hợp.
+Các hành động quản trị chính bao gồm: cảnh báo nội dung, xóa nội dung vi phạm, khóa tạm thời hoặc khóa dài hạn tài khoản. Sau mỗi hành động, hệ thống cập nhật trạng thái report và ghi nhận kết quả xử lý để phục vụ truy vết khi cần kiểm tra lại.
+Bên cạnh kiểm duyệt nội dung, phần cấu hình hệ thống (`SystemSettings.model.js`) cho phép điều chỉnh các tham số vận hành như giới hạn dung lượng tệp, chính sách đăng ký tài khoản hoặc các cờ bật/tắt tính năng. Việc tách cấu hình khỏi mã nguồn giúp hệ thống linh hoạt hơn khi cần thay đổi chính sách mà không phải triển khai lại toàn bộ ứng dụng.
+Về mặt quản trị rủi ro, phân hệ này còn giúp giảm tải cho nhóm phát triển trong vận hành thường ngày vì nhiều tình huống nội dung xấu có thể được xử lý trực tiếp từ dashboard admin thay vì can thiệp thủ công vào cơ sở dữ liệu.
+3.3. Cài đặt hệ thống Frontend
+3.3.1. Quản lý luồng trạng thái ứng dụng (Zustand)
+Trong kiến trúc frontend của đề tài, Zustand được sử dụng làm lớp quản lý trạng thái toàn cục (global state) thay cho việc truyền dữ liệu qua nhiều cấp component bằng props. Cách tiếp cận này giúp giao diện dễ mở rộng hơn khi số lượng màn hình và luồng tương tác tăng, đặc biệt với các chức năng cần đồng bộ dữ liệu theo thời gian thực như chat và thông báo.
 
-#### 4.2.6. Xây dựng phân hệ Quản trị hệ thống (Báo cáo vi phạm, Cấu hình hệ thống)
-Chỉ Admin mới có quyền truy cập các route quản trị (được bảo vệ bởi `verifyAdmin` middleware).
-Admin có thể xem các Report trong `report.controller.js`, quyết định xóa bài vi phạm hoặc khóa (ban) user. Cấu hình hệ thống (giới hạn dung lượng file, bật tắt tính năng đăng ký) được quản lý qua `SystemSettings.model.js`.
+Lý do lựa chọn Zustand thay vì các giải pháp phức tạp hơn là vì thư viện có API gọn, dễ đọc, ít boilerplate và phù hợp quy mô đồ án. Mỗi nhóm nghiệp vụ được tách thành một store độc lập để giảm phụ thuộc chéo, giúp việc bảo trì thuận lợi và hạn chế re-render không cần thiết.
 
-### 4.3. Cài đặt hệ thống Frontend
+Các store chính trong hệ thống:
+- `useAuthStore`: lưu trạng thái xác thực (`user`, `isAuthenticated`, token), cung cấp các action `login`, `logout`, `hydrateSession`.
+- `useChatStore`: lưu danh sách hội thoại, tin nhắn đang mở, trạng thái gửi/nhận tin theo thời gian thực từ Socket.IO.
+- `useNotificationStore`: quản lý danh sách thông báo, số lượng chưa đọc và trạng thái đánh dấu đã xem.
 
-#### 4.3.1. Quản lý luồng trạng thái ứng dụng (Zustand)
-Zustand được sử dụng làm Global Store. Ví dụ:
-- `useAuthStore`: Lưu trữ thông tin user hiện tại (`user`, `isAuthenticated`), cung cấp hàm `login`, `logout` gọi trực tiếp API.
-- `useChatStore`: Lưu trữ danh sách tin nhắn của phiên chat đang mở, cập nhật state tức thì khi Socket nhận tin mới.
-- `useNotificationStore`: Quản lý danh sách thông báo và đếm số lượng thông báo chưa đọc.
+Nguyên tắc tổ chức state được áp dụng:
+- State nào dùng chung nhiều màn hình mới đưa vào store toàn cục.
+- State cục bộ theo component (ví dụ trạng thái mở modal) giữ tại component để tránh làm store quá tải.
+- Action bất đồng bộ (gọi API) được gom vào store để chuẩn hóa xử lý loading/error.
 
-Dưới đây là đoạn mã minh họa việc khởi tạo Store quản lý xác thực bằng Zustand:
-```javascript
-import { create } from 'zustand';
-import axiosInstance from '../utils/axios';
+Trong thực tế vận hành giao diện, Zustand giúp hệ thống phản hồi nhanh hơn với các sự kiện mới: khi có tin nhắn đến hoặc thông báo mới, store cập nhật ngay và toàn bộ component liên quan tự đồng bộ mà không cần tải lại trang. Điều này đặc biệt quan trọng với đặc thù mạng xã hội học tập, nơi trải nghiệm realtime ảnh hưởng trực tiếp đến mức độ tương tác của người dùng.
+3.3.2. Xây dựng giao diện Người dùng 
+Giao diện người dùng được xây dựng theo định hướng "đơn giản, dễ thao tác, ưu tiên nội dung học tập". Bố cục tổng thể gồm thanh điều hướng chính, khu vực nội dung trung tâm và các thành phần ngữ cảnh như thông báo, gợi ý bạn bè, nhóm học tập đang tham gia. Việc thiết kế theo component trong React giúp tái sử dụng tốt các khối giao diện và duy trì tính nhất quán giữa các trang.
 
-const useAuthStore = create((set) => ({
-    user: null,
-    isAuthenticated: false,
-    loading: true,
+Về điều hướng, hệ thống tổ chức theo các màn hình cốt lõi: Trang chủ (Feed), Hồ sơ cá nhân, Nhóm học tập, Sự kiện, Chat và khu vực Trợ lý AI. Người dùng có thể di chuyển giữa các chức năng mà không cần tải lại toàn bộ trang nhờ cơ chế SPA, từ đó giảm độ trễ cảm nhận và tăng trải nghiệm liên tục.
 
-    login: async (email, password) => {
-        try {
-            const res = await axiosInstance.post('/auth/login', { email, password });
-            set({ user: res.data.user, isAuthenticated: true });
-            // Lưu token vào localStorage để giữ phiên đăng nhập
-            localStorage.setItem('token', res.data.token);
-            return { success: true };
-        } catch (error) {
-            return { success: false, message: error.response?.data?.message };
-        }
-    },
+Các nguyên tắc UX chính được áp dụng:
+- Hiển thị phản hồi tức thời sau thao tác (đăng bài, thích, bình luận, gửi tin nhắn).
+- Ưu tiên các thao tác thường dùng ở vị trí dễ tiếp cận (tạo bài viết, tìm kiếm, mở chat).
+- Giảm số bước ở các luồng chính để người dùng mới cũng có thể sử dụng nhanh.
+- Duy trì tính nhất quán về màu sắc, typography, kích thước nút bấm và khoảng cách thành phần.
 
-    logout: () => {
-        localStorage.removeItem('token');
-        set({ user: null, isAuthenticated: false });
-    },
-    
-    // Hàm này được gọi mỗi khi reload trang để kiểm tra token cũ còn hiệu lực không
-    checkAuth: async () => {
-        try {
-            const res = await axiosInstance.get('/auth/me');
-            set({ user: res.data.user, isAuthenticated: true, loading: false });
-        } catch (error) {
-            set({ user: null, isAuthenticated: false, loading: false });
-        }
-    }
-}));
+Chi tiết theo từng phân hệ giao diện:
+- Trang Bảng tin: sử dụng cơ chế Infinite Scroll để nạp dữ liệu theo lô, giúp giảm tải ban đầu và tăng cảm giác mượt khi duyệt nội dung. Mỗi bài viết hiển thị rõ thông tin tác giả, thời gian, chuyên mục, media đính kèm và cụm hành động tương tác.
+- Trang Hồ sơ cá nhân: cho phép cập nhật avatar, ảnh bìa, thông tin học tập; đồng thời hiển thị danh sách bạn bè, bài viết đã đăng và bài viết đã lưu theo bố cục rõ ràng.
+- Trang Nhóm học tập: tổ chức theo dạng tab (Thảo luận, Tài liệu, Q&A) để gom chức năng theo ngữ cảnh học tập; người dùng có thể chuyển nhanh giữa trao đổi nội dung và quản lý tài liệu.
+- Trang Sự kiện: hiển thị danh sách sự kiện dạng card với thông tin cốt lõi (thời gian, địa điểm, mô tả ngắn), hỗ trợ thao tác tham gia nhanh.
+- Trang Chat và thông báo: tối ưu cho tương tác thời gian thực; danh sách hội thoại và nội dung chat được cập nhật liên tục qua Socket.IO, hạn chế yêu cầu người dùng phải làm mới trang.
 
-export default useAuthStore;
-```
+Về khả năng tương thích thiết bị, giao diện được tối ưu responsive theo hướng mobile-first. Trên màn hình nhỏ, các thành phần phụ được thu gọn hợp lý để tập trung vào nội dung chính và giữ thao tác một tay thuận tiện. Điều này giúp hệ thống đáp ứng tốt nhu cầu sử dụng linh hoạt của sinh viên trên cả máy tính và điện thoại.
+3.3.3. Xây dựng giao diện Quản trị viên (Admin Dashboard, Thống kê AI)
+Giao diện Admin được tách riêng với khu vực người dùng thông thường và chỉ cho phép truy cập khi tài khoản có quyền `admin`. Cấu trúc màn hình theo mô hình dashboard: thanh điều hướng bên trái (quản lý người dùng, quản lý bài viết, báo cáo vi phạm, thống kê), khu vực nội dung trung tâm và cụm bộ lọc theo thời gian ở phần trên.
 
-#### 4.3.2. Xây dựng giao diện Người dùng (Trang chủ, Hồ sơ, Bảng tin, Nhóm, Sự kiện)
-Giao diện được xây dựng bằng React kết hợp Tailwind CSS (hoặc CSS module) để đảm bảo tính hiện đại.
-- Trang Bảng tin: Sử dụng cơ chế Infinite Scroll (cuộn vô hạn) để load thêm bài viết.
-- Trang Nhóm: Có thiết kế dạng Tab (Thảo luận | Tệp tin | Hỏi đáp) giống như hệ thống LMS.
-- Trang Sự kiện: Hiển thị danh sách sự kiện dạng Card kèm đồng hồ đếm ngược.
+Về thành phần dữ liệu, dashboard hiển thị các chỉ số tổng quan theo dạng thẻ (cards) như tổng số người dùng, tổng số bài viết, số báo cáo chờ xử lý và số tài khoản bị khóa. Các chỉ số này được cập nhật theo chu kỳ ngắn để quản trị viên theo dõi tình trạng hệ thống gần thời gian thực, đồng thời làm cơ sở ưu tiên xử lý các điểm nóng về nội dung.
 
-*[CHÈN ẢNH 1: GIAO DIỆN TRANG CHỦ / BẢNG TIN TẠI ĐÂY]*
+Phần thống kê trực quan sử dụng biểu đồ cột và đường (Chart.js/Recharts) để thể hiện:
+- Biến động số lượng bài viết theo ngày/tuần.
+- Tăng trưởng người dùng mới theo mốc thời gian.
+- Tỷ lệ nội dung bị báo cáo và tỷ lệ xử lý thành công.
+- Phân bố nhóm chủ đề thảo luận nổi bật do AI Analytics tổng hợp.
 
-*[CHÈN ẢNH 2: GIAO DIỆN TRANG NHÓM HỌC TẬP TẠI ĐÂY]*
+Đối với nghiệp vụ kiểm duyệt, bảng báo cáo vi phạm được thiết kế theo hướng thao tác nhanh: xem chi tiết nội dung bị báo cáo, lý do báo cáo, người gửi báo cáo và trạng thái xử lý. Quản trị viên có thể thực hiện các hành động như cảnh báo, xóa nội dung, khóa tạm thời tài khoản và ghi chú quyết định xử lý. Mỗi thao tác đều có xác nhận trước khi thực thi để giảm rủi ro thao tác nhầm.
 
-*[CHÈN ẢNH 3: GIAO DIỆN KHUNG CHAT VÀ AI TẠI ĐÂY]*
+Ở lớp trải nghiệm, giao diện quản trị ưu tiên tính rõ ràng và khả năng đọc dữ liệu: màu sắc trung tính, phân cấp tiêu đề hợp lý, bảng dữ liệu có phân trang và tìm kiếm nhanh. Trên thiết bị màn hình nhỏ, dashboard chuyển sang bố cục responsive dạng khối để vẫn đảm bảo quản trị viên theo dõi và xử lý sự cố cơ bản mà không phụ thuộc hoàn toàn vào máy tính bàn.
 
-#### 4.3.3. Xây dựng giao diện Quản trị viên (Admin Dashboard, Thống kê AI)
-Giao diện Admin tách biệt, có màu sắc tối giản, tập trung vào dữ liệu. Tích hợp thư viện biểu đồ (Chart.js / Recharts) để hiển thị số lượng truy cập, tỷ lệ người dùng tăng trưởng. Bảng quản lý Báo cáo vi phạm hỗ trợ tính năng duyệt/từ chối nhanh.
-
-*[CHÈN ẢNH 4: GIAO DIỆN ADMIN DASHBOARD VÀ BIỂU ĐỒ TẠI ĐÂY]*
-
-*[CHÈN ẢNH 5: GIAO DIỆN QUẢN LÝ BÁO CÁO VI PHẠM TẠI ĐÂY]*
-
-#### 4.3.4. Tích hợp API, Socket.IO và xử lý trải nghiệm (Responsive, Error Handling)
+Ngoài ra, khu vực thống kê AI đóng vai trò hỗ trợ ra quyết định quản trị thay vì thay thế quyết định con người. Các kết quả phân tích cảm xúc, từ khóa và xu hướng chỉ được xem là tín hiệu gợi ý; quyết định cuối cùng vẫn do quản trị viên xác nhận dựa trên ngữ cảnh thực tế của từng nội dung.
+3.3.4. Tích hợp API, Socket.IO và xử lý trải nghiệm (Responsive, Error Handling)
 - Axios Interceptor: Tự động bắt lỗi 401 (Hết hạn token) để đẩy người dùng về trang Login.
 - Socket Client: Khởi tạo ở file cấp cao (`App.jsx` hoặc Layout), lắng nghe sự kiện tổng cục (notification) để hiển thị Toast popup khi có thông báo mới dù đang ở bất kỳ trang nào.
 - Hệ thống hỗ trợ hiển thị Skeleton Loading trong lúc chờ API trả kết quả, tăng trải nghiệm UX.
+3.4. Triển khai hệ thống
+3.4.1. Triển khai Backend và Database
+- Backend được triển khai thực tế trên Render (Web Service), chạy bằng lệnh `npm start`.
+- Cơ sở dữ liệu triển khai trên MongoDB Atlas; backend kết nối qua biến môi trường `MONGODB_URI`.
+- Dữ liệu media (ảnh/file) được lưu trên Cloudinary thông qua các biến `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
+- Một số biến môi trường quan trọng phía backend: `JWT_SECRET`, `GEMINI_API_KEY`, `GOOGLE_CLIENT_ID`, `CORS_ORIGINS`, `FRONTEND_URL`.
+- Sau mỗi lần cập nhật biến môi trường, hệ thống thực hiện Manual Deploy trên Render để áp dụng cấu hình mới.
+Trong quá trình triển khai thực tế, nhóm áp dụng nguyên tắc "cấu hình tách biệt theo môi trường", tức là toàn bộ khóa bí mật và URL dịch vụ đều được quản lý bằng biến môi trường thay vì ghi cứng trong mã nguồn. Cách làm này giúp tăng an toàn bảo mật và giảm rủi ro khi chuyển giữa môi trường phát triển và production.
+Về vận hành backend, nhóm theo dõi log Render theo chu kỳ để phát hiện sớm các lỗi thường gặp như lỗi kết nối MongoDB, lỗi xác thực OAuth, lỗi quá hạn token hoặc lỗi tích hợp dịch vụ ngoài. Các lỗi này được xử lý theo quy trình: xác định nguyên nhân -> cập nhật cấu hình hoặc mã -> redeploy -> kiểm tra lại các luồng nghiệp vụ cốt lõi (đăng nhập, đăng bài, chat, upload media).
+3.4.2. Triển khai Frontend
+- Frontend React + Vite được triển khai trên Vercel, build bằng lệnh `npm run build`.
+- Biến môi trường quan trọng phía frontend: `VITE_API_BASE_URL` (trỏ đến domain backend Render) và `VITE_GOOGLE_CLIENT_ID`.
+- Dự án sử dụng cấu hình rewrite SPA trên Vercel để xử lý điều hướng client-side, tránh lỗi 404 khi reload ở các route như `/home`, `/groups`, `/events`.
+- Domain production dùng HTTPS mặc định của Vercel, đảm bảo truy cập an toàn và tương thích OAuth.
+Trong giai đoạn đưa hệ thống lên production, nhóm ghi nhận và xử lý một số rủi ro điển hình: lỗi CORS khi khác domain frontend/backend, lỗi 404 với route SPA khi reload, lỗi OAuth origin mismatch và lỗi thiếu biến môi trường cho dịch vụ upload. Việc chuẩn hóa checklist cấu hình trước khi phát hành (API base URL, OAuth origin/redirect, Cloudinary, CORS origins) giúp giảm đáng kể thời gian khắc phục sự cố.
+Song song đó, nhóm duy trì quy trình kiểm tra sau mỗi lần phát hành: xác minh trang đăng nhập, tạo bài viết, gửi tin nhắn realtime, tải tài liệu và luồng thông báo. Quy trình này đảm bảo mỗi bản cập nhật không làm ảnh hưởng các chức năng cốt lõi đã ổn định trước đó.
+3.5. Minh họa giao diện hệ thống
+ 
+Hình : Trang login
 
-### 4.4. Triển khai hệ thống
-
-#### 4.4.1. Triển khai Backend và Database
-- Database: MongoDB được triển khai qua MongoDB Atlas Cloud, đảm bảo tính dự phòng và dễ dàng scale. Dữ liệu tĩnh như ảnh/file được upload thẳng lên Cloudinary (đã được cấu hình hạn mức miễn phí).
-- Backend: Triển khai lên các nền tảng PaaS như Render, Vercel (nếu serverless) hoặc máy chủ VPS (Digital Ocean/AWS) qua Docker. Sử dụng PM2 nếu chạy trực tiếp trên VPS để đảm bảo Node.js tự khởi động lại khi crash.
-
-#### 4.4.2. Triển khai Frontend
-Source code React được build bằng Vite (lệnh `npm run build`) tạo ra thư mục `/dist` tối ưu. Thư mục này được host lên các CDN như Vercel hoặc Netlify để phân phối tĩnh (Static Hosting), giúp tốc độ tải trang cực nhanh.
-Miền (Domain) được cấu hình trỏ về Vercel, tự động cài đặt SSL/HTTPS an toàn.
-
-### 4.5. Kết luận chương 4
-Chương 4 đã chứng minh tính khả thi của hệ thống từ bản vẽ thiết kế đến sản phẩm thực tế. Quá trình cài đặt đã áp dụng đúng những công nghệ hiện đại nhất (MERN Stack + Vite + Zustand), đồng thời đưa ra được chiến lược tổ chức code sạch và dễ bảo trì. Việc kết hợp thông suốt giữa API, Socket.IO và AI Gemini đã mang lại một nền tảng mạng xã hội học tập hoàn chỉnh, sẵn sàng cho công tác kiểm thử ở chương tiếp theo.
+ 
+Hình : Trang chủ web
 
 
-## CHƯƠNG 5. KIỂM THỬ VÀ ĐÁNH GIÁ
 
-Sau khi hoàn thành giai đoạn cài đặt và triển khai, hệ thống cần trải qua quá trình kiểm thử nghiêm ngặt để đảm bảo các chức năng hoạt động đúng như thiết kế, hiệu năng ổn định và đạt được tính bảo mật cao. Chương này trình bày chi tiết về kế hoạch kiểm thử, các kịch bản kiểm thử (Test cases) cụ thể và đưa ra đánh giá tổng quan về kết quả đạt được của toàn bộ đồ án.
 
-### 5.1. Kế hoạch kiểm thử
+ 
+Hình : Trang nhóm
 
-#### 5.1.1. Phương pháp và công cụ kiểm thử
+
+
+
+
+ 
+
+Hình : Trang Sự kiện
+
+
+
+
+
+
+  
+
+Hình : Khung chat messenger và chat bot AI
+
+
+
+
+
+     
+Hình : Trang  quản trị admin
+
+
+
+
+
+3.6. Kiểm thử và đánh giá
+3.6.1. Kế hoạch kiểm thử
+3.6.1.1. Phương pháp và công cụ kiểm thử
 - Kiểm thử hộp đen (Black-box Testing): Tập trung vào việc kiểm tra giao diện người dùng và luồng nghiệp vụ mà không cần quan tâm đến logic code bên trong. Đảm bảo mọi luồng (như đăng nhập, đăng bài, nhắn tin) hoạt động đúng theo Use Case đã đề ra.
 - Kiểm thử tích hợp (Integration Testing): Kiểm tra sự tương tác giữa Frontend (React), Backend (Node.js/Express) và CSDL (MongoDB), đặc biệt là các luồng gọi API và sự kiện realtime của Socket.IO.
-- Công cụ sử dụng: 
-  - *Postman:* Dùng để kiểm thử các RESTful API độc lập.
-  - *Chrome DevTools:* Kiểm tra Responsive giao diện, theo dõi Network (thời gian tải, response trả về) và Console (log lỗi).
-
-#### 5.1.2. Môi trường kiểm thử
+- Công cụ sử dụng:
+  - Postman: Dùng để kiểm thử các RESTful API độc lập.
+  - Chrome DevTools: Kiểm tra Responsive giao diện, theo dõi Network (thời gian tải, response trả về) và Console (log lỗi).
+Trong quá trình kiểm thử, nhóm áp dụng nguyên tắc ưu tiên theo mức độ ảnh hưởng nghiệp vụ. Các luồng bắt buộc cho người dùng cuối như đăng nhập, đăng bài, bình luận, gửi tin nhắn và nhận thông báo được kiểm thử trước. Sau khi các luồng cốt lõi đạt ổn định, nhóm tiếp tục kiểm thử các luồng mở rộng như nhóm học tập, sự kiện và quản trị nội dung.
+Ngoài kiểm thử theo ca đơn lẻ, nhóm còn thực hiện kiểm thử chuỗi thao tác liên hoàn (end-to-end thủ công) để bảo đảm dữ liệu xuyên suốt giữa các module không bị lệch trạng thái, ví dụ: tạo bài viết -> bình luận -> nhận thông báo -> xử lý báo cáo ở tài khoản quản trị.
+3.6.1.2. Môi trường kiểm thử
 - Phần cứng: Máy tính PC/Laptop chạy HĐH Windows/macOS, RAM tối thiểu 8GB. Điện thoại di động (iOS/Android) dùng để test Responsive.
 - Phần mềm: Trình duyệt Google Chrome, Safari, Microsoft Edge.
 - Mạng: Môi trường mạng Wi-Fi và mạng 4G (để giả lập độ trễ kết nối khi test tính năng Socket).
 
-### 5.2. Các kịch bản và Kết quả kiểm thử
 
-#### 5.2.1. Kiểm thử chức năng theo các Use case chính
 
-Dưới đây là một số kịch bản kiểm thử (Test Cases) tiêu biểu đã được thực hiện:
 
-| Mã TC | Chức năng | Các bước thực hiện | Kết quả mong đợi | Kết quả thực tế | Trạng thái |
-|---|---|---|---|---|---|
-| TC-01 | Đăng nhập | 1. Nhập Email và Mật khẩu đúng.<br>2. Nhấn "Đăng nhập". | Hệ thống cấp JWT Token, chuyển hướng tới trang Bảng tin. | Như mong đợi | PASS |
-| TC-02 | Đăng nhập sai | 1. Nhập sai Mật khẩu.<br>2. Nhấn "Đăng nhập". | Hệ thống báo lỗi "Email hoặc mật khẩu không chính xác". Không chuyển trang. | Như mong đợi | PASS |
-| TC-03 | Đăng bài viết | 1. Gõ nội dung, chọn chuyên mục.<br>2. Đính kèm 1 file ảnh.<br>3. Nhấn "Đăng bài". | Bài viết xuất hiện trên đầu Bảng tin, ảnh load thành công. | Như mong đợi | PASS |
-| TC-04 | Nhắn tin Realtime | 1. User A mở khung chat với User B.<br>2. User A gửi tin "Hello". | Giao diện User B (đang online) hiện ngay lập tức tin nhắn "Hello" mà không cần f5. | Như mong đợi | PASS |
-| TC-06 | Bình luận bài viết | 1. Nhập bình luận vào ô.<br>2. Nhấn "Gửi". | Bình luận xuất hiện ngay dưới bài viết. Số lượng bình luận tăng lên 1. | Như mong đợi | PASS |
-| TC-07 | Thả tim bài viết | 1. Nhấn vào icon trái tim trên bài viết. | Icon trái tim đổi sang màu đỏ. Số lượt thích tăng lên 1. User nhận thông báo nếu là bài của người khác. | Như mong đợi | PASS |
 
-Bảng 5.2. Các kịch bản kiểm thử phân hệ Nhóm học tập và Sự kiện
 
-| Mã TC | Chức năng | Các bước thực hiện | Kết quả mong đợi | Kết quả thực tế | Trạng thái |
-|---|---|---|---|---|---|
-| TC-08 | Tạo nhóm mới | 1. Vào tab Nhóm, chọn "Tạo nhóm".<br>2. Nhập tên nhóm, chọn chế độ Công khai.<br>3. Nhấn "Lưu". | Nhóm mới được tạo thành công, tự động chuyển hướng vào trang chi tiết nhóm. User là Admin nhóm. | Như mong đợi | PASS |
-| TC-09 | Tải tài liệu lên nhóm | 1. Vào tab Tài liệu trong Nhóm.<br>2. Chọn file Word/PDF (dưới 10MB) và upload. | File được tải lên Cloudinary, hiển thị trong danh sách tài liệu kèm nút Tải xuống. | Như mong đợi | PASS |
-| TC-10 | Tạo sự kiện mới | 1. Nhập Tên sự kiện, Thời gian bắt đầu và kết thúc.<br>2. Chọn địa điểm và mô tả.<br>3. Nhấn Tạo sự kiện. | Sự kiện xuất hiện trên Bảng tin. Thời gian bắt đầu không được bé hơn thời gian hiện tại (nếu bé hơn phải báo lỗi). | Như mong đợi | PASS |
 
-Bảng 5.3. Các kịch bản kiểm thử phân hệ Quản trị viên (Admin)
 
-| Mã TC | Chức năng | Các bước thực hiện | Kết quả mong đợi | Kết quả thực tế | Trạng thái |
-|---|---|---|---|---|---|
-| TC-11 | Gửi báo cáo vi phạm | 1. Bấm vào icon 3 chấm ở bài viết của người khác.<br>2. Chọn "Báo cáo vi phạm".<br>3. Chọn lý do và gửi. | Hệ thống thông báo gửi thành công. Admin nhận được báo cáo ở trang quản trị. | Như mong đợi | PASS |
-| TC-12 | Khóa tài khoản User | 1. Đăng nhập quyền Admin.<br>2. Vào Danh sách người dùng, chọn "Khóa tài khoản" ở user X. | Trạng thái user X chuyển thành Banned. Nếu user X đang đăng nhập, hệ thống tự động kick ra ở request tiếp theo. | Như mong đợi | PASS |
-| TC-13 | Xóa bài viết vi phạm | 1. Vào mục Quản lý bài viết.<br>2. Bấm "Xóa" một bài viết rác. | Bài viết biến mất khỏi cơ sở dữ liệu và bảng tin. Lượt hiển thị giảm tương ứng. | Như mong đợi | PASS |
-| TC-14 | Thống kê số liệu | 1. Mở trang Admin Dashboard. | Các biểu đồ (Chart.js) tải thành công dữ liệu số lượng User và số bài viết đăng trong tuần. | Tốc độ tải biểu đồ nhanh | PASS |
 
-#### 5.2.2. Kiểm thử bảo mật cơ bản và phân quyền
+
+
+
+
+
+
+3.6.2. Các kịch bản và Kết quả kiểm thử
+3.6.2.1. Kiểm thử chức năng theo các Use case chính
+Dưới đây là một số kịch bản kiểm thử (Test Cases) tiêu biểu :
+Mã TC	Chức năng	Các bước thực hiện	Kết quả mong đợi	Kết quả thực tế	Trạng thái
+TC-01	Đăng nhập	1. Nhập Email và mật khẩu đúng.
+
+
+2. Nhấn "Đăng nhập".	Hệ thống cấp JWT Token, chuyển hướng tới trang Bảng tin.	Như mong đợi	PASS
+TC-02	Đăng nhập sai	1. Nhập sai mật khẩu.
+
+
+2. Nhấn "Đăng nhập".	Hệ thống báo lỗi "Email hoặc mật khẩu không chính xác". Không chuyển trang.	Như mong đợi	PASS
+TC-03	Đăng bài viết	1. Gõ nội dung, chọn chuyên mục.
+
+
+2. Đính kèm 1 file ảnh.
+
+
+3. Nhấn "Đăng bài".	Bài viết xuất hiện trên đầu Bảng tin, ảnh load thành công.	Như mong đợi	PASS
+TC-04	Nhắn tin Realtime	1. User A mở khung chat với User B.
+
+
+2. User A gửi tin "Hello".	Giao diện User B (đang online) hiện ngay lập tức tin nhắn "Hello" mà không cần f5.	Như mong đợi	PASS
+TC-05	Bình luận bài viết	1. Nhập nội dung bình luận.
+
+
+2. Nhấn "Gửi".	Bình luận xuất hiện ngay dưới bài viết. Số lượng bình luận tăng lên 1.	Như mong đợi	PASS
+TC-06	Thả tim bài viết	1. Nhấn vào icon trái tim trên bài viết.	Icon trái tim đổi sang màu đỏ. Số lượt thích tăng lên 1.	Như mong đợi	PASS
+
+
+Bảng 3.2. Các kịch bản kiểm thử phân hệ Nhóm học tập và Sự kiện
+Mã TC	Chức năng	Các bước thực hiện	Kết quả mong đợi	Kết quả thực tế	Trạng thái
+TC-07	Tạo nhóm mới	1. Vào tab Nhóm, chọn "Tạo nhóm".
+
+
+2. Nhập tên nhóm, chọn chế độ Công khai.
+
+
+3. Nhấn "Lưu".	Nhóm mới được tạo thành công, tự động chuyển hướng vào trang chi tiết nhóm. User là Admin nhóm.	Như mong đợi	PASS
+TC-08	Tải tài liệu lên nhóm	1. Vào tab Tài liệu trong Nhóm.
+
+
+2. Chọn file Word/PDF (dưới 10MB) và upload.	File được tải lên Cloudinary, hiển thị trong danh sách tài liệu kèm nút Tải xuống.	Như mong đợi	PASS
+TC-09	Tạo sự kiện mới	1. Nhập Tên sự kiện, Thời gian bắt đầu và kết thúc.
+
+
+2. Chọn địa điểm và mô tả.
+
+
+3. Nhấn "Tạo sự kiện".	Sự kiện xuất hiện trên Bảng tin. Thời gian bắt đầu không được bé hơn thời gian hiện tại (nếu bé hơn phải báo lỗi).	Như mong đợi	PASS
+
+Bảng 3.3. Các kịch bản kiểm thử phân hệ Quản trị viên (Admin)
+Mã TC	Chức năng	Các bước thực hiện	Kết quả mong đợi	Kết quả thực tế	Trạng thái
+TC-11	Gửi báo cáo vi phạm	1. Bấm vào icon 3 chấm ở bài viết.
+
+
+2. Chọn "Báo cáo vi phạm".
+
+
+3. Chọn lý do và gửi.	Hệ thống báo thành công. Admin nhận được báo cáo trong trang quản trị.	Như mong đợi	PASS
+TC-12	Khóa tài khoản User	1. Đăng nhập Admin.
+
+
+2. Chọn "Khóa tài khoản" user X.	Trạng thái thành Banned. User X bị đăng xuất ngay lập tức ở request tiếp theo.	Như mong đợi	PASS
+TC-13	Xóa bài viết vi phạm	1. Vào mục Quản lý bài viết.
+
+
+2. Bấm "Xóa" bài viết rác.	Bài viết bị xóa khỏi Database và Bảng tin. Cập nhật lại số liệu hiển thị.	Như mong đợi	PASS
+TC-14	Thống kê số liệu	1. Mở trang Admin Dashboard.	Biểu đồ (Chart.js) hiển thị đúng số lượng User và bài viết mới trong tuần.	Tốc độ tải biểu đồ nhanh	PASS
+
+3.6.2.2. Kiểm thử bảo mật cơ bản và phân quyền
 - Kiểm thử Authorization: Thử truy cập vào URL của Admin (ví dụ: `/admin/dashboard`) bằng tài khoản Sinh viên thông thường. Kết quả: Frontend chặn điều hướng, API trả về lỗi `403 Forbidden`. -> PASS
 - Kiểm thử Token Expiration: Đợi token hết hạn (sau thời gian cấu hình), cố gắng gọi API tạo bài viết. Kết quả: Hệ thống trả lỗi `401 Unauthorized` và đẩy người dùng ra màn hình Đăng nhập. -> PASS
-
-#### 5.2.3. Kiểm thử hiệu năng hệ thống
+3.6.2.3. Kiểm thử hiệu năng hệ thống
 - Tốc độ load trang ban đầu (First Contentful Paint) đo bằng Lighthouse trên Chrome đạt dưới 1.5 giây.
 - API lấy danh sách bài viết (Feed) có sử dụng Pagination (Limit = 10) phản hồi trung bình trong khoảng 150ms - 300ms.
 - Khả năng gửi/nhận tin nhắn qua Socket.IO có độ trễ cực thấp (dưới 50ms trong môi trường mạng ổn định).
-
-### 5.3. Đánh giá kết quả đạt được
-
-#### 5.3.1. Ưu điểm và mức độ đáp ứng mục tiêu
+3.6.3. Đánh giá kết quả đạt được
+3.6.3.1. Ưu điểm và mức độ đáp ứng mục tiêu
 - Hoàn thành xuất sắc mục tiêu đề ra: Hệ thống đã bao quát được toàn bộ luồng hoạt động cơ bản của một Mạng xã hội học tập dành riêng cho DNU. Từ bảng tin, nhắn tin, quản lý nhóm đến thông báo realtime đều vận hành trơn tru.
 - Kiến trúc mã nguồn hiện đại: Việc áp dụng MERN Stack cùng Vite, Zustand mang lại trải nghiệm SPA (Single Page Application) mượt mà, tốc độ phản hồi nhanh.
 - Tích hợp AI thông minh: Việc đưa AI Gemini vào xử lý tài liệu là một điểm sáng, giúp nền tảng không chỉ là nơi "chơi" mà thực sự là một "trợ lý học tập" đắc lực.
 - Giao diện thân thiện: Thiết kế UI/UX gọn gàng, có Responsive tốt trên mobile.
-
-#### 5.3.2. Những điểm còn hạn chế
+3.6.3.2. Những điểm còn hạn chế
 - Xử lý file dung lượng lớn: Hiện tại việc upload file/video kích thước rất lớn (trên 50MB) đôi lúc còn phụ thuộc vào băng thông và giới hạn gói miễn phí của Cloudinary.
 - Chức năng gọi Video/Audio: Hệ thống mới dừng ở mức chat văn bản và gửi file, chưa tích hợp WebRTC để gọi điện trực tuyến.
 - AI Analytics chưa tự động hoá hoàn toàn: Việc thống kê cảm xúc bài viết bằng AI cần tối ưu thêm về mặt tốc độ khi lượng bài viết trong ngày quá lớn (cần thiết kế cronjob ban đêm).
+Ngoài các hạn chế trên, hệ thống hiện chưa có bộ kiểm thử tự động toàn diện ở mức CI, do đó chất lượng phát hành vẫn phụ thuộc tương đối nhiều vào kiểm thử thủ công. Đây là điểm nhóm xác định cần đầu tư trong giai đoạn tiếp theo để tăng tính ổn định khi số lượng tính năng và tần suất cập nhật tăng.
 
-### 5.4. Kết luận chương 5
-Qua quá trình kiểm thử toàn diện từ chức năng, bảo mật đến hiệu năng, có thể khẳng định hệ thống mạng xã hội học tập DNU đã hoạt động ổn định và đáp ứng tốt các yêu cầu đặt ra ban đầu. Những lỗi nhỏ phát sinh trong quá trình code đã được phát hiện và khắc phục kịp thời. Dù vẫn còn một vài hạn chế nhỏ về giới hạn hạ tầng đám mây miễn phí, nhưng xét trên bình diện một đồ án tốt nghiệp, đây là một sản phẩm phần mềm hoàn thiện và có tính ứng dụng rất cao.
+3.6.4. Kết luận chương 3
+Chương 3 đã trình bày toàn bộ quá trình hiện thực hóa hệ thống từ tổ chức mã nguồn, cài đặt backend/frontend, triển khai cloud đến kiểm thử và đánh giá kết quả. Kết quả thực nghiệm cho thấy hệ thống đáp ứng tốt các luồng nghiệp vụ cốt lõi của một mạng xã hội học tập: xác thực người dùng, quản lý nội dung, tương tác realtime, quản trị và hỗ trợ AI.
 
-
----
-
-## KẾT LUẬN
-
-### 1. Kết quả đạt được
-
-#### 1.1 Về mặt lý thuyết
-- Nắm vững kiến trúc và công nghệ Web hiện đại: Đồ án đã tổng hợp và nghiên cứu chi tiết kiến trúc Client - Server, giao thức HTTP/HTTPS và phong cách thiết kế RESTful API.
-- Nghiên cứu ứng dụng công nghệ Full-stack (MERN): Đã tìm hiểu và làm chủ các công nghệ cốt lõi bao gồm Node.js, Express, MongoDB và React/Vite. Đặc biệt là việc nghiên cứu các cơ chế bảo mật (JWT, bcrypt, CORS) và xử lý dữ liệu lớn bằng phân trang.
-- Tìm hiểu cơ chế truyền thông thời gian thực: Đã nghiên cứu ứng dụng WebSocket và thư viện Socket.IO trong việc duy trì kết nối 2 chiều liên tục để phục vụ tính năng nhắn tin và thông báo.
-- Nghiên cứu tích hợp Trí tuệ nhân tạo (AI): Đã tìm hiểu vai trò của mô hình ngôn ngữ lớn (LLM) và cách tích hợp Google Generative AI (Gemini) thông qua API để hỗ trợ môi trường học tập, kết hợp với các công cụ trích xuất văn bản.
-
-#### 1.2 Về mặt thực tiễn
-Đề xuất và xây dựng thành công mạng xã hội học tập: Đồ án đã triển khai hoàn thiện một nền tảng chuyên biệt dành cho sinh viên DNU, giải quyết bài toán giao tiếp rời rạc.
-
-Xây dựng phần mềm hoàn chỉnh với các module chức năng:
-- Module quản lý tài khoản và hồ sơ: Xử lý luồng đăng ký, đăng nhập bảo mật; cho phép người dùng tùy chỉnh trang cá nhân (avatar, thông tin sinh viên).
-- Module quản lý nội dung và Bảng tin: Cung cấp không gian chia sẻ bài viết, đính kèm hình ảnh/tệp tin, tích hợp tính năng thả tim, bình luận và lưu bài viết.
-- Module tương tác và giao tiếp Realtime: Hỗ trợ kết bạn, nhắn tin trực tiếp 1-1 theo thời gian thực và nhận thông báo tức thì (push notification).
-- Module Nhóm học tập và Sự kiện: Cho phép tạo môi trường nhóm riêng biệt với các tab Thảo luận, Chia sẻ tài liệu và Hỏi đáp (Q&A); quản lý và tổ chức sự kiện.
-- Module Trợ lý AI (AI Assistant): Tích hợp Chatbot AI để giải đáp thắc mắc chuyên môn, phân tích và tóm tắt trực tiếp các tài liệu học tập PDF mà người dùng tải lên.
-- Module Quản trị hệ thống (Admin Dashboard): Cung cấp bộ công cụ trực quan để quản trị viên theo dõi số liệu, quản lý người dùng và kiểm duyệt, xử lý các báo cáo vi phạm.
-
-### 2. Hạn chế
-Bên cạnh những kết quả đạt được, đồ án vẫn còn một số hạn chế cần được nhìn nhận:
-- Xử lý tài liệu và tệp tin dung lượng lớn: Hiện tại, việc upload các video hoặc tệp tin kích thước rất lớn (>50MB) đôi lúc còn phụ thuộc vào băng thông và giới hạn của dịch vụ lưu trữ đám mây miễn phí (Cloudinary).
-- Thiếu chức năng giao tiếp đa phương tiện (Video/Audio): Hệ thống mới dừng ở mức chat văn bản và gửi file, chưa tích hợp giao thức WebRTC để thực hiện các cuộc gọi trực tuyến.
-- Giới hạn trong phân tích dữ liệu AI: Module AI Analytics phân tích cảm xúc (Sentiment) trên các bài viết cần được tối ưu hóa về hiệu năng khi lượng dữ liệu lớn, thay vì xử lý đồng bộ có thể dẫn đến quá tải.
-- Tính khả dụng trên thiết bị di động: Dù giao diện đã áp dụng Responsive, nhưng trải nghiệm trên trình duyệt di động chưa thể tận dụng trọn vẹn các phần cứng (camera, push notification gốc) như một ứng dụng Native App.
-
-### 3. Hướng phát triển
-Để khắc phục những hạn chế và nâng cao hơn nữa hiệu quả của hệ thống, một số hướng phát triển tiềm năng có thể được xem xét trong tương lai:
-- Phát triển ứng dụng di động (Mobile App): Nghiên cứu đóng gói hệ thống thành ứng dụng di động thông qua React Native hoặc Flutter để mang lại trải nghiệm tốt hơn và gửi thông báo hệ thống liên tục.
-- Nghiên cứu và tích hợp WebRTC: Cải tiến hệ thống chat bằng cách bổ sung tính năng gọi Video/Audio nhóm và chia sẻ màn hình, phục vụ tối đa nhu cầu học nhóm trực tuyến.
-- Liên kết và đồng bộ hệ thống của trường: Tích hợp trực tiếp với hệ thống quản lý đào tạo (LMS) hiện có của trường để tự động hóa việc chia nhóm lớp học theo thời khóa biểu.
-- Cải tiến và mở rộng mô hình AI:
-  + Tích hợp kỹ thuật RAG (Retrieval-Augmented Generation) để AI có thể truy xuất kiến thức từ một kho tài liệu chuẩn của trường thay vì chỉ dựa vào tài liệu cá nhân tải lên.
-  + Áp dụng tự động hóa (Cronjob) để AI liên tục quét và cảnh báo các bài viết có nội dung độc hại mà không cần chờ người dùng báo cáo.
-
----
-
-## TÀI LIỆU THAM KHẢO
-1. Tài liệu chính thức của React.js: *https://react.dev/*
-2. Tài liệu chính thức của Node.js & Express: *https://expressjs.com/*
-3. Tài liệu chính thức của MongoDB & Mongoose: *https://mongoosejs.com/*
-4. Tài liệu chính thức của Socket.IO: *https://socket.io/*
-5. Google Generative AI Documentation: *https://ai.google.dev/*
-6. Các bài viết về kiến trúc MERN Stack và RESTful API từ Medium, StackOverflow.
----
-
-## DANH MỤC VIẾT TẮT
-
-| Viết tắt | Ý nghĩa đầy đủ | Tiếng Việt |
-| :--- | :--- | :--- |
-| API | Application Programming Interface | Giao diện lập trình ứng dụng |
-| REST | Representational State Transfer | Chuyển giao trạng thái đại diện |
-| HTTP | HyperText Transfer Protocol | Giao thức truyền tải siêu văn bản |
-| HTTPS | HyperText Transfer Protocol Secure | Giao thức truyền tải siêu văn bản an toàn |
-| JWT | JSON Web Token | Mã thông báo Web dạng JSON |
-| SPA | Single Page Application | Ứng dụng trang đơn |
-| UI | User Interface | Giao diện người dùng |
-| UX | User Experience | Trải nghiệm người dùng |
-| AI | Artificial Intelligence | Trí tuệ nhân tạo |
-| LLM | Large Language Model | Mô hình ngôn ngữ lớn |
-| JSON | JavaScript Object Notation | Ký pháp đối tượng JavaScript |
-| MVC | Model-View-Controller | Mô hình Model-View-Controller (Dữ liệu - Hiển thị - Điều khiển) |
-| DB | Database | Cơ sở dữ liệu |
-| MERN | MongoDB, Express.js, React.js, Node.js | Bộ giải pháp công nghệ MERN |
-| CI/CD | Continuous Integration / Continuous Deployment| Tích hợp liên tục / Triển khai liên tục |
+Bên cạnh các kết quả đạt được, chương cũng chỉ ra các giới hạn hiện tại như khả năng xử lý media dung lượng lớn và mức độ tự động hóa kiểm thử chưa cao. Đây là cơ sở quan trọng để đề xuất lộ trình cải tiến trong giai đoạn phát triển tiếp theo, đồng thời chứng minh tính khả thi của đề tài ở cả góc độ kỹ thuật lẫn vận hành thực tế.

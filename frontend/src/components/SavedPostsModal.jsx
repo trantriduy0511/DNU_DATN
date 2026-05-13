@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { notify } from '../lib/notify';
 
 const SavedPostsModal = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -28,7 +29,7 @@ const SavedPostsModal = () => {
       window.dispatchEvent(new CustomEvent('savedPostsChanged', { detail: { postIds: list.map(p => p?._id).filter(Boolean) } }));
     } catch (e) {
       console.error('Error fetching saved posts:', e);
-      alert('Lỗi khi tải bài viết đã lưu');
+      notify('Lỗi khi tải bài viết đã lưu');
     } finally {
       setLoading(false);
     }
@@ -51,7 +52,7 @@ const SavedPostsModal = () => {
       await fetchSaved();
     } catch (e) {
       console.error('Error unsaving post:', e);
-      alert('Lỗi khi bỏ lưu bài viết');
+      notify('Lỗi khi bỏ lưu bài viết');
     }
   };
 

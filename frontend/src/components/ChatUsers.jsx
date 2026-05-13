@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, X, Send, Search, ArrowLeft, MoreVertical, MoreHorizontal, Check, CheckCheck, Image as ImageIcon, FileText, Paperclip, Film, Users, Plus, UserPlus, LogOut, Trash2, Ban, User, UserMinus, RotateCcw, ExternalLink, Calendar } from 'lucide-react';
+import { MessageCircle, X, Send, Search, ArrowLeft, MoreVertical, MoreHorizontal, Check, CheckCheck, Image as ImageIcon, FileText, Paperclip, Film, Users, Plus, UserPlus, LogOut, Trash2, Ban, User, UserMinus, RotateCcw, ExternalLink, Calendar, Pencil } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
@@ -10,6 +10,7 @@ import { parseEventShareFromMessage, resolveEventShareImageUrl } from '../utils/
 import { parseGroupShareFromMessage, resolveGroupShareImageUrl } from '../utils/groupShareMessage.js';
 import { emitAppEvent, onAppEvent } from '../shared/events/appEventBus';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { notify, confirmAsync } from '../lib/notify';
 
 /** So sánh id từ Mongo/API/socket (ObjectId vs string) — dùng thay cho === */
 const idsEqual = (a, b) => {
@@ -145,13 +146,59 @@ const ChatUsers = () => {
     if (avatar) {
       return resolveMediaUrl(avatar);
     }
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=${background}&color=fff`;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Người dùng')}&background=${background}&color=fff`;
   };
 
   const withAvatarFallback = (name, background = '10b981') => (e) => {
     if (e.currentTarget?.dataset?.fallbackApplied) return;
     if (e.currentTarget?.dataset) e.currentTarget.dataset.fallbackApplied = '1';
     e.currentTarget.src = resolveAvatarUrl('', name, background);
+  };
+
+  // Cache cho user data tra cứu theo id — dùng để hiển thị tên/avatar khi msg.sender
+  // không có name (tài khoản rời nhóm, bị xoá, hoặc dữ liệu populate thiếu).
+  const [senderCache, setSenderCache] = useState({});
+  const senderFetchingRef = useRef(new Set());
+
+  // Tra cứu participant theo id (lấy thông tin user đầy đủ từ conversation)
+  const findParticipantById = (senderId, conversation) => {
+    if (!senderId || !conversation?.participants?.length) return null;
+    const sid = String(senderId);
+    return (
+      conversation.participants.find(
+        (p) => String(p?._id || p?.id || p) === sid
+      ) || null
+    );
+  };
+
+  const extractSenderId = (msg) => {
+    const s = msg?.sender;
+    if (!s) return null;
+    if (typeof s === 'string') return s;
+    return s._id || s.id || null;
+  };
+
+  // Trả về tên người gửi đúng — ưu tiên msg.sender.name → participants → senderCache (fetch từ /users/:id).
+  const resolveSenderName = (msg, conversation = selectedConversation) => {
+    const direct = String(msg?.sender?.name || '').trim();
+    if (direct) return direct;
+    const senderId = extractSenderId(msg);
+    const fromParticipants = findParticipantById(senderId, conversation);
+    const partName = String(fromParticipants?.name || '').trim();
+    if (partName) return partName;
+    const cached = senderId ? senderCache[String(senderId)] : null;
+    const cachedName = String(cached?.name || '').trim();
+    if (cachedName) return cachedName;
+    return 'Người dùng';
+  };
+
+  const resolveSenderAvatar = (msg, conversation = selectedConversation) => {
+    if (msg?.sender?.avatar) return msg.sender.avatar;
+    const senderId = extractSenderId(msg);
+    const fromParticipants = findParticipantById(senderId, conversation);
+    if (fromParticipants?.avatar) return fromParticipants.avatar;
+    const cached = senderId ? senderCache[String(senderId)] : null;
+    return cached?.avatar || '';
   };
 
   const [isOpen, setIsOpen] = useState(false);
@@ -180,6 +227,9 @@ const ChatUsers = () => {
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAddMembers, setShowAddMembers] = useState(false);
+  const [showRenameGroup, setShowRenameGroup] = useState(false);
+  const [renameGroupInput, setRenameGroupInput] = useState('');
+  const [renamingGroup, setRenamingGroup] = useState(false);
   const [addMembersSearchQuery, setAddMembersSearchQuery] = useState('');
   const [addMembersSearchResults, setAddMembersSearchResults] = useState([]);
   const [selectedMembersToAdd, setSelectedMembersToAdd] = useState([]);
@@ -191,6 +241,9 @@ const ChatUsers = () => {
   const [deletingConversationId, setDeletingConversationId] = useState(null);
   const [blockingUserId, setBlockingUserId] = useState(null);
   const [openParticipantMenu, setOpenParticipantMenu] = useState(null);
+  /** Menu nhanh khi bấm avatar trong tin nhắn: { left, top, userId, name } (tọa độ viewport) */
+  const [messageUserMenu, setMessageUserMenu] = useState(null);
+  const messageUserMenuRef = useRef(null);
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [removingParticipantId, setRemovingParticipantId] = useState(null);
   const [conversationFilter, setConversationFilter] = useState('all'); // 'all', 'unread', 'group'
@@ -211,6 +264,57 @@ const ChatUsers = () => {
   const groupAvatarInputRef = useRef(null);
   const { user } = useAuthStore();
   const navigate = useNavigate();
+
+  // Khi messages/conversation thay đổi: phát hiện các sender chưa có name và fetch về.
+  useEffect(() => {
+    if (!Array.isArray(messages) || messages.length === 0) return undefined;
+    let cancelled = false;
+
+    const unknownIds = new Set();
+    messages.forEach((msg) => {
+      if (!msg) return;
+      const direct = String(msg?.sender?.name || '').trim();
+      if (direct) return;
+      const senderId = extractSenderId(msg);
+      if (!senderId) return;
+      const sid = String(senderId);
+      const fromParticipants = findParticipantById(senderId, selectedConversation);
+      if (String(fromParticipants?.name || '').trim()) return;
+      if (senderCache[sid]?.name) return;
+      if (senderFetchingRef.current.has(sid)) return;
+      unknownIds.add(sid);
+    });
+
+    if (unknownIds.size === 0) return undefined;
+
+    const idsArr = [...unknownIds];
+    idsArr.forEach((id) => senderFetchingRef.current.add(id));
+
+    (async () => {
+      const results = await Promise.allSettled(
+        idsArr.map((id) => api.get(`/users/${id}`))
+      );
+      if (cancelled) return;
+      const next = {};
+      results.forEach((r, idx) => {
+        const id = idsArr[idx];
+        if (r.status === 'fulfilled') {
+          const data = r.value?.data?.user || r.value?.data || {};
+          if (data?.name) {
+            next[id] = { name: data.name, avatar: data.avatar || '' };
+          }
+        }
+        senderFetchingRef.current.delete(id);
+      });
+      if (Object.keys(next).length > 0) {
+        setSenderCache((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, selectedConversation, senderCache]);
 
   useEffect(() => {
     emitAppEvent('chatUsersVisibilityChange', { isOpen });
@@ -487,12 +591,18 @@ const ChatUsers = () => {
     return () => offOpenChat();
   }, []);
 
-  // Listen for openChatWindow event from header
+  // Listen for openChatWindow event from header / floating button.
+  // Mỗi lần phát sự kiện sẽ toggle khung chat: lần 1 mở, lần 2 thu lại.
   useEffect(() => {
     const handleOpenChatWindow = () => {
-      setIsOpen(true);
-      fetchConversations();
-      fetchUnreadCount();
+      setIsOpen((prev) => {
+        const next = !prev;
+        if (next) {
+          fetchConversations();
+          fetchUnreadCount();
+        }
+        return next;
+      });
     };
 
     const offOpenChatWindow = onAppEvent('openChatWindow', handleOpenChatWindow);
@@ -578,6 +688,27 @@ const ChatUsers = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showUserMenu]);
+
+  useEffect(() => {
+    if (!messageUserMenu) return undefined;
+
+    const handlePointerDown = (e) => {
+      const t = e.target;
+      if (messageUserMenuRef.current?.contains(t)) return;
+      setMessageUserMenu(null);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMessageUserMenu(null);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [messageUserMenu]);
 
   const fetchBlockedUsers = async () => {
     try {
@@ -703,7 +834,7 @@ const ChatUsers = () => {
       scrollToBottom();
     } catch (error) {
       console.error('Error sending message:', error);
-      alert(error.response?.data?.message || 'Lỗi khi gửi tin nhắn');
+      notify(error.response?.data?.message || 'Lỗi khi gửi tin nhắn');
     } finally {
       setUploading(false);
     }
@@ -714,7 +845,7 @@ const ChatUsers = () => {
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
     
     if (imageFiles.length + selectedImages.length > 10) {
-      alert('Tối đa 10 ảnh');
+      notify('Tối đa 10 ảnh');
       return;
     }
     
@@ -725,7 +856,7 @@ const ChatUsers = () => {
     const files = Array.from(e.target.files);
     
     if (files.length + selectedFiles.length > 10) {
-      alert('Tối đa 10 file');
+      notify('Tối đa 10 file');
       return;
     }
     
@@ -813,10 +944,34 @@ const ChatUsers = () => {
 
   const getConversationAvatar = (conversation) => {
     if (conversation.type === 'group') {
-      return resolveAvatarUrl(conversation.avatar, conversation.name || 'Group', '10b981');
+      return resolveAvatarUrl(conversation.avatar, conversation.name || 'Nhóm', '10b981');
     }
     const otherUser = getOtherParticipant(conversation);
-    return resolveAvatarUrl(otherUser?.avatar, otherUser?.name || 'User', '10b981');
+    return resolveAvatarUrl(otherUser?.avatar, otherUser?.name || 'Người dùng', '10b981');
+  };
+
+  /** Mở / chọn cuộc trò chuyện 1-1 với user (dùng từ menu avatar trong tin nhắn). */
+  const openDirectMessageWithUser = async (targetUserId) => {
+    if (!targetUserId) return;
+    setMessageUserMenu(null);
+    try {
+      const res = await api.get(`/messages/conversation/${targetUserId}`);
+      const conv = res.data?.conversation;
+      if (!conv?._id) {
+        notify(res.data?.message || 'Không thể mở cuộc hội thoại');
+        return;
+      }
+      setConversations((prev) => {
+        const exists = prev.some((c) => idsEqual(c._id, conv._id));
+        if (exists) return prev.map((c) => (idsEqual(c._id, conv._id) ? conv : c));
+        return [conv, ...prev];
+      });
+      setSelectedConversation(conv);
+      emitAppEvent('messagesUpdated');
+    } catch (error) {
+      console.error('Error opening direct conversation:', error);
+      notify(error.response?.data?.message || 'Lỗi khi mở cuộc hội thoại');
+    }
   };
 
   const handleSearchUsers = async (query) => {
@@ -852,12 +1007,12 @@ const ChatUsers = () => {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {
-      alert('Vui lòng nhập tên nhóm');
+      notify('Vui lòng nhập tên nhóm');
       return;
     }
 
     if (selectedMembers.length === 0) {
-      alert('Vui lòng chọn ít nhất một thành viên');
+      notify('Vui lòng chọn ít nhất một thành viên');
       return;
     }
 
@@ -884,7 +1039,7 @@ const ChatUsers = () => {
       emitAppEvent('chatGroupsUpdated');
     } catch (error) {
       console.error('Error creating group:', error);
-      alert(error.response?.data?.message || 'Lỗi khi tạo nhóm');
+      notify(error.response?.data?.message || 'Lỗi khi tạo nhóm');
     } finally {
       setCreatingGroup(false);
     }
@@ -903,7 +1058,7 @@ const ChatUsers = () => {
       });
     } catch (error) {
       console.error('Error fetching participants:', error);
-      alert(error.response?.data?.message || 'Lỗi khi lấy danh sách thành viên');
+      notify(error.response?.data?.message || 'Lỗi khi lấy danh sách thành viên');
     } finally {
       setLoadingParticipants(false);
     }
@@ -918,10 +1073,6 @@ const ChatUsers = () => {
 
   const handlePickGroupAvatar = () => {
     if (!selectedConversation?._id) return;
-    if (!isGroupAdmin()) {
-      alert('Chỉ quản trị viên mới có thể đổi ảnh đại diện nhóm');
-      return;
-    }
     setShowGroupMenu(false);
     groupAvatarInputRef.current?.click?.();
   };
@@ -930,17 +1081,13 @@ const ChatUsers = () => {
     try {
       const file = e.target?.files?.[0];
       if (!file || !selectedConversation?._id) return;
-      if (!isGroupAdmin()) {
-        alert('Chỉ quản trị viên mới có thể đổi ảnh đại diện nhóm');
-        return;
-      }
 
       if (!String(file.type || '').startsWith('image/')) {
-        alert('Vui lòng chọn file ảnh');
+        notify('Vui lòng chọn file ảnh');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert('Ảnh không được vượt quá 5MB');
+        notify('Ảnh không được vượt quá 5MB');
         return;
       }
 
@@ -956,12 +1103,59 @@ const ChatUsers = () => {
         setSelectedConversation(updated);
         setConversations((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
       }
-      alert('✅ Đã cập nhật ảnh đại diện nhóm');
+      notify('✅ Đã cập nhật ảnh đại diện nhóm');
     } catch (error) {
       console.error('Error updating group avatar:', error);
-      alert(error.response?.data?.message || 'Lỗi cập nhật ảnh đại diện nhóm');
+      notify(error.response?.data?.message || 'Lỗi cập nhật ảnh đại diện nhóm');
     } finally {
       if (e?.target) e.target.value = '';
+    }
+  };
+
+  const openRenameGroupModal = () => {
+    if (!selectedConversation?._id) return;
+    setRenameGroupInput(selectedConversation.name || '');
+    setShowRenameGroup(true);
+    setShowGroupMenu(false);
+  };
+
+  const handleSubmitRenameGroup = async () => {
+    if (!selectedConversation?._id) return;
+    const name = (renameGroupInput || '').trim();
+    if (!name) {
+      notify('Tên nhóm không được để trống');
+      return;
+    }
+    if (name.length > 100) {
+      notify('Tên nhóm không được vượt quá 100 ký tự');
+      return;
+    }
+    if (name === (selectedConversation.name || '')) {
+      setShowRenameGroup(false);
+      return;
+    }
+    try {
+      setRenamingGroup(true);
+      const res = await api.put(
+        `/messages/groups/${selectedConversation._id}/name`,
+        { name }
+      );
+      const updated = res.data?.conversation;
+      if (updated?._id) {
+        setSelectedConversation(updated);
+        setConversations((prev) =>
+          prev.map((c) => (c._id === updated._id ? updated : c))
+        );
+      } else {
+        setSelectedConversation((prev) => (prev ? { ...prev, name } : prev));
+      }
+      notify('✅ Đã đổi tên cuộc trò chuyện');
+      setShowRenameGroup(false);
+    } catch (error) {
+      console.error('Error renaming group:', error);
+      notify(error.response?.data?.message || 'Lỗi khi đổi tên nhóm');
+    } finally {
+      setRenamingGroup(false);
     }
   };
 
@@ -996,7 +1190,7 @@ const ChatUsers = () => {
 
   const handleAddMembersToGroup = async () => {
     if (selectedMembersToAdd.length === 0) {
-      alert('Vui lòng chọn ít nhất một thành viên để thêm');
+      notify('Vui lòng chọn ít nhất một thành viên để thêm');
       return;
     }
 
@@ -1022,10 +1216,10 @@ const ChatUsers = () => {
       setSelectedMembersToAdd([]);
       setAddMembersSearchQuery('');
       setAddMembersSearchResults([]);
-      alert('Đã thêm thành viên vào nhóm!');
+      notify('Đã thêm thành viên vào nhóm!');
     } catch (error) {
       console.error('Error adding members:', error);
-      alert(error.response?.data?.message || 'Lỗi khi thêm thành viên');
+      notify(error.response?.data?.message || 'Lỗi khi thêm thành viên');
     } finally {
       setAddingMembers(false);
     }
@@ -1066,7 +1260,7 @@ const ChatUsers = () => {
   };
 
   const handleRecallMessage = async (messageId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn thu hồi tin nhắn này? Tin nhắn sẽ không thể xem được nữa.')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn thu hồi tin nhắn này? Tin nhắn sẽ không thể xem được nữa.'))) {
       return;
     }
 
@@ -1084,7 +1278,7 @@ const ChatUsers = () => {
       fetchConversations(false);
     } catch (error) {
       console.error('Error recalling message:', error);
-      alert(error.response?.data?.message || 'Lỗi khi thu hồi tin nhắn');
+      notify(error.response?.data?.message || 'Lỗi khi thu hồi tin nhắn');
     } finally {
       setRecallingMessageId(null);
     }
@@ -1097,7 +1291,7 @@ const ChatUsers = () => {
   };
 
   const handleLeaveGroup = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn rời nhóm này?')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn rời nhóm này?'))) {
       return;
     }
 
@@ -1108,15 +1302,15 @@ const ChatUsers = () => {
       setConversations(prev => prev.filter(c => c._id !== selectedConversation._id));
       setSelectedConversation(null);
       setShowGroupMenu(false);
-      alert('Bạn đã rời nhóm');
+      notify('Bạn đã rời nhóm');
     } catch (error) {
       console.error('Error leaving group:', error);
-      alert(error.response?.data?.message || 'Lỗi khi rời nhóm');
+      notify(error.response?.data?.message || 'Lỗi khi rời nhóm');
     }
   };
 
   const handleDeleteConversation = async (conversationId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa cuộc hội thoại này? Tất cả tin nhắn sẽ bị xóa vĩnh viễn.')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn xóa cuộc hội thoại này? Tất cả tin nhắn sẽ bị xóa vĩnh viễn.'))) {
       return;
     }
 
@@ -1133,17 +1327,18 @@ const ChatUsers = () => {
       }
       
       setOpenConversationMenu(null);
-      alert('Đã xóa cuộc hội thoại');
+      notify('Đã xóa cuộc hội thoại');
     } catch (error) {
       console.error('Error deleting conversation:', error);
-      alert(error.response?.data?.message || 'Lỗi khi xóa cuộc hội thoại');
+      notify(error.response?.data?.message || 'Lỗi khi xóa cuộc hội thoại');
     } finally {
       setDeletingConversationId(null);
     }
   };
 
   const handleBlockUser = async (userId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn chặn người dùng này? Bạn sẽ không thể nhận tin nhắn từ họ.')) {
+    setMessageUserMenu(null);
+    if (!(await confirmAsync('Bạn có chắc chắn muốn chặn người dùng này? Bạn sẽ không thể nhận tin nhắn từ họ.'))) {
       return;
     }
 
@@ -1173,17 +1368,18 @@ const ChatUsers = () => {
       
       setOpenConversationMenu(null);
       setOpenParticipantMenu(null);
-      alert('Đã chặn người dùng');
+      notify('Đã chặn người dùng');
     } catch (error) {
       console.error('Error blocking user:', error);
-      alert(error.response?.data?.message || 'Lỗi khi chặn người dùng');
+      notify(error.response?.data?.message || 'Lỗi khi chặn người dùng');
     } finally {
       setBlockingUserId(null);
     }
   };
 
   const handleUnblockUser = async (userId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn bỏ chặn người dùng này?')) {
+    setMessageUserMenu(null);
+    if (!(await confirmAsync('Bạn có chắc chắn muốn bỏ chặn người dùng này?'))) {
       return;
     }
 
@@ -1213,10 +1409,10 @@ const ChatUsers = () => {
       
       setOpenConversationMenu(null);
       setOpenParticipantMenu(null);
-      alert('Đã bỏ chặn người dùng');
+      notify('Đã bỏ chặn người dùng');
     } catch (error) {
       console.error('Error unblocking user:', error);
-      alert(error.response?.data?.message || 'Lỗi khi bỏ chặn người dùng');
+      notify(error.response?.data?.message || 'Lỗi khi bỏ chặn người dùng');
     } finally {
       setBlockingUserId(null);
     }
@@ -1228,7 +1424,7 @@ const ChatUsers = () => {
     const participant = groupParticipants.find(p => p._id === participantId);
     if (!participant) return;
 
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${participant.name} khỏi nhóm này?`)) {
+    if (!(await confirmAsync(`Bạn có chắc chắn muốn xóa ${participant.name} khỏi nhóm này?`))) {
       return;
     }
 
@@ -1251,10 +1447,10 @@ const ChatUsers = () => {
       }
       
       setOpenParticipantMenu(null);
-      alert('Đã xóa thành viên khỏi nhóm');
+      notify('Đã xóa thành viên khỏi nhóm');
     } catch (error) {
       console.error('Error removing participant:', error);
-      alert(error.response?.data?.message || 'Lỗi khi xóa thành viên');
+      notify(error.response?.data?.message || 'Lỗi khi xóa thành viên');
     } finally {
       setRemovingParticipantId(null);
     }
@@ -1369,20 +1565,20 @@ const ChatUsers = () => {
           {!selectedConversation && (
             <div className="flex flex-col w-full border-r border-[var(--fb-divider)] bg-[var(--fb-surface)] flex-shrink-0 h-full">
             {/* Header */}
-            <div className="bg-[#0084ff] text-white p-3 shadow-sm flex-shrink-0">
+            <div className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] p-3 shadow-sm flex-shrink-0 border-b border-[var(--fb-divider)]">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-lg">Chat</h3>
                 <div className="flex items-center space-x-1">
                   <button
                     onClick={() => setShowCreateGroup(true)}
-                    className="p-1.5 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+                    className="p-1.5 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
                     title="Tạo nhóm"
                   >
                     <Users className="w-5 h-5" />
                   </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                    className="p-1.5 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+                    className="p-1.5 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1391,13 +1587,13 @@ const ChatUsers = () => {
               
               {/* Search */}
               <div className="relative">
-                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                <Search className="w-4 h-4 text-[var(--fb-icon)] absolute left-3 top-1/2 transform -translate-y-1/2" />
                 <input
                   type="text"
                   placeholder="Tìm kiếm trên Messenger"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-white bg-opacity-10 border-0 rounded-lg text-white text-sm placeholder-gray-300 focus:outline-none focus:bg-opacity-20 transition-all"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--fb-input)] border-0 rounded-lg text-[var(--fb-text-primary)] text-sm placeholder-[var(--fb-text-secondary)] focus:outline-none focus:ring-1 focus:ring-blue-400 transition-all"
                 />
               </div>
             </div>
@@ -1408,7 +1604,7 @@ const ChatUsers = () => {
                 onClick={() => setConversationFilter('all')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   conversationFilter === 'all'
-                    ? 'bg-[#0084ff] text-white'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                     : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
                 }`}
               >
@@ -1418,7 +1614,7 @@ const ChatUsers = () => {
                 onClick={() => setConversationFilter('unread')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   conversationFilter === 'unread'
-                    ? 'bg-[#0084ff] text-white'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                     : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
                 }`}
               >
@@ -1428,7 +1624,7 @@ const ChatUsers = () => {
                 onClick={() => setConversationFilter('group')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   conversationFilter === 'group'
-                    ? 'bg-[#0084ff] text-white'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
                     : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
                 }`}
               >
@@ -1488,12 +1684,12 @@ const ChatUsers = () => {
                                 className="w-12 h-12 rounded-full object-cover"
                               />
                               {isGroup && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-[#0084ff] rounded-full flex items-center justify-center border-2 border-white">
+                              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-[#0084ff] rounded-full flex items-center justify-center border-2 border-[var(--fb-surface)]">
                                 <Users className="w-3 h-3 text-white" />
                                 </div>
                               )}
                             {!isGroup && otherUser?.isOnline && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#31a24c] rounded-full border-2 border-white"></div>
+                              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#31a24c] rounded-full border-2 border-[var(--fb-surface)]"></div>
                             )}
                               {unread > 0 && (
                               <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#0084ff] text-white text-xs font-bold rounded-full flex items-center justify-center">
@@ -1543,7 +1739,7 @@ const ChatUsers = () => {
                               e.stopPropagation();
                               setOpenConversationMenu(openConversationMenu === conv._id ? null : conv._id);
                             }}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100"
+                            className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-all duration-200 opacity-0 group-hover:opacity-100"
                             title="Tùy chọn"
                           >
                             <MoreVertical className="w-4 h-4 text-[var(--fb-icon)]" />
@@ -1644,11 +1840,11 @@ const ChatUsers = () => {
           {selectedConversation && (
             <div className="flex-1 flex flex-col w-full min-w-0 h-full overflow-hidden">
               {/* Chat Header */}
-              <div className="bg-[#0084ff] text-white p-3 flex items-center justify-between border-b border-[#0066cc] flex-shrink-0">
+              <div className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] p-3 flex items-center justify-between border-b border-[var(--fb-divider)] flex-shrink-0">
                 <div className="flex items-center space-x-0.5">
                   <button
                     onClick={() => setSelectedConversation(null)}
-                    className="p-1.5 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+                    className="p-1.5 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
                     title="Quay lại danh sách chat"
                   >
                     <ArrowLeft className="w-5 h-5" />
@@ -1657,7 +1853,7 @@ const ChatUsers = () => {
                     type="button"
                     className={`flex items-center space-x-1 text-left rounded-lg -m-1 p-1 transition-colors ${
                       selectedConversation?.type !== 'group'
-                        ? 'hover:bg-white hover:bg-opacity-10 cursor-pointer'
+                        ? 'hover:bg-[var(--fb-hover)] cursor-pointer'
                         : 'cursor-default'
                     }`}
                     onClick={() => {
@@ -1675,15 +1871,15 @@ const ChatUsers = () => {
                       className="w-10 h-10 rounded-full"
                   />
                     {selectedConversation?.type !== 'group' && getOtherParticipant(selectedConversation)?.isOnline && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#31a24c] rounded-full border-2 border-white"></div>
+                      <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#31a24c] rounded-full border-2 border-[var(--fb-surface)]"></div>
                       )}
                     </div>
                   <div>
                     <p className={`font-semibold text-sm ${selectedConversation?.type !== 'group' ? 'hover:underline' : ''}`}>{getConversationName(selectedConversation)}</p>
                     {selectedConversation?.type === 'group' ? (
-                      <p className="text-xs text-blue-100">{selectedConversation.participants?.length || 0} thành viên</p>
+                      <p className="text-xs text-[var(--fb-text-secondary)]">{selectedConversation.participants?.length || 0} thành viên</p>
                     ) : (
-                      <p className="text-xs text-blue-100 flex items-center space-x-1">
+                      <p className="text-xs text-[var(--fb-text-secondary)] flex items-center space-x-1">
                         {getOtherParticipant(selectedConversation)?.isOnline && (
                           <span className="w-1.5 h-1.5 bg-[#31a24c] rounded-full"></span>
                         )}
@@ -1705,7 +1901,7 @@ const ChatUsers = () => {
                       />
                       <button
                         onClick={() => setShowGroupMenu(!showGroupMenu)}
-                        className="p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+                        className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
                         title="Tùy chọn nhóm"
                       >
                         <MoreVertical className="w-5 h-5" />
@@ -1713,44 +1909,47 @@ const ChatUsers = () => {
                       
                       {/* Dropdown Menu */}
                       {showGroupMenu && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-gray-800 rounded-lg shadow-xl z-50 overflow-hidden">
+                        <div className="absolute right-0 top-full mt-2 w-52 bg-[var(--fb-surface)] border border-[var(--fb-divider)] rounded-lg shadow-xl z-50 overflow-hidden">
                           <button
                             onClick={() => {
                               handleViewParticipants();
                               setShowGroupMenu(false);
                             }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 text-white hover:bg-gray-700 transition-colors"
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)] transition-colors"
                           >
-                            <Users className="w-5 h-5" />
+                            <Users className="w-5 h-5 text-[var(--fb-icon)]" />
                             <span>Thành viên</span>
                           </button>
-                          {isGroupAdmin() && (
-                            <button
-                              onClick={handlePickGroupAvatar}
-                              className="w-full flex items-center space-x-3 px-4 py-3 text-white hover:bg-gray-700 transition-colors"
-                            >
-                              <ImageIcon className="w-5 h-5" />
-                              <span>Thêm ảnh</span>
-                            </button>
-                          )}
-                          {isGroupAdmin() && (
-                            <button
-                              onClick={() => {
-                                setShowAddMembers(true);
-                                setShowGroupMenu(false);
-                              }}
-                              className="w-full flex items-center space-x-3 px-4 py-3 text-white hover:bg-gray-700 transition-colors"
-                            >
-                              <UserPlus className="w-5 h-5" />
-                              <span>Thêm người</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={openRenameGroupModal}
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)] transition-colors"
+                          >
+                            <Pencil className="w-5 h-5 text-[var(--fb-icon)]" />
+                            <span>Tên cuộc trò chuyện</span>
+                          </button>
+                          <button
+                            onClick={handlePickGroupAvatar}
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)] transition-colors"
+                          >
+                            <ImageIcon className="w-5 h-5 text-[var(--fb-icon)]" />
+                            <span>Thêm ảnh</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAddMembers(true);
+                              setShowGroupMenu(false);
+                            }}
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)] transition-colors"
+                          >
+                            <UserPlus className="w-5 h-5 text-[var(--fb-icon)]" />
+                            <span>Thêm người</span>
+                          </button>
                           <button
                             onClick={() => {
                               handleLeaveGroup();
                               setShowGroupMenu(false);
                             }}
-                            className="w-full flex items-center space-x-3 px-4 py-3 text-white hover:bg-red-600 transition-colors"
+                            className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                           >
                             <LogOut className="w-5 h-5" />
                             <span>Rời nhóm</span>
@@ -1762,7 +1961,7 @@ const ChatUsers = () => {
                     <div className="relative" ref={userMenuRef}>
                       <button
                         onClick={() => setShowUserMenu(!showUserMenu)}
-                        className="p-2 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+                        className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
                         title="Tùy chọn"
                       >
                         <MoreVertical className="w-5 h-5" />
@@ -1840,7 +2039,7 @@ const ChatUsers = () => {
               <div
                 ref={messagesContainerRef}
                 onScroll={handleMessagesScroll}
-                className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#f0f2f5]"
+                className="flex-1 overflow-y-auto py-3 px-1.5 space-y-2 bg-[var(--fb-app)]"
               >
                 {messages.map((msg) => {
                   const isOwn = msg.sender?._id === user.id;
@@ -1860,44 +2059,93 @@ const ChatUsers = () => {
                     shareTarget && shareBodyText ? normalizeSharedPostCaption(shareBodyText) : '';
 
                   const canRecall = canRecallMessage(msg);
-                  
+
+                  // Sticker: tin nhắn chỉ có ảnh, không có text/file/share/recall — render không bubble.
+                  const isStickerMessage =
+                    !msg.isRecalled &&
+                    !eventShare &&
+                    !groupShare &&
+                    !shareTarget &&
+                    !(msg.content && msg.content.trim()) &&
+                    Array.isArray(msg.images) && msg.images.length === 1 &&
+                    (!msg.files || msg.files.length === 0);
+
                   return (
                     <div
                       key={msg._id}
-                      className={`flex items-end space-x-2 ${isOwn ? 'flex-row-reverse space-x-reverse' : ''} group`}
+                      className={`flex ${selectedConversation?.type === 'group' ? 'items-end' : 'items-center'} space-x-2 ${isOwn ? 'flex-row-reverse space-x-reverse' : ''} group`}
                       onMouseEnter={() => setHoveredMessageId(msg._id)}
                       onMouseLeave={() => setHoveredMessageId(null)}
                     >
-                      {!isOwn && (
-                        <img
-                          src={resolveAvatarUrl(msg.sender?.avatar, msg.sender?.name, '10b981')}
-                          alt={msg.sender?.name}
-                          className="w-8 h-8 rounded-full"
-                          onError={withAvatarFallback(msg.sender?.name, '10b981')}
-                        />
-                      )}
+                      {!isOwn && (() => {
+                        const senderName = resolveSenderName(msg);
+                        const senderAvatar = resolveSenderAvatar(msg);
+                        const senderId = extractSenderId(msg);
+                        const menuOpen =
+                          messageUserMenu && senderId && idsEqual(messageUserMenu.userId, senderId);
+                        return (
+                          <div className="relative flex-shrink-0">
+                            <button
+                              type="button"
+                              className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--fb-app)]"
+                              aria-haspopup="menu"
+                              aria-expanded={Boolean(menuOpen)}
+                              aria-label={`Tùy chọn ${senderName}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!senderId) return;
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setMessageUserMenu((prev) =>
+                                  prev && idsEqual(prev.userId, senderId)
+                                    ? null
+                                    : {
+                                        left: r.left,
+                                        top: r.top,
+                                        userId: String(senderId),
+                                        name: senderName,
+                                      }
+                                );
+                              }}
+                            >
+                              <img
+                                src={resolveAvatarUrl(senderAvatar, senderName, '10b981')}
+                                alt=""
+                                className="w-8 h-8 rounded-full pointer-events-none"
+                                draggable={false}
+                                onError={withAvatarFallback(senderName, '10b981')}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })()}
                       <div
                         className={`relative flex flex-col ${isOwn ? 'items-end' : ''} ${
-                          eventShare || groupShare
-                            ? 'max-w-[min(280px,calc(100%-2.75rem))]'
-                            : 'max-w-[min(17rem,calc(100%-2.75rem))]'
+                          isStickerMessage
+                            ? 'max-w-[min(90px,calc(100%-2.75rem))]'
+                            : eventShare || groupShare
+                              ? 'max-w-[min(280px,calc(100%-2.75rem))]'
+                              : 'max-w-[min(17rem,calc(100%-2.75rem))]'
                         }`}
                       >
                         {/* Show sender name in group messages */}
                         {!isOwn && selectedConversation?.type === 'group' && (
-                          <p className="text-xs font-semibold text-gray-700 mb-1 px-2">{msg.sender?.name}</p>
+                          <p className="text-xs font-semibold text-[var(--fb-text-secondary)] mb-1 px-2">{resolveSenderName(msg)}</p>
                         )}
                         <div
-                          className={`rounded-2xl relative ${
-                            eventShare || groupShare ? 'px-1 py-1' : 'px-3 py-1.5'
-                          } ${
-                            isOwn
-                              ? msg.isRecalled 
-                                ? 'bg-gray-300 text-gray-600' 
-                                : 'bg-[#0084ff] text-white'
-                              : msg.isRecalled
-                                ? 'bg-gray-200 text-gray-500'
-                                : 'bg-[#e4e6eb] text-gray-900'
+                          className={`relative ${
+                            isStickerMessage
+                              ? 'bg-transparent p-0'
+                              : `rounded-2xl ${
+                                  eventShare || groupShare ? 'px-1 py-1' : 'px-3 py-1.5'
+                                } ${
+                                  isOwn
+                                    ? msg.isRecalled
+                                      ? 'bg-[var(--fb-input)] text-[var(--fb-text-secondary)]'
+                                      : 'bg-[#0084ff] text-white'
+                                    : msg.isRecalled
+                                      ? 'bg-[var(--fb-input)] text-[var(--fb-text-secondary)]'
+                                      : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)]'
+                                }`
                           }`}
                         >
                           {msg.isRecalled ? (
@@ -1909,24 +2157,45 @@ const ChatUsers = () => {
                             <>
                               {/* Images */}
                               {msg.images && msg.images.length > 0 && (
-                                <div className="grid grid-cols-2 gap-2 mb-2">
-                                  {msg.images.map((img, idx) => (
-                                    <a
-                                      key={idx}
-                                      href={resolveMediaUrl(img.url)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="relative group"
-                                    >
-                                      <img
-                                        src={resolveMediaUrl(img.url)}
-                                        alt={img.originalName || 'Image'}
-                                        className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90"
-                                      />
-                                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-opacity"></div>
-                                    </a>
-                                  ))}
-                                </div>
+                                isStickerMessage ? (
+                                  <a
+                                    href={resolveMediaUrl(msg.images[0].url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="relative inline-block"
+                                  >
+                                    <img
+                                      src={resolveMediaUrl(msg.images[0].url)}
+                                      alt={msg.images[0].originalName || 'Sticker'}
+                                      className="max-w-[90px] max-h-[90px] w-auto h-auto object-contain rounded-xl cursor-pointer hover:opacity-90"
+                                    />
+                                  </a>
+                                ) : (
+                                  <div
+                                    className={`grid gap-2 ${msg.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} ${(msg.content && msg.content.trim()) || (msg.files && msg.files.length > 0) ? 'mb-2' : ''}`}
+                                  >
+                                    {msg.images.map((img, idx) => (
+                                      <a
+                                        key={idx}
+                                        href={resolveMediaUrl(img.url)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`relative group ${msg.images.length === 1 ? 'inline-block' : ''}`}
+                                      >
+                                        <img
+                                          src={resolveMediaUrl(img.url)}
+                                          alt={img.originalName || 'Image'}
+                                          className={
+                                            msg.images.length === 1
+                                              ? 'max-w-[140px] max-h-[140px] w-auto h-auto object-contain rounded-lg cursor-pointer hover:opacity-90'
+                                              : 'w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90'
+                                          }
+                                        />
+                                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-opacity"></div>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )
                               )}
                               
                               {/* Files */}
@@ -2017,7 +2286,7 @@ const ChatUsers = () => {
                                           </div>
                                         )}
                                       </div>
-                                      <div className={`px-3.5 py-3 ${isOwn ? 'bg-white' : 'bg-[#f0f2f5]'}`}>
+                                      <div className={`px-3.5 py-3 ${isOwn ? 'bg-white' : 'bg-[var(--fb-input)]'}`}>
                                         <p className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900">
                                           {eventShare.title}
                                         </p>
@@ -2063,7 +2332,7 @@ const ChatUsers = () => {
                                           </div>
                                         )}
                                       </div>
-                                      <div className={`px-3.5 py-3 ${isOwn ? 'bg-white' : 'bg-[#f0f2f5]'}`}>
+                                      <div className={`px-3.5 py-3 ${isOwn ? 'bg-white' : 'bg-[var(--fb-input)]'}`}>
                                         <p className="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900">
                                           {groupShare.title}
                                         </p>
@@ -2101,7 +2370,7 @@ const ChatUsers = () => {
                                     >
                                       <div
                                         className={`flex items-center gap-2 px-3.5 py-2 ${
-                                          isOwn ? 'bg-white/15 text-white' : 'bg-[#f0f2f5] text-gray-700'
+                                          isOwn ? 'bg-white/15 text-white' : 'bg-[var(--fb-input)] text-gray-700'
                                         }`}
                                       >
                                         <ExternalLink className="h-4 w-4 shrink-0 opacity-85" />
@@ -2194,11 +2463,11 @@ const ChatUsers = () => {
                 {/* Typing Indicator */}
                 {typingUsers.size > 0 && (
                   <div className="flex items-center space-x-2">
-                    <div className="bg-[#e4e6eb] px-4 py-2 rounded-2xl">
+                    <div className="bg-[var(--fb-input)] px-4 py-2 rounded-2xl">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 bg-[var(--fb-icon)] rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-[var(--fb-icon)] rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-[var(--fb-icon)] rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
                   </div>
@@ -2218,7 +2487,7 @@ const ChatUsers = () => {
               )}
 
               {/* Input */}
-              <div className={`p-3 bg-white border-t border-gray-200 flex-shrink-0 ${selectedConversation?.isBlocked && selectedConversation?.type === 'direct' ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className={`p-3 bg-[var(--fb-surface)] border-t border-[var(--fb-divider)] flex-shrink-0 ${selectedConversation?.isBlocked && selectedConversation?.type === 'direct' ? 'opacity-50 pointer-events-none' : ''}`}>
                 {/* Preview selected files */}
                 {(selectedImages.length > 0 || selectedFiles.length > 0) && (
                   <div className="mb-3 space-y-2">
@@ -2304,10 +2573,10 @@ const ChatUsers = () => {
                     />
                     <button
                       onClick={() => imageInputRef.current?.click()}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-colors"
                       title="Gửi ảnh"
                     >
-                      <ImageIcon className="w-5 h-5 text-gray-600" />
+                      <ImageIcon className="w-5 h-5 text-[var(--fb-icon)]" />
                     </button>
                     
                     <input
@@ -2321,10 +2590,10 @@ const ChatUsers = () => {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                      className="p-2 hover:bg-[var(--fb-hover)] rounded-full transition-colors"
                       title="Gửi file hoặc video"
                     >
-                      <Paperclip className="w-5 h-5 text-gray-600" />
+                      <Paperclip className="w-5 h-5 text-[var(--fb-icon)]" />
                     </button>
                   </div>
                   
@@ -2337,7 +2606,7 @@ const ChatUsers = () => {
                     }}
                     onKeyPress={handleKeyPress}
                     placeholder="Aa"
-                    className="flex-1 px-4 py-2 bg-[#f0f2f5] border-0 rounded-full focus:outline-none text-sm"
+                    className="flex-1 px-4 py-2 bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder-[var(--fb-text-secondary)] border-0 rounded-full focus:outline-none text-sm"
                   />
                   <button
                     onClick={handleSendMessage}
@@ -2361,7 +2630,7 @@ const ChatUsers = () => {
       {/* Create Group Modal - Rendered via Portal to body */}
       {showCreateGroup && typeof document !== 'undefined' && createPortal(
         <div 
-          className="chat-window-fixed-absolute bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200"
+          className="chat-window-fixed-absolute bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-[var(--fb-divider)]"
           style={{ 
             position: 'fixed',
             bottom: '1rem',
@@ -2381,7 +2650,7 @@ const ChatUsers = () => {
           }}
         >
             {/* Header */}
-          <div className="bg-[#0084ff] text-white p-3 flex items-center justify-between flex-shrink-0">
+          <div className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] p-3 flex items-center justify-between flex-shrink-0 border-b border-[var(--fb-divider)]">
             <h3 className="font-semibold text-lg">Tạo nhóm chat</h3>
               <button
                 onClick={() => {
@@ -2392,7 +2661,7 @@ const ChatUsers = () => {
                   setUserSearchQuery('');
                   setSearchUsers([]);
                 }}
-              className="p-1.5 hover:bg-white hover:bg-opacity-10 rounded-full transition-colors"
+              className="p-1.5 hover:bg-[var(--fb-hover)] rounded-full transition-colors text-[var(--fb-icon)]"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2543,8 +2812,8 @@ const ChatUsers = () => {
       )}
 
       {/* View Participants Modal */}
-      {showParticipants && selectedConversation?.type === 'group' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+      {showParticipants && selectedConversation?.type === 'group' && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10010]">
           <div className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-green-500 to-teal-500 text-white p-4 flex items-center justify-between">
@@ -2682,37 +2951,21 @@ const ChatUsers = () => {
                                   
                                   {/* Divider */}
                                   <div className="border-t border-gray-100 my-1"></div>
-                                  
-                                  {/* Neutral Actions */}
+
+                                  {/* Nhắn tin trực tiếp với thành viên này */}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (isBlocked) {
-                                        handleUnblockUser(participant._id);
-                                      } else {
-                                        handleBlockUser(participant._id);
-                                      }
+                                      setOpenParticipantMenu(null);
+                                      setShowParticipants(false);
+                                      void openDirectMessageWithUser(participant._id);
                                     }}
-                                    disabled={blockingUserId === participant._id}
-                                    className={`w-full flex items-center space-x-3 px-4 py-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group ${
-                                      isBlocked 
-                                        ? 'text-green-700 hover:bg-green-50 hover:text-green-600' 
-                                        : 'text-gray-700 hover:bg-orange-50 hover:text-orange-600'
-                                    }`}
+                                    className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-all duration-200 group"
                                   >
-                                    <div className={`p-1.5 rounded-lg transition-colors ${
-                                      isBlocked 
-                                        ? 'bg-green-100 group-hover:bg-green-200' 
-                                        : 'bg-orange-100 group-hover:bg-orange-200'
-                                    }`}>
-                                      <Ban className={`w-4 h-4 ${
-                                        isBlocked ? 'text-green-600' : 'text-orange-600'
-                                      }`} />
+                                    <div className="p-1.5 rounded-lg bg-emerald-100 group-hover:bg-emerald-200 transition-colors">
+                                      <MessageCircle className="w-4 h-4 text-emerald-600" />
                                     </div>
-                                    <span className="font-medium">{isBlocked ? 'Bỏ chặn' : 'Chặn'}</span>
-                                    {blockingUserId === participant._id && (
-                                      <div className="ml-auto w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                                    )}
+                                    <span className="font-medium">Nhắn tin</span>
                                   </button>
                                   
                                   {/* Divider before destructive action */}
@@ -2777,12 +3030,92 @@ const ChatUsers = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Rename Group Modal */}
+      {showRenameGroup && selectedConversation?.type === 'group' && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10010] p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !renamingGroup) {
+              setShowRenameGroup(false);
+            }
+          }}
+        >
+          <div
+            className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] border border-[var(--fb-divider)] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !renamingGroup) {
+                e.preventDefault();
+                handleSubmitRenameGroup();
+              }
+              if (e.key === 'Escape' && !renamingGroup) {
+                setShowRenameGroup(false);
+              }
+            }}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-[var(--fb-divider)]">
+              <h3 className="font-semibold text-base">Tên cuộc trò chuyện</h3>
+              <button
+                type="button"
+                disabled={renamingGroup}
+                onClick={() => setShowRenameGroup(false)}
+                className="p-1.5 rounded-full hover:bg-[var(--fb-hover)] text-[var(--fb-icon)] disabled:opacity-60"
+                aria-label="Đóng"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <label className="block text-sm text-[var(--fb-text-secondary)]" htmlFor="rename-group-input">
+                Đặt tên mới cho cuộc trò chuyện. Tên này sẽ được hiển thị cho tất cả thành viên.
+              </label>
+              <input
+                id="rename-group-input"
+                type="text"
+                value={renameGroupInput}
+                onChange={(e) => setRenameGroupInput(e.target.value)}
+                maxLength={100}
+                placeholder="Nhập tên cuộc trò chuyện"
+                autoFocus
+                className="w-full px-3 py-2.5 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-[var(--fb-text-secondary)] text-right">
+                {(renameGroupInput || '').length}/100
+              </p>
+            </div>
+            <div className="px-4 pb-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRenameGroup(false)}
+                disabled={renamingGroup}
+                className="px-4 py-2 rounded-lg border border-[var(--fb-divider)] hover:bg-[var(--fb-hover)] text-sm font-medium disabled:opacity-60"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitRenameGroup}
+                disabled={renamingGroup || !renameGroupInput.trim()}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                {renamingGroup && (
+                  <span className="w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+                )}
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Add Members Modal */}
-      {showAddMembers && selectedConversation?.type === 'group' && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+      {showAddMembers && selectedConversation?.type === 'group' && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10010]">
           <div className="bg-white rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-green-500 to-teal-500 text-white p-4 flex items-center justify-between">
@@ -2914,8 +3247,82 @@ const ChatUsers = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
+
+      {/* Menu khi bấm avatar người gửi trong khung chat */}
+      {messageUserMenu &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[10018]"
+              aria-hidden
+              onClick={() => setMessageUserMenu(null)}
+            />
+            <div
+              ref={messageUserMenuRef}
+              role="menu"
+              className="fixed z-[10019] min-w-[220px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl"
+              style={{
+                left: Math.max(8, Math.min(messageUserMenu.left, window.innerWidth - 228)),
+                top: messageUserMenu.top - 8,
+                transform: 'translateY(-100%)',
+              }}
+            >
+              <div className="pointer-events-none absolute left-5 -bottom-1.5 h-3 w-3 rotate-45 border border-gray-200 bg-white border-t-0 border-l-0" />
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-gray-800 transition-colors hover:bg-gray-100"
+                onClick={() => {
+                  void openDirectMessageWithUser(messageUserMenu.userId);
+                }}
+              >
+                <MessageCircle className="h-5 w-5 shrink-0 text-gray-600" aria-hidden />
+                Nhắn tin
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-gray-800 transition-colors hover:bg-gray-100"
+                onClick={() => {
+                  const uid = messageUserMenu.userId;
+                  setMessageUserMenu(null);
+                  navigate(`/profile/${uid}`);
+                }}
+              >
+                <User className="h-5 w-5 shrink-0 text-gray-600" aria-hidden />
+                Xem trang cá nhân
+              </button>
+              {blockedUsers.some((bu) => idsEqual(bu._id, messageUserMenu.userId)) ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-gray-800 transition-colors hover:bg-gray-100"
+                  onClick={() => void handleUnblockUser(messageUserMenu.userId)}
+                  disabled={blockingUserId === messageUserMenu.userId}
+                >
+                  <UserMinus className="h-5 w-5 shrink-0 text-gray-600" aria-hidden />
+                  Bỏ chặn
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[15px] text-gray-800 transition-colors hover:bg-gray-100"
+                  onClick={() => void handleBlockUser(messageUserMenu.userId)}
+                  disabled={blockingUserId === messageUserMenu.userId}
+                >
+                  <Ban className="h-5 w-5 shrink-0 text-gray-600" aria-hidden />
+                  Chặn
+                </button>
+              )}
+            </div>
+          </>,
+          document.body
+        )}
     </>
   );
 };

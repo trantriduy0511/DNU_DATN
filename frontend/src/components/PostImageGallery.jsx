@@ -50,7 +50,7 @@ export default function PostImageGallery({
             playsInline
             preload="metadata"
             data-scroll-autoplay="true"
-            className="h-auto w-full max-h-[min(72vh,620px)] bg-black object-contain"
+            className="h-auto max-h-full w-full bg-black object-contain"
             onClick={(e) => e.stopPropagation()}
           />
         );
@@ -66,7 +66,7 @@ export default function PostImageGallery({
             className={
               cover
                 ? 'pointer-events-none absolute inset-0 h-full w-full object-cover'
-                : 'pointer-events-none h-auto w-full max-h-[min(70vh,620px)] object-contain'
+                : 'pointer-events-none h-auto max-h-full w-full object-contain'
             }
           />
           {cover ? (
@@ -91,7 +91,7 @@ export default function PostImageGallery({
         className={
           cover
             ? 'absolute inset-0 h-full w-full object-cover'
-            : 'h-auto w-full max-h-[min(92vh,1200px)] object-contain'
+            : 'h-auto max-h-full w-full object-contain'
         }
       />
     );
@@ -123,14 +123,14 @@ export default function PostImageGallery({
 
   /** Một ảnh: giữ object-contain như trước */
   if (n === 1) {
-    return <div className="w-full">{cellShell(0, false, 'max-h-[min(72vh,560px)]')}</div>;
+    return <div className="w-full">{cellShell(0, false, 'max-h-[min(55vh,460px)]')}</div>;
   }
 
   /** Hai ảnh: hai ô vuông cạnh nhau — aspect cố định, không bị video dọc kéo dài */
   if (n === 2) {
     return (
       <div
-        className={`grid w-full grid-cols-2 overflow-hidden ${GAP} aspect-[2/1] max-h-[min(70vh,560px)]`}
+        className={`grid w-full grid-cols-2 overflow-hidden ${GAP} aspect-[2/1] max-h-[min(55vh,460px)]`}
       >
         {cellShell(0, true, 'min-h-0 h-full')}
         {cellShell(1, true, 'min-h-0 h-full')}
@@ -142,7 +142,7 @@ export default function PostImageGallery({
   if (n === 3) {
     return (
       <div
-        className={`grid max-h-[min(70vh,560px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
+        className={`grid max-h-[min(55vh,460px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
       >
         {cellShell(0, true, 'row-span-2 min-h-0 h-full')}
         {cellShell(1, true, 'min-h-0 h-full')}
@@ -155,7 +155,7 @@ export default function PostImageGallery({
   if (n === 5) {
     return (
       <div
-        className={`grid max-h-[min(70vh,620px)] w-full grid-cols-6 grid-rows-2 overflow-hidden ${GAP} aspect-[3/2]`}
+        className={`grid max-h-[min(55vh,500px)] w-full grid-cols-6 grid-rows-2 overflow-hidden ${GAP} aspect-[3/2]`}
       >
         {cellShell(0, true, 'col-span-3 min-h-0 h-full')}
         {cellShell(1, true, 'col-span-3 min-h-0 h-full')}
@@ -170,7 +170,7 @@ export default function PostImageGallery({
   const extra = n - 4;
   return (
     <div
-      className={`grid max-h-[min(70vh,560px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
+      className={`grid max-h-[min(55vh,460px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
     >
       {cellShell(0, true, 'min-h-0 h-full')}
       {cellShell(1, true, 'min-h-0 h-full')}

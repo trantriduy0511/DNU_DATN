@@ -34,9 +34,11 @@ export const getOrCreateConversation = async (req, res) => {
       });
     }
 
-    // Find existing conversation
+    // Chỉ tìm cuộc hội thoại 1-1 (direct) đúng 2 người này — KHÔNG match nhóm
+    // có chứa cả 2 (tránh nhầm tiêu đề thành tên nhóm khi mở "Nhắn tin").
     let conversation = await Conversation.findOne({
-      participants: { $all: [currentUserId, userId] }
+      type: 'direct',
+      participants: { $all: [currentUserId, userId], $size: 2 }
     })
       .populate('participants', 'name avatar email studentRole')
       .populate({
@@ -44,9 +46,10 @@ export const getOrCreateConversation = async (req, res) => {
         populate: { path: 'sender', select: 'name avatar' }
       });
 
-    // Create new conversation if not exists
+    // Create new direct conversation if not exists
     if (!conversation) {
       conversation = await Conversation.create({
+        type: 'direct',
         participants: [currentUserId, userId]
       });
 
@@ -154,12 +157,44 @@ export const getMessages = async (req, res) => {
       });
     }
 
-    const messages = await Message.find({ conversation: conversationId })
-      .populate('sender', 'name avatar')
-      .populate('receiver', 'name avatar')
+    const rawMessages = await Message.find({ conversation: conversationId })
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
+
+    // Tự populate sender/receiver — giữ lại ObjectId gốc + đảm bảo trả về dữ liệu user
+    // ngay cả khi user đã bị xoá/inactive (mongoose populate mặc định sẽ null hoá ObjectId).
+    const userIdSet = new Set();
+    rawMessages.forEach((m) => {
+      if (m.sender) userIdSet.add(String(m.sender));
+      if (m.receiver) userIdSet.add(String(m.receiver));
+    });
+    const userIds = [...userIdSet];
+    const users = userIds.length
+      ? await User.find({ _id: { $in: userIds } }).select('_id name avatar studentRole').lean()
+      : [];
+    const userMap = new Map(users.map((u) => [String(u._id), u]));
+
+    const messages = rawMessages.map((m) => {
+      const senderId = m.sender ? String(m.sender) : '';
+      const receiverId = m.receiver ? String(m.receiver) : '';
+      const senderDoc = senderId ? userMap.get(senderId) : null;
+      const receiverDoc = receiverId ? userMap.get(receiverId) : null;
+      return {
+        ...m,
+        sender: senderDoc
+          ? senderDoc
+          : senderId
+            ? { _id: senderId, name: '', avatar: '' }
+            : null,
+        receiver: receiverDoc
+          ? receiverDoc
+          : receiverId
+            ? { _id: receiverId, name: '', avatar: '' }
+            : null,
+      };
+    });
 
     const count = await Message.countDocuments({ conversation: conversationId });
 
@@ -591,14 +626,14 @@ export const addParticipants = async (req, res) => {
       });
     }
 
-    // Check if user is admin or creator
-    const isAdmin = conversation.admins.includes(req.user.id) || 
-                    conversation.createdBy?.toString() === req.user.id;
-
-    if (!isAdmin) {
+    // Bất kỳ thành viên nào trong nhóm cũng có thể thêm người mới.
+    const isMember = conversation.participants.some(
+      (id) => id.toString() === req.user.id
+    );
+    if (!isMember) {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ quản trị viên mới có thể thêm thành viên'
+        message: 'Bạn không phải là thành viên của nhóm'
       });
     }
 
@@ -884,13 +919,14 @@ export const updateGroupAvatar = async (req, res) => {
       });
     }
 
-    // Check if user is admin or creator
-    const isAdmin = conversation.admins.includes(req.user.id) ||
-      conversation.createdBy?.toString() === req.user.id;
-    if (!isAdmin) {
+    // Bất kỳ thành viên nào trong nhóm cũng có thể đổi ảnh đại diện.
+    const isMember = conversation.participants.some(
+      (id) => id.toString() === req.user.id
+    );
+    if (!isMember) {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ quản trị viên mới có thể đổi ảnh đại diện nhóm'
+        message: 'Bạn không phải là thành viên của nhóm'
       });
     }
 
@@ -929,6 +965,83 @@ export const updateGroupAvatar = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi cập nhật ảnh đại diện nhóm',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update group conversation name
+// @route   PUT /api/messages/groups/:conversationId/name
+// @access  Private (group admin / creator)
+export const updateGroupName = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const rawName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+
+    if (!rawName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên nhóm không được để trống'
+      });
+    }
+    if (rawName.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tên nhóm không được vượt quá 100 ký tự'
+      });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy nhóm'
+      });
+    }
+
+    if (conversation.type !== 'group') {
+      return res.status(400).json({
+        success: false,
+        message: 'Đây không phải là nhóm chat'
+      });
+    }
+
+    // Bất kỳ thành viên nào trong nhóm cũng có thể đổi tên cuộc trò chuyện.
+    const isMember = conversation.participants.some(
+      (id) => id.toString() === req.user.id
+    );
+    if (!isMember) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không phải là thành viên của nhóm'
+      });
+    }
+
+    conversation.name = rawName;
+    await conversation.save();
+
+    const populatedConversation = await Conversation.findById(conversationId)
+      .populate('participants', 'name avatar email studentRole')
+      .populate('createdBy', 'name avatar')
+      .populate('admins', 'name avatar')
+      .populate({
+        path: 'lastMessage',
+        populate: { path: 'sender', select: 'name avatar' }
+      });
+
+    emitToConversation(conversationId, 'conversation:updated', {
+      conversation: populatedConversation
+    });
+
+    res.status(200).json({
+      success: true,
+      conversation: populatedConversation
+    });
+  } catch (error) {
+    console.error('Error updating group name:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi cập nhật tên nhóm',
       error: error.message
     });
   }

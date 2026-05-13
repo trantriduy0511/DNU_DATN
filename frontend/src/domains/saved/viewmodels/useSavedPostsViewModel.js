@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   loadSavedPosts,
   unsavePost,
@@ -47,6 +47,8 @@ export function useSavedPostsViewModel(user) {
     fetchSaved();
   }, [fetchSaved]);
 
+  const hydratedRef = useRef(false);
+
   useEffect(() => {
     const data = loadCollections();
     setCollections(data.collections);
@@ -54,6 +56,12 @@ export function useSavedPostsViewModel(user) {
   }, []);
 
   useEffect(() => {
+    // Bỏ qua lần chạy đầu tiên (state khởi tạo, chưa hydrate xong),
+    // nếu không sẽ ghi đè storage bằng [{default}] và mất collections đã tạo.
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      return;
+    }
     persistCollections(collections, postCollectionMap);
   }, [collections, postCollectionMap]);
 
@@ -104,15 +112,51 @@ export function useSavedPostsViewModel(user) {
 
   const createCollection = () => {
     const name = newCollectionName.trim();
-    if (!name) return false;
+    if (!name) return { ok: false, reason: 'empty' };
     const exists = collections.some((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (exists) return false;
+    if (exists) return { ok: false, reason: 'duplicate' };
     const id = `col_${Date.now()}`;
     setCollections((prev) => [...prev, { id, name }]);
     setNewCollectionName('');
     setShowCreateCollectionModal(false);
-    return true;
+    return { ok: true, id, name };
   };
+
+  const renameCollection = (id, nextName) => {
+    const name = (nextName || '').trim();
+    if (!name) return { ok: false, reason: 'empty' };
+    if (id === 'default') return { ok: false, reason: 'default' };
+    const exists = collections.some((c) => c.id !== id && c.name.toLowerCase() === name.toLowerCase());
+    if (exists) return { ok: false, reason: 'duplicate' };
+    setCollections((prev) => prev.map((c) => (c.id === id ? { ...c, name } : c)));
+    return { ok: true };
+  };
+
+  const deleteCollection = (id) => {
+    if (id === 'default') return { ok: false, reason: 'default' };
+    setCollections((prev) => prev.filter((c) => c.id !== id));
+    setPostCollectionMap((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((postId) => {
+        if (next[postId] === id) next[postId] = 'default';
+      });
+      return next;
+    });
+    if (filterCollectionId === id) setFilterCollectionId('all');
+    return { ok: true };
+  };
+
+  const collectionCounts = useMemo(() => {
+    const counts = { all: posts.length };
+    collections.forEach((c) => {
+      counts[c.id] = 0;
+    });
+    posts.forEach((post) => {
+      const cid = postCollectionMap[post._id] || 'default';
+      counts[cid] = (counts[cid] || 0) + 1;
+    });
+    return counts;
+  }, [posts, postCollectionMap, collections]);
 
   const openShareModal = async (post) => {
     if (!post?._id) return;
@@ -209,6 +253,9 @@ export function useSavedPostsViewModel(user) {
     removeFromSaved,
     assignPostToCollection,
     createCollection,
+    renameCollection,
+    deleteCollection,
+    collectionCounts,
     openShareModal,
     confirmShare,
     fetchSaved,

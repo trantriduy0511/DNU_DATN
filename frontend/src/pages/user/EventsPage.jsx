@@ -27,6 +27,7 @@ import {
   Ban,
   Check,
 } from 'lucide-react';
+import { notify } from '../../lib/notify';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../utils/api';
@@ -489,7 +490,7 @@ const EventsPage = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('Kích thước ảnh không được vượt quá 10MB');
+        notify('Kích thước ảnh không được vượt quá 10MB');
         return;
       }
       setEventForm({ ...eventForm, image: file });
@@ -580,7 +581,7 @@ const EventsPage = () => {
       closeCoHostStatus();
     } catch (error) {
       console.error('Error creating event:', error);
-      alert(error.response?.data?.message || 'Lỗi tạo sự kiện');
+      notify(error.response?.data?.message || 'Lỗi tạo sự kiện');
     } finally {
       setSubmitting(false);
     }
@@ -593,7 +594,7 @@ const EventsPage = () => {
       setRsvpMenuEventId(null);
       await fetchEvents();
     } catch (error) {
-      alert(error.response?.data?.message || 'Không cập nhật được phản hồi');
+      notify(error.response?.data?.message || 'Không cập nhật được phản hồi');
     }
   };
 
@@ -726,7 +727,7 @@ const EventsPage = () => {
     if (!shareModalEvent?._id) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const ev = shareModalEvent;
@@ -741,7 +742,7 @@ const EventsPage = () => {
         setShareModalEvent(null);
         setShareSelectedFriendIds(new Set());
         setShareModalIntent('share');
-        alert(res.data?.message || `Đã gửi ${sent} lời mời.`);
+        notify(res.data?.message || `Đã gửi ${sent} lời mời.`);
         return;
       }
 
@@ -758,10 +759,10 @@ const EventsPage = () => {
       setShareModalEvent(null);
       setShareSelectedFriendIds(new Set());
       setShareModalIntent('share');
-      alert(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
+      notify(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Share/invite event failed:', error);
-      alert(error.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -771,26 +772,27 @@ const EventsPage = () => {
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
       <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-6">
         {/* Header */}
-        <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-[var(--fb-text-primary)] flex items-center gap-2">
-                <Calendar className="w-8 h-8 text-blue-600" />
+        <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-4 sm:p-6 mb-6">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fb-text-primary)] flex items-center gap-2">
+                <Calendar className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600" />
                 Sự kiện
               </h1>
-              <p className="text-[var(--fb-text-secondary)] mt-1">Khám phá và tham gia các sự kiện thú vị</p>
+              <p className="text-[var(--fb-text-secondary)] mt-1 text-sm sm:text-base hidden sm:block">Khám phá và tham gia các sự kiện thú vị</p>
             </div>
             <button
               onClick={handleCreateEvent}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg"
+              className="shrink-0 inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base font-semibold hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg whitespace-nowrap"
             >
               <Plus className="w-5 h-5" />
-              Tạo sự kiện
+              <span className="hidden sm:inline">Tạo sự kiện</span>
+              <span className="sm:hidden">Tạo</span>
             </button>
           </div>
 
           {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--fb-icon)] w-5 h-5" />
               <input
@@ -801,27 +803,24 @@ const EventsPage = () => {
                 className="w-full pl-10 pr-4 py-2 border border-[var(--fb-divider)] bg-[var(--fb-input)] text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {statuses.map(status => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">Tất cả danh mục</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+          </div>
+
+          {/* Status pills (cuộn ngang trên mobile, hiển thị inline trên desktop) */}
+          <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {statuses.map((status) => (
+              <button
+                key={status.value}
+                type="button"
+                onClick={() => setStatusFilter(status.value)}
+                className={`inline-flex shrink-0 items-center rounded-full px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                  statusFilter === status.value
+                    ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                    : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                }`}
+              >
+                {status.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -856,15 +855,15 @@ const EventsPage = () => {
               return (
                 <div
                   key={event._id}
-                  className={`group relative flex aspect-square w-full cursor-pointer flex-col rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-md transition-shadow hover:shadow-lg hover:ring-2 hover:ring-blue-500/20 ${
+                  className={`group relative flex w-full cursor-pointer flex-col rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-md transition-shadow hover:shadow-lg hover:ring-2 hover:ring-blue-500/20 sm:aspect-square ${
                     eventCardMoreMenuId != null && String(eventCardMoreMenuId) === String(event._id)
                       ? 'z-[25] overflow-visible'
                       : 'overflow-hidden'
                   }`}
                   onClick={() => handleOpenEventDetail(event)}
                 >
-                  {/* 4/10 — ảnh bìa (overflow chỉ trên lớp ảnh để menu ⋯ không bị cắt) */}
-                  <div className="relative h-[40%] min-h-0 shrink-0 bg-[var(--fb-input)]">
+                  {/* Ảnh bìa: mobile dùng aspect cố định, desktop chia 40% chiều cao */}
+                  <div className="relative aspect-[16/9] w-full shrink-0 bg-[var(--fb-input)] sm:aspect-auto sm:h-[40%]">
                     <div className="absolute inset-0 overflow-hidden rounded-t-xl">
                       {coverSrc ? (
                         <div
@@ -935,8 +934,8 @@ const EventsPage = () => {
                     </div>
                   </div>
 
-                  {/* 6/10 — thông tin (theo theme sáng/tối) */}
-                  <div className="flex h-[60%] min-h-0 flex-col border-t border-[var(--fb-divider)] bg-[var(--fb-surface)] px-2.5 py-2 text-[var(--fb-text-primary)]">
+                  {/* Thông tin: mobile dãn tự nhiên, desktop giữ 60% */}
+                  <div className="flex min-h-0 flex-1 flex-col border-t border-[var(--fb-divider)] bg-[var(--fb-surface)] px-2.5 py-2 text-[var(--fb-text-primary)] sm:h-[60%] sm:flex-none">
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
                       <span
                         className={`max-w-[55%] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold leading-tight ${getStatusColor(status)}`}

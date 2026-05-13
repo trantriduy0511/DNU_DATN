@@ -9,6 +9,7 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 import ChatAI from '../../components/ChatAI';
 import AIAnalytics from './AIAnalytics';
 import MainLayout from '../../components/MainLayout';
+import { notify, confirmAsync } from '../../lib/notify';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -720,12 +721,12 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa người dùng này?')) {
       try {
         await api.delete(`/admin/users/${userId}`);
         fetchData();
       } catch (error) {
-        alert('Lỗi xóa người dùng');
+        notify('Lỗi xóa người dùng');
       }
     }
   };
@@ -733,7 +734,7 @@ const AdminDashboard = () => {
   const handleUpdateUserStatus = async (userId, status) => {
     // Confirm before banning
     if (status === 'banned') {
-      const confirmed = window.confirm(
+      const confirmed = await confirmAsync(
         '⚠️ Bạn có chắc chắn muốn khóa tài khoản này?\n\n' +
         'Người dùng sẽ không thể đăng nhập cho đến khi bạn mở khóa.'
       );
@@ -745,19 +746,19 @@ const AdminDashboard = () => {
       
       // Show success message
       if (status === 'banned') {
-        alert('✅ Đã khóa tài khoản thành công!');
+        notify('✅ Đã khóa tài khoản thành công!');
       } else {
-        alert('✅ Đã mở khóa tài khoản thành công!');
+        notify('✅ Đã mở khóa tài khoản thành công!');
       }
       
       fetchData();
     } catch (error) {
-      alert('❌ Lỗi cập nhật trạng thái: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi cập nhật trạng thái: ' + (error.response?.data?.message || error.message));
     }
   };
 
   const handleDeletePost = async (postId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa bài viết này?')) {
       try {
         // Single delete = soft delete: keep row, mark as rejected.
         await api.put(`/admin/posts/${postId}/reject`);
@@ -772,7 +773,7 @@ const AdminDashboard = () => {
         );
         fetchData();
       } catch (error) {
-        alert('Lỗi xóa bài viết');
+        notify('Lỗi xóa bài viết');
       }
     }
   };
@@ -782,10 +783,10 @@ const AdminDashboard = () => {
       await api.put(`/admin/posts/${postId}/approve`);
       setShowPostDetailModal(false);
       setSelectedPost(null);
-      alert('✅ Đã duyệt bài viết thành công!');
+      notify('✅ Đã duyệt bài viết thành công!');
       fetchData();
     } catch (error) {
-      alert('❌ Lỗi duyệt bài viết');
+      notify('❌ Lỗi duyệt bài viết');
     }
   };
 
@@ -794,10 +795,10 @@ const AdminDashboard = () => {
       await api.put(`/admin/posts/${postId}/reject`);
       setShowPostDetailModal(false);
       setSelectedPost(null);
-      alert('✅ Đã từ chối bài viết!');
+      notify('✅ Đã từ chối bài viết!');
       fetchData();
     } catch (error) {
-      alert('❌ Lỗi từ chối bài viết');
+      notify('❌ Lỗi từ chối bài viết');
     }
   };
 
@@ -807,7 +808,7 @@ const AdminDashboard = () => {
       await loadAdminPosts(postFilters);
     } catch (error) {
       console.error('Error filtering posts:', error);
-      alert('Lỗi lọc bài viết');
+      notify('Lỗi lọc bài viết');
     } finally {
       setLoading(false);
     }
@@ -828,7 +829,7 @@ const AdminDashboard = () => {
       setSelectedGroup(res.data.group);
     } catch (error) {
       console.error('Error fetching group details:', error);
-      alert('Lỗi tải thông tin nhóm');
+      notify('Lỗi tải thông tin nhóm');
       setShowGroupDetailModal(false);
     }
     
@@ -836,14 +837,14 @@ const AdminDashboard = () => {
   };
 
   const handleApproveGroup = async (groupId) => {
-    if (!window.confirm('Bạn có chắc muốn duyệt nhóm này?')) return;
+    if (!(await confirmAsync('Bạn có chắc muốn duyệt nhóm này?'))) return;
     
     try {
       await api.put(`/admin/groups/${groupId}/approve`);
-      alert('✅ Đã duyệt nhóm thành công!');
+      notify('✅ Đã duyệt nhóm thành công!');
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi duyệt nhóm');
+      notify(error.response?.data?.message || 'Lỗi duyệt nhóm');
     }
   };
 
@@ -854,24 +855,24 @@ const AdminDashboard = () => {
       await api.put(`/admin/groups/${selectedGroup._id}/reject`, {
         reason: rejectReason || 'Nhóm không đáp ứng yêu cầu của hệ thống'
       });
-      alert('✅ Đã từ chối nhóm!');
+      notify('✅ Đã từ chối nhóm!');
       setShowRejectGroupModal(false);
       setRejectReason('');
       setSelectedGroup(null);
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi từ chối nhóm');
+      notify(error.response?.data?.message || 'Lỗi từ chối nhóm');
     }
   };
 
   const handleDeleteGroup = async (groupId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa nhóm này? Tất cả bài viết trong nhóm cũng sẽ bị xóa.')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa nhóm này? Tất cả bài viết trong nhóm cũng sẽ bị xóa.')) {
       try {
         await api.delete(`/groups/${groupId}`);
-        alert('✅ Đã xóa nhóm thành công!');
+        notify('✅ Đã xóa nhóm thành công!');
         fetchData();
       } catch (error) {
-        alert('❌ Lỗi xóa nhóm');
+        notify('❌ Lỗi xóa nhóm');
       }
     }
   };
@@ -898,7 +899,7 @@ const AdminDashboard = () => {
       });
     } catch (error) {
       console.error('Error filtering comments:', error);
-      alert('Lỗi lọc bình luận');
+      notify('Lỗi lọc bình luận');
     } finally {
       setLoading(false);
     }
@@ -973,7 +974,7 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa bình luận này?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa bình luận này?')) {
       try {
         await api.delete(`/admin/comments/${commentId}`);
         setComments((prev) =>
@@ -986,7 +987,7 @@ const AdminDashboard = () => {
         );
         fetchData();
       } catch (error) {
-        alert('Lỗi xóa bình luận');
+        notify('Lỗi xóa bình luận');
       }
     }
   };
@@ -1043,7 +1044,7 @@ const AdminDashboard = () => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Kích thước ảnh không được vượt quá 5MB');
+        notify('Kích thước ảnh không được vượt quá 5MB');
         return;
       }
       setEventForm({ ...eventForm, image: file });
@@ -1110,17 +1111,17 @@ const AdminDashboard = () => {
       handleCloseEventModal();
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || (editingEvent ? 'Lỗi cập nhật sự kiện' : 'Lỗi tạo sự kiện'));
+      notify(error.response?.data?.message || (editingEvent ? 'Lỗi cập nhật sự kiện' : 'Lỗi tạo sự kiện'));
     }
   };
 
   const handleDeleteEvent = async (eventId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa sự kiện này?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa sự kiện này?')) {
       try {
         await api.delete(`/admin/events/${eventId}`);
         fetchData();
       } catch (error) {
-        alert('Lỗi xóa sự kiện');
+        notify('Lỗi xóa sự kiện');
       }
     }
   };
@@ -1806,7 +1807,7 @@ const AdminDashboard = () => {
                   await loadAdminPosts(nextFilters);
                 } catch (error) {
                   console.error('Error filtering posts by status:', error);
-                  alert('Lỗi lọc trạng thái bài viết');
+                  notify('Lỗi lọc trạng thái bài viết');
                 } finally {
                   setLoading(false);
                 }
@@ -2183,46 +2184,46 @@ const AdminDashboard = () => {
   const handleUpdateReportStatus = async (reportId, status, adminNote = '') => {
     try {
       await api.put(`/reports/${reportId}`, { status, adminNote });
-      alert(`✅ Đã cập nhật trạng thái báo cáo thành công!`);
+      notify(`✅ Đã cập nhật trạng thái báo cáo thành công!`);
       fetchData();
       setShowReportDetailModal(false);
       setSelectedReport(null);
     } catch (error) {
       console.error('Error updating report status:', error);
-      alert('❌ Lỗi cập nhật trạng thái: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi cập nhật trạng thái: ' + (error.response?.data?.message || error.message));
     }
   };
 
   const handleResolveReport = async (reportId) => {
-    if (window.confirm('Bạn có chắc chắn muốn đánh dấu báo cáo này đã xử lý?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn đánh dấu báo cáo này đã xử lý?')) {
       await handleUpdateReportStatus(reportId, 'resolved');
     }
   };
 
   const handleDismissReport = async (reportId) => {
-    if (window.confirm('Bạn có chắc chắn muốn bỏ qua báo cáo này? (dismissed)')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn bỏ qua báo cáo này? (dismissed)')) {
       await handleUpdateReportStatus(reportId, 'dismissed');
     }
   };
 
   const handleDeleteReport = async (reportId) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa báo cáo này?')) {
+    if (await confirmAsync('Bạn có chắc chắn muốn xóa báo cáo này?')) {
       try {
         await api.delete(`/reports/${reportId}`);
-        alert('✅ Đã xóa báo cáo!');
+        notify('✅ Đã xóa báo cáo!');
         fetchData();
         setShowReportDetailModal(false);
         setSelectedReport(null);
       } catch (error) {
         console.error('Error deleting report:', error);
-        alert('❌ Lỗi xóa báo cáo: ' + (error.response?.data?.message || error.message));
+        notify('❌ Lỗi xóa báo cáo: ' + (error.response?.data?.message || error.message));
       }
     }
   };
 
   const handleDeleteReportedContent = async (report) => {
     const contentType = report.reportedPost ? 'bài viết' : report.reportedComment ? 'bình luận' : 'nội dung';
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${contentType} bị báo cáo này?`)) {
+    if (await confirmAsync(`Bạn có chắc chắn muốn xóa ${contentType} bị báo cáo này?`)) {
       try {
         if (report.reportedPost) {
           await api.delete(`/admin/posts/${report.reportedPost._id || report.reportedPost}`);
@@ -2233,10 +2234,10 @@ const AdminDashboard = () => {
         // Mark report as resolved after deleting content
         await handleUpdateReportStatus(report._id, 'resolved', 'Đã xóa nội dung vi phạm');
         
-        alert(`✅ Đã xóa ${contentType} và đánh dấu báo cáo đã xử lý!`);
+        notify(`✅ Đã xóa ${contentType} và đánh dấu báo cáo đã xử lý!`);
       } catch (error) {
         console.error('Error deleting content:', error);
-        alert('❌ Lỗi xóa nội dung: ' + (error.response?.data?.message || error.message));
+        notify('❌ Lỗi xóa nội dung: ' + (error.response?.data?.message || error.message));
       }
     }
   };
@@ -2244,7 +2245,7 @@ const AdminDashboard = () => {
   const handleUpdateUserRole = async (userId, newRole) => {
     // Confirm before changing to admin
     if (newRole === 'admin') {
-      if (!confirm('⚠️ Bạn có chắc muốn cấp quyền Admin cho tài khoản này? Họ sẽ có toàn quyền quản trị hệ thống.')) {
+      if (!(await confirmAsync('⚠️ Bạn có chắc muốn cấp quyền Admin cho tài khoản này? Họ sẽ có toàn quyền quản trị hệ thống.'))) {
         fetchData(); // Refresh to reset dropdown
         return;
       }
@@ -2253,7 +2254,7 @@ const AdminDashboard = () => {
     // Confirm before demoting from admin
     const user = users.find(u => u._id === userId);
     if (user && user.role === 'admin' && newRole === 'user') {
-      if (!confirm('⚠️ Bạn có chắc muốn gỡ quyền Admin của tài khoản này?')) {
+      if (!(await confirmAsync('⚠️ Bạn có chắc muốn gỡ quyền Admin của tài khoản này?'))) {
         fetchData(); // Refresh to reset dropdown
         return;
       }
@@ -2261,29 +2262,29 @@ const AdminDashboard = () => {
     
     try {
       await api.put(`/admin/users/${userId}/role`, { role: newRole });
-      alert(`✅ Đã cập nhật vai trò hệ thống thành ${newRole === 'admin' ? 'Admin' : 'User'}`);
+      notify(`✅ Đã cập nhật vai trò hệ thống thành ${newRole === 'admin' ? 'Admin' : 'User'}`);
       fetchData();
     } catch (error) {
       console.error('Error updating user role:', error);
-      alert(error.response?.data?.message || '❌ Lỗi cập nhật vai trò hệ thống');
+      notify(error.response?.data?.message || '❌ Lỗi cập nhật vai trò hệ thống');
       fetchData(); // Refresh to reset dropdown
     }
   };
 
   const handleSendNotification = async () => {
     if (!notificationForm.message.trim()) {
-      alert('Vui lòng nhập nội dung thông báo');
+      notify('Vui lòng nhập nội dung thông báo');
       return;
     }
     
     if (notificationForm.recipientIds.length === 0) {
-      alert('Vui lòng chọn ít nhất một người nhận');
+      notify('Vui lòng chọn ít nhất một người nhận');
       return;
     }
 
     try {
       await api.post('/admin/notifications', notificationForm);
-      alert(`✅ Đã gửi thông báo đến ${notificationForm.recipientIds.length} người dùng!`);
+      notify(`✅ Đã gửi thông báo đến ${notificationForm.recipientIds.length} người dùng!`);
       setShowSendNotificationModal(false);
       setNotificationForm({
         recipientIds: [],
@@ -2294,7 +2295,7 @@ const AdminDashboard = () => {
       setSelectedUsersForNotification([]);
       fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi gửi thông báo');
+      notify(error.response?.data?.message || 'Lỗi gửi thông báo');
     }
   };
 
@@ -2334,16 +2335,16 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteNotification = async (notificationId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thông báo này?')) {
+    if (!(await confirmAsync('Bạn có chắc muốn xóa thông báo này?'))) {
       return;
     }
 
     try {
       await api.delete(`/admin/notifications/${notificationId}`);
       fetchData();
-      alert('✅ Đã xóa thông báo');
+      notify('✅ Đã xóa thông báo');
     } catch (error) {
-      alert('Lỗi xóa thông báo');
+      notify('Lỗi xóa thông báo');
     }
   };
 
@@ -2375,7 +2376,7 @@ const AdminDashboard = () => {
       fetchHeaderUnreadCount();
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      alert(error.response?.data?.message || 'Không thể cập nhật trạng thái thông báo');
+      notify(error.response?.data?.message || 'Không thể cập nhật trạng thái thông báo');
     }
   };
 
@@ -2383,7 +2384,7 @@ const AdminDashboard = () => {
     try {
       const unreadNotifications = notifications.filter((n) => !n.isRead);
       if (unreadNotifications.length === 0) {
-        alert('Không có thông báo chưa đọc nào');
+        notify('Không có thông báo chưa đọc nào');
         return;
       }
 
@@ -2398,20 +2399,20 @@ const AdminDashboard = () => {
           read: (prev.read || 0) + unreadNotifications.length
         };
       });
-      alert(`✅ Đã đánh dấu ${unreadNotifications.length} thông báo là đã đọc`);
+      notify(`✅ Đã đánh dấu ${unreadNotifications.length} thông báo là đã đọc`);
       fetchData();
     } catch (error) {
-      alert('Lỗi đánh dấu tất cả thông báo');
+      notify('Lỗi đánh dấu tất cả thông báo');
     }
   };
 
   const handleBulkDeletePosts = async () => {
     if (selectedItems.posts.length === 0) {
-      alert('Vui lòng chọn ít nhất một bài viết');
+      notify('Vui lòng chọn ít nhất một bài viết');
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc muốn xóa ${selectedItems.posts.length} bài viết đã chọn?`)) {
+    if (!(await confirmAsync(`Bạn có chắc muốn xóa ${selectedItems.posts.length} bài viết đã chọn?`))) {
       return;
     }
 
@@ -2426,17 +2427,17 @@ const AdminDashboard = () => {
       setPosts((prev) => (prev || []).filter((post) => !deletingIds.includes(post._id)));
       setSelectedPost((prev) => (prev && deletingIds.includes(prev._id) ? null : prev));
       setShowPostDetailModal((prev) => (selectedPost && deletingIds.includes(selectedPost._id) ? false : prev));
-      alert(`✅ Đã xóa ${deletingIds.length} bài viết thành công`);
+      notify(`✅ Đã xóa ${deletingIds.length} bài viết thành công`);
       setSelectedItems({ ...selectedItems, posts: [] });
       fetchData();
     } catch (error) {
-      alert('Lỗi xóa bài viết');
+      notify('Lỗi xóa bài viết');
     }
   };
 
   const handleBulkApprovePosts = async () => {
     if (selectedItems.posts.length === 0) {
-      alert('Vui lòng chọn ít nhất một bài viết');
+      notify('Vui lòng chọn ít nhất một bài viết');
       return;
     }
 
@@ -2444,21 +2445,21 @@ const AdminDashboard = () => {
       await Promise.all(
         selectedItems.posts.map(postId => api.put(`/admin/posts/${postId}/approve`))
       );
-      alert(`✅ Đã duyệt ${selectedItems.posts.length} bài viết thành công`);
+      notify(`✅ Đã duyệt ${selectedItems.posts.length} bài viết thành công`);
       setSelectedItems({ ...selectedItems, posts: [] });
       fetchData();
     } catch (error) {
-      alert('Lỗi duyệt bài viết');
+      notify('Lỗi duyệt bài viết');
     }
   };
 
   const handleBulkDeleteComments = async () => {
     if (selectedItems.comments.length === 0) {
-      alert('Vui lòng chọn ít nhất một bình luận');
+      notify('Vui lòng chọn ít nhất một bình luận');
       return;
     }
 
-    if (!window.confirm(`Bạn có chắc muốn xóa ${selectedItems.comments.length} bình luận đã chọn?`)) {
+    if (!(await confirmAsync(`Bạn có chắc muốn xóa ${selectedItems.comments.length} bình luận đã chọn?`))) {
       return;
     }
 
@@ -2472,17 +2473,17 @@ const AdminDashboard = () => {
       setComments((prev) => (prev || []).filter((comment) => !deletingIds.includes(comment._id)));
       setSelectedComment((prev) => (prev && deletingIds.includes(prev._id) ? null : prev));
       setShowCommentDetailModal((prev) => (selectedComment && deletingIds.includes(selectedComment._id) ? false : prev));
-      alert(`✅ Đã xóa ${deletingIds.length} bình luận thành công`);
+      notify(`✅ Đã xóa ${deletingIds.length} bình luận thành công`);
       setSelectedItems({ ...selectedItems, comments: [] });
       fetchData();
     } catch (error) {
-      alert('Lỗi xóa bình luận');
+      notify('Lỗi xóa bình luận');
     }
   };
 
   const handleBulkUpdateUserStatus = async (status) => {
     if (selectedItems.users.length === 0) {
-      alert('Vui lòng chọn ít nhất một người dùng');
+      notify('Vui lòng chọn ít nhất một người dùng');
       return;
     }
 
@@ -2490,11 +2491,11 @@ const AdminDashboard = () => {
       await Promise.all(
         selectedItems.users.map(userId => api.put(`/admin/users/${userId}/status`, { status }))
       );
-      alert(`✅ Đã cập nhật trạng thái ${selectedItems.users.length} người dùng thành công`);
+      notify(`✅ Đã cập nhật trạng thái ${selectedItems.users.length} người dùng thành công`);
       setSelectedItems({ ...selectedItems, users: [] });
       fetchData();
     } catch (error) {
-      alert('Lỗi cập nhật trạng thái người dùng');
+      notify('Lỗi cập nhật trạng thái người dùng');
     }
   };
 
@@ -2558,10 +2559,10 @@ const AdminDashboard = () => {
       link.download = filename;
       link.click();
 
-      alert(`✅ Đã xuất ${data.length} bản ghi thành công`);
+      notify(`✅ Đã xuất ${data.length} bản ghi thành công`);
     } catch (error) {
       console.error('Error exporting data:', error);
-      alert('Lỗi xuất dữ liệu');
+      notify('Lỗi xuất dữ liệu');
     }
   };
 
@@ -3335,7 +3336,7 @@ const AdminDashboard = () => {
     
     // Confirm when promoting to Lecturer
     if (newStudentRole === 'Giảng viên') {
-      if (!confirm(`⚠️ Bạn có chắc muốn thay đổi vai trò của "${user?.name}" thành Giảng viên? Họ sẽ có quyền đăng tài liệu trong phần Tài liệu học tập.`)) {
+      if (!(await confirmAsync(`⚠️ Bạn có chắc muốn thay đổi vai trò của "${user?.name}" thành Giảng viên? Họ sẽ có quyền đăng tài liệu trong phần Tài liệu học tập.`))) {
         preservePermissionsScroll(); // Refresh to reset dropdown without jumping
         return;
       }
@@ -3343,7 +3344,7 @@ const AdminDashboard = () => {
     
     // Confirm when demoting to Student
     if (user && user.studentRole === 'Giảng viên' && newStudentRole === 'Sinh viên') {
-      if (!confirm(`⚠️ Bạn có chắc muốn thay đổi "${user?.name}" từ Giảng viên xuống Sinh viên?`)) {
+      if (!(await confirmAsync(`⚠️ Bạn có chắc muốn thay đổi "${user?.name}" từ Giảng viên xuống Sinh viên?`))) {
         preservePermissionsScroll(); // Refresh to reset dropdown without jumping
         return;
       }
@@ -3351,11 +3352,11 @@ const AdminDashboard = () => {
     
     try {
       await api.put(`/admin/users/${userId}/student-role`, { studentRole: newStudentRole });
-      alert(`✅ Đã cập nhật vai trò học tập thành ${newStudentRole}`);
+      notify(`✅ Đã cập nhật vai trò học tập thành ${newStudentRole}`);
       preservePermissionsScroll();
     } catch (error) {
       console.error('Error updating student role:', error);
-      alert(error.response?.data?.message || '❌ Lỗi cập nhật vai trò học tập');
+      notify(error.response?.data?.message || '❌ Lỗi cập nhật vai trò học tập');
       preservePermissionsScroll(); // Refresh to reset dropdown without jumping
     }
   };
@@ -3534,29 +3535,29 @@ const AdminDashboard = () => {
     setSettingsSaving(true);
     try {
       await api.put('/admin/settings', systemSettings);
-      alert('✅ Đã lưu cài đặt hệ thống thành công!');
+      notify('✅ Đã lưu cài đặt hệ thống thành công!');
       fetchData();
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert(error.response?.data?.message || '❌ Lỗi lưu cài đặt hệ thống');
+      notify(error.response?.data?.message || '❌ Lỗi lưu cài đặt hệ thống');
     } finally {
       setSettingsSaving(false);
     }
   };
 
   const handleResetSettings = async () => {
-    if (!confirm('Bạn có chắc chắn muốn reset tất cả cài đặt về mặc định? Hành động này không thể hoàn tác.')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn reset tất cả cài đặt về mặc định? Hành động này không thể hoàn tác.'))) {
       return;
     }
     
     setSettingsSaving(true);
     try {
       await api.post('/admin/settings/reset');
-      alert('✅ Đã reset cài đặt về mặc định!');
+      notify('✅ Đã reset cài đặt về mặc định!');
       fetchData();
     } catch (error) {
       console.error('Error resetting settings:', error);
-      alert(error.response?.data?.message || '❌ Lỗi reset cài đặt');
+      notify(error.response?.data?.message || '❌ Lỗi reset cài đặt');
     } finally {
       setSettingsSaving(false);
     }
@@ -4950,8 +4951,8 @@ const AdminDashboard = () => {
               {selectedPost.status === 'pending' && (
                 <>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Bạn có chắc chắn muốn từ chối bài viết này?')) {
+                    onClick={async () => {
+                      if (await confirmAsync('Bạn có chắc chắn muốn từ chối bài viết này?')) {
                         handleRejectPost(selectedPost._id);
                       }
                     }}
@@ -4969,8 +4970,8 @@ const AdminDashboard = () => {
               )}
               
               <button
-                onClick={() => {
-                  if (window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+                onClick={async () => {
+                  if (await confirmAsync('Bạn có chắc chắn muốn xóa bài viết này?')) {
                     handleDeletePost(selectedPost._id);
                     setShowPostDetailModal(false);
                     setSelectedPost(null);

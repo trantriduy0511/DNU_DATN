@@ -9,6 +9,7 @@ import { buildGroupShareMessageContent } from '../../utils/groupShareMessage.js'
 import { formatTimeAgo } from '../../utils/formatTime';
 import { useHomeSavedActionsViewModel } from '../../domains/home/viewmodels/useHomeSavedActionsViewModel';
 import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
+import { notify, confirmAsync } from '../../lib/notify';
 // Chat overlays are mounted globally in NavigationBar
 import OnlineUsers from '../../components/OnlineUsers';
 import DocumentAnalyzer from '../../components/DocumentAnalyzer';
@@ -139,6 +140,47 @@ function isLecturerDocumentAuthor(post) {
 
 function isLecturerDocumentPost(post) {
   return post?.category === 'Tài liệu' && isLecturerDocumentAuthor(post);
+}
+
+// Giới hạn số ký tự text trước khi hiện "Xem thêm" để mọi bài viết không tràn quá viewport.
+const POST_TEXT_PREVIEW_LIMIT = 360;
+
+function PostContentText({ content, postId }) {
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    setExpanded(false);
+  }, [postId, content]);
+
+  const raw = typeof content === 'string' ? content : '';
+  const isLong = raw.length > POST_TEXT_PREVIEW_LIMIT;
+  const display = !expanded && isLong ? `${raw.slice(0, POST_TEXT_PREVIEW_LIMIT).trimEnd()}…` : raw;
+
+  return (
+    <div>
+      <p className="text-[var(--fb-text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">
+        {display}
+        {isLong && !expanded ? ' ' : null}
+        {isLong && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="ml-1 text-sm font-semibold text-[var(--fb-text-secondary)] hover:underline"
+          >
+            Xem thêm
+          </button>
+        )}
+      </p>
+      {isLong && expanded && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="mt-1 text-sm font-semibold text-[var(--fb-text-secondary)] hover:underline"
+        >
+          Thu gọn
+        </button>
+      )}
+    </div>
+  );
 }
 
 const UserHome = () => {
@@ -651,6 +693,36 @@ const UserHome = () => {
     return () => window.clearTimeout(t);
   }, [searchParams, posts]);
 
+  useEffect(() => {
+    const urlPid = searchParams.get('post');
+    const th = imageTheater;
+    if (th?.post?._id) {
+      const p = th.post;
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: String(p._id), title: (p.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    if (urlPid) {
+      const p = posts.find((x) => String(x._id) === String(urlPid));
+      window.dispatchEvent(
+        new CustomEvent('chatAISetPostContext', {
+          detail: { postId: urlPid, title: (p?.title || '').trim() || 'Bài viết' }
+        })
+      );
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+  }, [imageTheater, searchParams, posts]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(new CustomEvent('chatAISetPostContext', { detail: { postId: null, title: '' } }));
+    };
+  }, []);
+
   // Saved posts modal is mounted globally with NavigationBar now.
 
   // Close search dropdown when clicking outside
@@ -952,7 +1024,7 @@ const UserHome = () => {
       setShareFriendsList(res.data.friends || []);
     } catch (error) {
       console.error('Error loading friends:', error);
-      alert(error.response?.data?.message || 'Không tải được danh sách bạn bè');
+      notify(error.response?.data?.message || 'Không tải được danh sách bạn bè');
       setShareModalPost(null);
     } finally {
       setShareFriendsLoading(false);
@@ -973,7 +1045,7 @@ const UserHome = () => {
     if (!shareModalPost?._id) return;
     const ids = [...shareSelectedFriendIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const postId = shareModalPost._id;
@@ -1004,10 +1076,10 @@ const UserHome = () => {
       const n = ids.length;
       setShareModalPost(null);
       setShareSelectedFriendIds(new Set());
-      alert(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
+      notify(`Đã gửi tới ${n} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Share to friends failed:', error);
-      alert(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể chia sẻ. Vui lòng thử lại.');
     } finally {
       setShareSending(false);
     }
@@ -1092,7 +1164,7 @@ const UserHome = () => {
   
   const handleSubmitReport = async () => {
     if (!reportReason.trim()) {
-      alert('Vui lòng nhập lý do báo cáo');
+      notify('Vui lòng nhập lý do báo cáo');
       return;
     }
     
@@ -1103,14 +1175,14 @@ const UserHome = () => {
         reason: reportReason
       });
       
-      alert('✅ Đã gửi báo cáo. Chúng tôi sẽ xem xét trong thời gian sớm nhất.');
+      notify('✅ Đã gửi báo cáo. Chúng tôi sẽ xem xét trong thời gian sớm nhất.');
       setShowReportModal(false);
       setReportingPost(null);
       setReportReason('');
       setReportCategory('Spam');
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('❌ Lỗi gửi báo cáo: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi gửi báo cáo: ' + (error.response?.data?.message || error.message));
     }
   };
   
@@ -1138,7 +1210,7 @@ const UserHome = () => {
     if (!text && !hasMedia) return;
     try {
         if (newPostCategory === 'Tài liệu' && !canPostLecturerDocuments) {
-          alert('Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên');
+          notify('Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên');
           return;
         }
         // Tạo FormData để upload file
@@ -1163,7 +1235,7 @@ const UserHome = () => {
         const res = await api.post('/posts', formData);
         
         // Show success message
-        alert('✅ ' + res.data.message);
+        notify('✅ ' + res.data.message);
         
         // Clear form
         setNewPostContent('');
@@ -1180,7 +1252,7 @@ const UserHome = () => {
       console.error('Error posting:', error);
       console.error('Error response:', error.response?.data);
       const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
-      alert('Lỗi đăng bài viết: ' + errorMessage);
+      notify('Lỗi đăng bài viết: ' + errorMessage);
     }
   };
 
@@ -1239,7 +1311,7 @@ const UserHome = () => {
 
   const handleUpdatePost = async () => {
     if (!editPostContent.trim()) {
-      alert('Vui lòng nhập nội dung bài viết');
+      notify('Vui lòng nhập nội dung bài viết');
       return;
     }
 
@@ -1272,23 +1344,23 @@ const UserHome = () => {
 
       await api.put(`/posts/${editingPost._id}`, formData);
       
-      alert('✅ Đã cập nhật bài viết thành công!');
+      notify('✅ Đã cập nhật bài viết thành công!');
       handleCloseEditPost();
       fetchData();
     } catch (error) {
       console.error('Error updating post:', error);
-      alert('❌ Lỗi cập nhật bài viết: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi cập nhật bài viết: ' + (error.response?.data?.message || error.message));
     }
   };
 
   const handleDeletePost = async (postId) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa bài viết này?')) {
+    if (!(await confirmAsync('Bạn có chắc chắn muốn xóa bài viết này?'))) {
       return;
     }
 
     try {
       await api.delete(`/posts/${postId}`);
-      alert('✅ Đã xóa bài viết thành công!');
+      notify('✅ Đã xóa bài viết thành công!');
       
       // Remove post from state
       setPosts(posts.filter(post => post._id !== postId));
@@ -1301,7 +1373,7 @@ const UserHome = () => {
       setShowPostOptions(null);
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('❌ Lỗi xóa bài viết: ' + (error.response?.data?.message || error.message));
+      notify('❌ Lỗi xóa bài viết: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -1325,25 +1397,25 @@ const UserHome = () => {
         // Remove from discover groups
         setDiscoverGroups(prev => prev.filter(g => g._id !== groupId));
         
-        alert('Đã tham gia nhóm thành công!');
+        notify('Đã tham gia nhóm thành công!');
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi tham gia nhóm');
+      notify(error.response?.data?.message || 'Lỗi tham gia nhóm');
     }
   };
 
   const handleLeaveGroupFromCard = async (groupId) => {
     if (!groupId) return;
-    if (!window.confirm('Bạn có chắc muốn rời nhóm này?')) return;
+    if (!(await confirmAsync('Bạn có chắc muốn rời nhóm này?'))) return;
     try {
       await api.post(`/groups/${groupId}/leave`);
       setGroups((prev) => prev.filter((g) => String(g._id) !== String(groupId)));
       setGroupCardMenuId(null);
       window.dispatchEvent(new CustomEvent('userGroupsChanged'));
       fetchData();
-      alert('Đã rời nhóm!');
+      notify('Đã rời nhóm!');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi rời nhóm');
+      notify(error.response?.data?.message || 'Lỗi rời nhóm');
     }
   };
 
@@ -1375,7 +1447,7 @@ const UserHome = () => {
       await fetchFriendsHubData();
       window.dispatchEvent(new CustomEvent('messagesUpdated'));
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể chấp nhận lời mời');
+      notify(error.response?.data?.message || 'Không thể chấp nhận lời mời');
     }
   };
 
@@ -1384,7 +1456,7 @@ const UserHome = () => {
       await api.put(`/friends/reject/${fromUserId}`);
       await fetchFriendsHubData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể từ chối lời mời');
+      notify(error.response?.data?.message || 'Không thể từ chối lời mời');
     }
   };
 
@@ -1395,7 +1467,7 @@ const UserHome = () => {
       if (!conversationId) return;
       window.dispatchEvent(new CustomEvent('openChat', { detail: { conversationId } }));
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể mở cuộc trò chuyện');
+      notify(error.response?.data?.message || 'Không thể mở cuộc trò chuyện');
     }
   };
 
@@ -1414,7 +1486,7 @@ const UserHome = () => {
         await fetchData();
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Không thể cập nhật theo dõi feed nhóm');
+      notify(error.response?.data?.message || 'Không thể cập nhật theo dõi feed nhóm');
     }
   };
 
@@ -1425,7 +1497,7 @@ const UserHome = () => {
       setHomeRsvpMenuEventId(null);
       await fetchData();
     } catch (error) {
-      alert(error.response?.data?.message || 'Không cập nhật được phản hồi');
+      notify(error.response?.data?.message || 'Không cập nhật được phản hồi');
     }
   };
 
@@ -1514,7 +1586,7 @@ const UserHome = () => {
     if (!homeGroupShareModalGroup?._id) return;
     const ids = [...homeGroupShareSelectedIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const grp = homeGroupShareModalGroup;
@@ -1533,10 +1605,10 @@ const UserHome = () => {
       setHomeGroupShareSelectedIds(new Set());
       setHomeGroupShareQuery('');
       setHomeGroupShareFriendsLoading(false);
-      alert(`Đã gửi nhóm tới ${ids.length} người bạn qua tin nhắn.`);
+      notify(`Đã gửi nhóm tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Home group share failed:', error);
-      alert(error.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.');
     } finally {
       setHomeGroupShareSending(false);
     }
@@ -1546,7 +1618,7 @@ const UserHome = () => {
     if (!homeEventShareModalEvent?._id) return;
     const ids = [...homeEventShareSelectedIds];
     if (ids.length === 0) {
-      alert('Vui lòng chọn ít nhất một người bạn.');
+      notify('Vui lòng chọn ít nhất một người bạn.');
       return;
     }
     const ev = homeEventShareModalEvent;
@@ -1560,7 +1632,7 @@ const UserHome = () => {
         setHomeEventShareModalEvent(null);
         setHomeEventShareSelectedIds(new Set());
         setHomeEventShareModalIntent('share');
-        alert(res.data?.message || `Đã gửi ${sent} lời mời.`);
+        notify(res.data?.message || `Đã gửi ${sent} lời mời.`);
         return;
       }
 
@@ -1577,10 +1649,10 @@ const UserHome = () => {
       setHomeEventShareModalEvent(null);
       setHomeEventShareSelectedIds(new Set());
       setHomeEventShareModalIntent('share');
-      alert(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
+      notify(`Đã gửi sự kiện tới ${ids.length} người bạn qua tin nhắn.`);
     } catch (error) {
       console.error('Home event share/invite failed:', error);
-      alert(error.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
+      notify(error.response?.data?.message || 'Không thể hoàn tất. Vui lòng thử lại.');
     } finally {
       setHomeEventShareSending(false);
     }
@@ -1607,7 +1679,7 @@ const UserHome = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      alert('Ảnh không được vượt quá 10MB');
+      notify('Ảnh không được vượt quá 10MB');
       e.target.value = '';
       return;
     }
@@ -1637,9 +1709,9 @@ const UserHome = () => {
         category: 'Học tập'
       });
       fetchData();
-      alert(res.data?.message || 'Đã gửi yêu cầu tạo nhóm. Nhóm của bạn đang chờ admin duyệt.');
+      notify(res.data?.message || 'Đã gửi yêu cầu tạo nhóm. Nhóm của bạn đang chờ admin duyệt.');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi tạo nhóm');
+      notify(error.response?.data?.message || 'Lỗi tạo nhóm');
     }
   };
 
@@ -1691,7 +1763,7 @@ const UserHome = () => {
       setShowGroupSettingsModal(true);
     } catch (error) {
       console.error('Error fetching group data:', error);
-      alert('Không thể tải thông tin nhóm');
+      notify('Không thể tải thông tin nhóm');
     }
   };
 
@@ -1700,28 +1772,28 @@ const UserHome = () => {
 
     // Validation
     if (!groupSettingsForm.name || !groupSettingsForm.name.trim()) {
-      alert('Tên nhóm không được để trống');
+      notify('Tên nhóm không được để trống');
       return;
     }
 
     if (groupSettingsForm.name.length > 100) {
-      alert('Tên nhóm không được vượt quá 100 ký tự');
+      notify('Tên nhóm không được vượt quá 100 ký tự');
       return;
     }
 
     if (groupSettingsForm.description && groupSettingsForm.description.length > 500) {
-      alert('Mô tả không được vượt quá 500 ký tự');
+      notify('Mô tả không được vượt quá 500 ký tự');
       return;
     }
 
     if (groupSettingsForm.rules && groupSettingsForm.rules.length > 2000) {
-      alert('Nội quy không được vượt quá 2000 ký tự');
+      notify('Nội quy không được vượt quá 2000 ký tự');
       return;
     }
 
     // Validate tags
     if (Array.isArray(groupSettingsForm.tags) && groupSettingsForm.tags.length > 10) {
-      alert('Tối đa 10 tags');
+      notify('Tối đa 10 tags');
       return;
     }
 
@@ -1745,7 +1817,7 @@ const UserHome = () => {
       if (selectedIsGroupCreator) {
         if (groupSettingsCoverFile) {
           if (groupSettingsCoverFile.size > 5 * 1024 * 1024) {
-            alert('Ảnh nhóm không được vượt quá 5MB');
+            notify('Ảnh nhóm không được vượt quá 5MB');
             return;
           }
           formData.append('images', groupSettingsCoverFile);
@@ -1796,11 +1868,11 @@ const UserHome = () => {
       // Close settings modal
       setShowGroupSettingsModal(false);
       
-      alert('Cập nhật cài đặt nhóm thành công!');
+      notify('Cập nhật cài đặt nhóm thành công!');
     } catch (error) {
       console.error('Error updating group settings:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Lỗi cập nhật cài đặt nhóm';
-      alert(errorMessage);
+      notify(errorMessage);
     }
   };
   
@@ -1844,7 +1916,7 @@ const UserHome = () => {
       setNewGroupPostFiles([]);
       setShowGroupPostForm(false);
       
-      alert('✅ Đã đăng bài trong nhóm!');
+      notify('✅ Đã đăng bài trong nhóm!');
     } catch (error) {
       console.error('Error creating group post:', error);
       console.error('Error details:', error.response?.data);
@@ -1855,7 +1927,7 @@ const UserHome = () => {
         console.log('Debug info:', debugInfo);
       }
       
-      alert('❌ Lỗi đăng bài: ' + errorMsg);
+      notify('❌ Lỗi đăng bài: ' + errorMsg);
     }
   };
   
@@ -1895,26 +1967,26 @@ const UserHome = () => {
   const handleAddMember = async (userId) => {
     try {
       const res = await api.post(`/groups/${selectedGroup._id}/invites`, { userId });
-      alert(res.data?.message || 'Đã gửi lời mời tham gia nhóm');
+      notify(res.data?.message || 'Đã gửi lời mời tham gia nhóm');
       setShowAddMemberModal(false);
       setUserSearchQuery('');
       setSearchUsers([]);
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi gửi lời mời');
+      notify(error.response?.data?.message || 'Lỗi gửi lời mời');
     }
   };
 
   const handleRemoveMember = async (memberId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa thành viên này khỏi nhóm?')) {
+    if (!(await confirmAsync('Bạn có chắc muốn xóa thành viên này khỏi nhóm?'))) {
       return;
     }
 
     try {
       const res = await api.delete(`/groups/${selectedGroup._id}/members/${memberId}`);
       setGroupMembers(res.data.members || []);
-      alert('Đã xóa thành viên khỏi nhóm!');
+      notify('Đã xóa thành viên khỏi nhóm!');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi xóa thành viên');
+      notify(error.response?.data?.message || 'Lỗi xóa thành viên');
     }
   };
 
@@ -1922,14 +1994,14 @@ const UserHome = () => {
     try {
       const res = await api.put(`/groups/${selectedGroup._id}/members/${memberId}`, { role: newRole });
       setGroupMembers(res.data.members || []);
-      alert('Đã cập nhật vai trò thành viên!');
+      notify('Đã cập nhật vai trò thành viên!');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi cập nhật vai trò');
+      notify(error.response?.data?.message || 'Lỗi cập nhật vai trò');
     }
   };
 
   const handleDeleteGroup = async (groupId) => {
-    if (!window.confirm('Bạn có chắc muốn xóa nhóm này? Hành động này không thể hoàn tác!')) {
+    if (!(await confirmAsync('Bạn có chắc muốn xóa nhóm này? Hành động này không thể hoàn tác!'))) {
       return;
     }
 
@@ -1938,9 +2010,9 @@ const UserHome = () => {
       setShowGroupDetailModal(false);
       setSelectedGroup(null);
       fetchData();
-      alert('Đã xóa nhóm thành công!');
+      notify('Đã xóa nhóm thành công!');
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi xóa nhóm');
+      notify(error.response?.data?.message || 'Lỗi xóa nhóm');
     }
   };
 
@@ -2048,13 +2120,13 @@ const UserHome = () => {
     e.stopPropagation();
     try {
       await api.post(`/friends/request/${userId}`);
-      alert('✅ Đã gửi lời mời kết bạn');
+      notify('✅ Đã gửi lời mời kết bạn');
       // Update search results to reflect the change
       setSearchResults(prev => prev.map(r => 
         r._id === userId ? { ...r, friendStatus: 'request_sent' } : r
       ));
     } catch (error) {
-      alert(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
+      notify(error.response?.data?.message || 'Lỗi khi gửi lời mời kết bạn');
     }
   };
 
@@ -2070,7 +2142,7 @@ const UserHome = () => {
       }));
     } catch (error) {
       console.error('Error starting chat:', error);
-      alert('Lỗi khi mở chat');
+      notify('Lỗi khi mở chat');
     }
   };
 
@@ -2258,13 +2330,13 @@ const UserHome = () => {
       <div className="px-4 pb-3">
         {post.textBackground && (!post.images || post.images.length === 0) && (!post.files || post.files.length === 0) ? (
           <div
-            className={`w-full min-h-[220px] sm:min-h-[300px] md:min-h-[420px] rounded-xl px-4 sm:px-5 py-6 sm:py-8 flex items-center justify-center text-center text-xl sm:text-2xl md:text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere] ${isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'}`}
+            className={`w-full min-h-[200px] sm:min-h-[260px] md:min-h-[320px] max-h-[55vh] overflow-y-auto rounded-xl px-4 sm:px-5 py-6 sm:py-8 flex items-center justify-center text-center text-xl sm:text-2xl md:text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere] ${isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'}`}
             style={{ background: post.textBackground }}
           >
             {post.content}
           </div>
         ) : (
-          <p className="text-[var(--fb-text-primary)] text-[15px] leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere]">{post.content}</p>
+          <PostContentText content={post.content} postId={post._id} />
         )}
         {post.tags && post.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -2302,7 +2374,7 @@ const UserHome = () => {
                     playsInline
                     preload="metadata"
                     data-scroll-autoplay="true"
-                    className="h-auto w-full max-h-[min(72vh,620px)] rounded-lg bg-black object-contain"
+                    className="h-auto w-full max-h-[min(55vh,500px)] rounded-lg bg-black object-contain"
                   />
                 </div>
               ) : (
@@ -2515,7 +2587,7 @@ const UserHome = () => {
 
       {/* Main Feed - Facebook Style (~680px max readable width, full width on small screens) */}
       <div className="lg:col-span-6">
-        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-3 sm:space-y-4">
+        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-2">
         {/* New Post - Facebook Style */}
         <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
           <div className="p-3 sm:p-4">
@@ -2789,6 +2861,22 @@ const UserHome = () => {
       </button>
     );
 
+    /** Tab ngang (mobile) — kiểu Facebook, tránh danh sách dọc dài */
+    const navTabMobile = (active, onClick, Icon, label) => (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold transition-colors whitespace-nowrap ${
+          active
+            ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+            : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+        }`}
+      >
+        <Icon className="h-4 w-4 shrink-0 opacity-90" />
+        {label}
+      </button>
+    );
+
     return (
       <div className="mx-auto max-w-7xl px-2 pb-6 sm:px-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -2796,13 +2884,12 @@ const UserHome = () => {
             <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-[22px] font-bold text-[var(--fb-text-primary)]">Nhóm</h2>
-                <button
-                  type="button"
-                  title="Cài đặt (sắp có)"
-                  className="rounded-full p-2 text-[var(--fb-icon)] hover:bg-[var(--fb-input)]"
-                >
-                  <Settings className="h-5 w-5" />
-                </button>
+              </div>
+
+              <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+                {navTabMobile(groupsSubTab === 'feed', goFeed, Newspaper, 'Bảng feed')}
+                {navTabMobile(groupsSubTab === 'explore', goExplore, Compass, 'Khám phá')}
+                {navTabMobile(groupsSubTab === 'myGroups', goMyGroups, Users, 'Nhóm tôi')}
               </div>
 
               <div className="relative mb-3">
@@ -2823,12 +2910,13 @@ const UserHome = () => {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="hidden space-y-1 lg:block">
                 {navBtn(groupsSubTab === 'feed', goFeed, Newspaper, 'Bảng feed nhóm')}
                 {navBtn(groupsSubTab === 'explore', goExplore, Compass, 'Khám phá')}
                 {navBtn(groupsSubTab === 'myGroups', goMyGroups, Users, 'Nhóm của tôi')}
               </div>
 
+              <div className={groupsSubTab === 'myGroups' ? 'contents' : 'hidden lg:contents'}>
               <button
                 type="button"
                 onClick={() => {
@@ -2897,6 +2985,7 @@ const UserHome = () => {
                     })
                   )}
                 </div>
+              </div>
               </div>
             </div>
           </aside>
@@ -3116,7 +3205,8 @@ const UserHome = () => {
               </>
             ) : groupsSubTab === 'feed' ? (
               <>
-                <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px]">
+                {/* Đồng bộ kích thước bài với feed trang chủ: cột main giới hạn ~620-680px */}
+                <div className="mx-auto w-full max-w-[min(100%,620px)] 2xl:max-w-[680px]">
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-[var(--fb-text-primary)] sm:text-xl">
                       Bảng feed nhóm
@@ -3141,7 +3231,7 @@ const UserHome = () => {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       {posts.map((post) => (
                         <React.Fragment key={post._id}>{renderPostCard(post)}</React.Fragment>
                       ))}
@@ -3327,6 +3417,37 @@ const UserHome = () => {
         </aside>
 
         <section className="lg:col-span-9">
+          {/* Mobile: tab ngang cuộn được (giống Facebook) */}
+          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+            <button
+              type="button"
+              onClick={() => {
+                setFriendsHubTab('requests');
+                handleTabChange('friends', { friendsSubTab: 'requests' });
+              }}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                isRequests
+                  ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                  : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+              }`}
+            >
+              Lời mời kết bạn{friendRequestsCount > 0 ? ` (${friendRequestsCount})` : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFriendsHubTab('all');
+                handleTabChange('friends', { friendsSubTab: 'all' });
+              }}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors ${
+                !isRequests
+                  ? 'bg-[#E7F3FF] text-[#1877F2] dark:bg-blue-900/35 dark:text-blue-200'
+                  : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+              }`}
+            >
+              Tất cả bạn bè ({friendsHubAll.length})
+            </button>
+          </div>
           <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 lg:p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[var(--fb-text-primary)]">
@@ -3717,7 +3838,7 @@ const UserHome = () => {
                 <button
                   onClick={async () => {
                     await checkAuth();
-                    alert('✅ Đã cập nhật quyền hạn');
+                    notify('✅ Đã cập nhật quyền hạn');
                   }}
                   className="text-sm text-gray-500 hover:text-orange-600 transition-colors flex items-center space-x-1"
                   title="Cập nhật quyền hạn mới nhất"
@@ -5273,7 +5394,7 @@ const UserHome = () => {
                         e.preventDefault();
                         const result = createSaveCollectionInModal();
                         if (!result.ok && result.reason === 'duplicate') {
-                          alert('Tên bộ sưu tập đã tồn tại.');
+                          notify('Tên bộ sưu tập đã tồn tại.');
                         }
                       }
                     }}
@@ -5283,7 +5404,7 @@ const UserHome = () => {
                     onClick={() => {
                       const result = createSaveCollectionInModal();
                       if (!result.ok && result.reason === 'duplicate') {
-                        alert('Tên bộ sưu tập đã tồn tại.');
+                        notify('Tên bộ sưu tập đã tồn tại.');
                       }
                     }}
                     disabled={!newSaveCollectionName.trim()}
@@ -5764,14 +5885,23 @@ const UserHome = () => {
                               ? 'Kéo để xem vùng khác; chạm nhẹ vào ảnh để phóng thêm'
                               : 'Bấm để phóng thêm; khi tối đa bấm lại để vừa khung'
                           }
-                          className={`m-auto block max-w-none object-contain transition-[max-height,max-width] duration-200 ease-out ${
+                          className={`m-auto block object-contain transition-[width,max-width,max-height] duration-200 ease-out ${
                             postTheaterZoom >= 4 ? 'cursor-zoom-out' : 'cursor-zoom-in'
                           }`}
-                          style={{
-                            width: `${100 * postTheaterZoom}%`,
-                            maxWidth: 'none',
-                            maxHeight: 'none',
-                          }}
+                          style={
+                            postTheaterZoom <= 1
+                              ? {
+                                  width: 'auto',
+                                  height: 'auto',
+                                  maxWidth: '100%',
+                                  maxHeight: '100%',
+                                }
+                              : {
+                                  width: `${100 * postTheaterZoom}%`,
+                                  maxWidth: 'none',
+                                  maxHeight: 'none',
+                                }
+                          }
                           onClick={
                             postTheaterZoom <= 1
                               ? (ev) => {

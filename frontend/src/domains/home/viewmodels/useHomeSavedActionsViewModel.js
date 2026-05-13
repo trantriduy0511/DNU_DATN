@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import apiClient from '../../../shared/infra/http/apiClient';
 import { STORAGE_KEYS } from '../../../shared/infra/storage/storageKeys';
 import { loadJSON, saveJSON } from '../../../shared/infra/storage/storageService';
@@ -9,6 +9,9 @@ export function useHomeSavedActionsViewModel(savedPosts, setSavedPosts) {
   const [saveCollectionModalPostId, setSaveCollectionModalPostId] = useState(null);
   const [saveCollectionChoice, setSaveCollectionChoice] = useState('default');
   const [newSaveCollectionName, setNewSaveCollectionName] = useState('');
+
+  const collectionsHydratedRef = useRef(false);
+  const mapHydratedRef = useRef(false);
 
   useEffect(() => {
     const rawCollections = loadJSON(STORAGE_KEYS.savedCollections, null);
@@ -23,10 +26,19 @@ export function useHomeSavedActionsViewModel(savedPosts, setSavedPosts) {
   }, []);
 
   useEffect(() => {
+    // Bỏ qua lần chạy đầu để không ghi đè storage bằng state khởi tạo trước hydrate
+    if (!collectionsHydratedRef.current) {
+      collectionsHydratedRef.current = true;
+      return;
+    }
     saveJSON(STORAGE_KEYS.savedCollections, savedCollections);
   }, [savedCollections]);
 
   useEffect(() => {
+    if (!mapHydratedRef.current) {
+      mapHydratedRef.current = true;
+      return;
+    }
     saveJSON(STORAGE_KEYS.savedCollectionMap, savedPostCollectionMap);
   }, [savedPostCollectionMap]);
 

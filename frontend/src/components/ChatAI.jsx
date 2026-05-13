@@ -11,6 +11,7 @@ import {
   RefreshCw,
   ImagePlus,
 } from "lucide-react";
+import { notify } from '../lib/notify';
 import { useAuthStore } from "../store/authStore";
 import api from "../utils/api";
 
@@ -33,6 +34,7 @@ const ChatAI = () => {
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewImageUrl, setPreviewImageUrl] = useState("");
+  const [aiPostContext, setAiPostContext] = useState({ postId: null, title: "" });
   const messagesEndRef = useRef(null);
   const imageInputRef = useRef(null);
   const { user } = useAuthStore();
@@ -1066,6 +1068,7 @@ const ChatAI = () => {
         message: currentMessage,
         conversationHistory: conversationHistory,
         studyMaterial: null, // Can be set when user provides study material
+        postId: aiPostContext.postId || undefined,
         imageAttachment: imageToSend
           ? {
               mimeType: imageToSend.mimeType,
@@ -1131,11 +1134,11 @@ const ChatAI = () => {
   const processImageFile = (file) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("Chỉ hỗ trợ tệp ảnh.");
+      notify("Chỉ hỗ trợ tệp ảnh.");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert("Ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.");
+      notify("Ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.");
       return;
     }
 
@@ -1200,10 +1203,25 @@ const ChatAI = () => {
     });
   };
 
-  // Listen for openChatAI event from sidebar
+  useEffect(() => {
+    const onSetPost = (e) => {
+      const pid = e?.detail?.postId != null ? String(e.detail.postId).trim() : "";
+      const title = e?.detail?.title != null ? String(e.detail.title).trim() : "";
+      if (!pid) {
+        setAiPostContext({ postId: null, title: "" });
+        return;
+      }
+      setAiPostContext({ postId: pid, title: title || "Bài viết" });
+    };
+    window.addEventListener("chatAISetPostContext", onSetPost);
+    return () => window.removeEventListener("chatAISetPostContext", onSetPost);
+  }, []);
+
+  // Listen for openChatAI event from sidebar / floating button.
+  // Toggle: lần 1 mở, lần 2 thu lại khung Chat AI.
   useEffect(() => {
     const handleOpenChatAI = () => {
-      setIsOpen(true);
+      setIsOpen((prev) => !prev);
     };
 
     window.addEventListener("openChatAI", handleOpenChatAI);
@@ -1290,12 +1308,17 @@ const ChatAI = () => {
           >
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+              <div className="flex items-center space-x-2 min-w-0">
+                <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
                   <Bot className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-bold text-sm">Trợ lý AI</h3>
+                  {aiPostContext.postId ? (
+                    <p className="text-[10px] text-blue-100 truncate pr-1" title={aiPostContext.title}>
+                      Tham chiếu: {aiPostContext.title}
+                    </p>
+                  ) : null}
                   <p className="text-xs text-blue-100 flex items-center space-x-1">
                     <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
                     <span>Đang hoạt động</span>

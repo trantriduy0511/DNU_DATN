@@ -7,6 +7,7 @@ import { formatTimeAgo } from '../utils/formatTime';
 import { initializeSocket } from '../utils/socket';
 import { useAuthStore } from '../store/authStore';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { notify } from '../lib/notify';
 
 const sameId = (a, b) => String(a) === String(b);
 
@@ -228,13 +229,13 @@ const NotificationBell = () => {
     if (!inviteId || !groupId) return;
     try {
       const res = await api.post(`/groups/${groupId}/invites/${inviteId}/accept`);
-      alert(res.data?.message || 'Đã tham gia nhóm!');
+      notify(res.data?.message || 'Đã tham gia nhóm!');
       await handleDelete(notification._id);
       window.dispatchEvent(new CustomEvent('userGroupsChanged'));
       setShowDropdown(false);
       navigate(`/groups/${groupId}`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể chấp nhận lời mời');
+      notify(err.response?.data?.message || 'Không thể chấp nhận lời mời');
     }
   };
 
@@ -247,7 +248,7 @@ const NotificationBell = () => {
       await api.post(`/groups/${groupId}/invites/${inviteId}/decline`);
       await handleDelete(notification._id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể từ chối lời mời');
+      notify(err.response?.data?.message || 'Không thể từ chối lời mời');
     }
   };
 
@@ -260,12 +261,12 @@ const NotificationBell = () => {
     if (!eventId) return;
     try {
       const res = await api.post(`/events/${eventId}/cohost-invite/accept`);
-      alert(res.data?.message || 'Đã chấp nhận làm đồng tổ chức');
+      notify(res.data?.message || 'Đã chấp nhận làm đồng tổ chức');
       await handleDelete(notification._id);
       setShowDropdown(false);
       navigate(`/events/${eventId}`);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể chấp nhận lời mời');
+      notify(err.response?.data?.message || 'Không thể chấp nhận lời mời');
     }
   };
 
@@ -278,10 +279,10 @@ const NotificationBell = () => {
     if (!eventId) return;
     try {
       const res = await api.post(`/events/${eventId}/cohost-invite/decline`);
-      alert(res.data?.message || 'Đã từ chối');
+      notify(res.data?.message || 'Đã từ chối');
       await handleDelete(notification._id);
     } catch (err) {
-      alert(err.response?.data?.message || 'Không thể từ chối lời mời');
+      notify(err.response?.data?.message || 'Không thể từ chối lời mời');
     }
   };
 
@@ -448,7 +449,7 @@ const NotificationBell = () => {
         createPortal(
           <div
             ref={dropdownPanelRef}
-            className="fixed top-16 right-4 w-96 bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-xl border border-[var(--fb-divider)] z-[2000] max-h-[600px] flex flex-col"
+            className="fixed top-16 right-4 w-96 bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-xl border border-[var(--fb-divider)] z-[10000] max-h-[600px] flex flex-col"
           >
             <div className="p-4 pb-2 flex items-center justify-between sticky top-0 bg-[var(--fb-surface)] rounded-t-lg">
               <h3 className="text-lg font-bold text-[var(--fb-text-primary)]">Thông báo</h3>
@@ -510,13 +511,12 @@ const NotificationBell = () => {
                 <button
                   type="button"
                   onClick={() => {
+                    setShowDropdown(false);
                     if (user?.role === 'admin') {
-                      setShowDropdown(false);
                       navigate('/admin/notifications');
                       return;
                     }
-                    setNotificationFilter('all');
-                    setShowAllItems(true);
+                    navigate('/notifications');
                   }}
                   className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
                 >
