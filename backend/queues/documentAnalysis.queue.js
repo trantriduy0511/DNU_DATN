@@ -2,6 +2,7 @@ import { Queue, Worker } from 'bullmq';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import redisConnection, { isRedisEnabled } from '../config/redis.js';
 import AIAnalysisJob from '../models/AIAnalysisJob.model.js';
+import { normalizeUploadedFileName } from '../utils/uploadFileName.js';
 
 const QUEUE_NAME = 'document-analysis';
 
@@ -26,17 +27,6 @@ const getGenAIClient = () => {
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const normalizeUploadedFileName = (name) => {
-  const raw = String(name || '').trim();
-  if (!raw) return 'unknown';
-  try {
-    const recovered = Buffer.from(raw, 'latin1').toString('utf8');
-    const hasUnicode = /[\u0100-\uFFFF]/.test(recovered);
-    return hasUnicode ? recovered : raw;
-  } catch {
-    return raw;
-  }
-};
 
 const sanitizeAiText = (value) =>
   String(value || '')

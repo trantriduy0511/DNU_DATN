@@ -411,7 +411,8 @@ const UserHome = () => {
   const navigate = useNavigate();
   const { user, token, logout, updateUser, checkAuth } = useAuthStore();
   const isInitialMount = useRef(true);
-  const canPostLecturerDocuments = user?.role === 'admin' || user?.studentRole === 'Giảng viên';
+  const canPostLecturerDocuments =
+    user?.role === 'admin' || String(user?.studentRole || '').trim() === 'Giảng viên';
 
   const homeEventInviteFriendsEligible = useMemo(() => {
     const ev = homeEventShareModalEvent;
@@ -822,7 +823,7 @@ const UserHome = () => {
 
   const fetchData = async () => {
     // Only set main loading for initial load or tab changes that need full reload
-    if (activeTab === 'home' || activeTab === 'documents' || activeTab === 'events' || activeTab === 'friends') {
+    if (activeTab === 'home' || activeTab === 'events' || activeTab === 'friends') {
     setLoading(true);
     }
     try {
@@ -860,19 +861,8 @@ const UserHome = () => {
         });
         setLikedPosts(liked);
       } else if (activeTab === 'documents') {
-        const res = await api.get('/posts', {
-          params: { category: 'Tài liệu' }
-        });
-        const docPosts = (res.data.posts || []).filter(isLecturerDocumentPost);
-        setPosts(docPosts);
-
-        const liked = new Set();
-        docPosts.forEach((post) => {
-          if (post.likes?.includes(user?.id)) {
-            liked.add(post._id);
-          }
-        });
-        setLikedPosts(liked);
+        setPosts([]);
+        setLikedPosts(new Set());
       } else if (activeTab === 'groups') {
         // Check cache first
         const now = Date.now();
@@ -2173,7 +2163,7 @@ const UserHome = () => {
   const renderPostCard = (post) => (
     <div
       id={`post-${String(post._id)}`}
-      className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden hover:shadow-md transition-shadow scroll-mt-24"
+      className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden max-lg:hover:shadow-none lg:hover:shadow-md transition-shadow scroll-mt-24"
     >
       {/* Header - Facebook Style */}
       <div className="p-3 flex items-center justify-between">
@@ -2489,7 +2479,7 @@ const UserHome = () => {
   );
 
   const renderHome = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-6 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
       {/* Left Sidebar - Facebook Style */}
       <aside className="hidden lg:block lg:col-span-3">
         <div className="sticky top-20 space-y-4">
@@ -2532,7 +2522,7 @@ const UserHome = () => {
                   <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                     <BookOpen className="w-5 h-5 text-blue-600" />
               </div>
-                <span className="text-sm font-medium text-[var(--fb-text-primary)]">Tài liệu giảng viên</span>
+                <span className="text-sm font-medium text-[var(--fb-text-primary)]">Phân tích tài liệu</span>
             </button>
             <button 
               onClick={() => handleTabChange('groups')}
@@ -2587,9 +2577,10 @@ const UserHome = () => {
 
       {/* Main Feed - Facebook Style (~680px max readable width, full width on small screens) */}
       <div className="lg:col-span-6">
-        <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-2">
+        <div className="mx-auto flex w-full max-w-[min(100%,760px)] flex-col lg:gap-2 2xl:max-w-[820px]">
+        <div className="flex min-w-0 flex-col max-lg:divide-y max-lg:divide-[var(--fb-divider)] max-lg:overflow-hidden max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm lg:contents">
         {/* New Post - Facebook Style */}
-        <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
+        <div className="overflow-hidden border border-[var(--fb-divider)] bg-[var(--fb-surface)] max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none lg:rounded-lg lg:shadow-sm">
           <div className="p-3 sm:p-4">
           <div className="flex items-center space-x-3">
               <img
@@ -2600,7 +2591,15 @@ const UserHome = () => {
                 onClick={() => navigate(`/profile/${user?.id}`)}
               />
             <button
-              onClick={() => setShowHomePostModal(true)}
+              type="button"
+              onClick={async () => {
+                try {
+                  await checkAuth();
+                } catch {
+                  /* bỏ qua — vẫn mở modal */
+                }
+                setShowHomePostModal(true);
+              }}
                 className="flex-1 text-left px-4 py-2.5 bg-[var(--fb-input)] rounded-full text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] transition-colors text-[15px]"
             >
               Bạn đang nghĩ gì?
@@ -2610,7 +2609,7 @@ const UserHome = () => {
         </div>
 
         {/* Filter - Facebook Style */}
-        <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
+        <div className="overflow-hidden border border-[var(--fb-divider)] bg-[var(--fb-surface)] max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none lg:rounded-lg lg:shadow-sm">
           <div className="flex items-center space-x-1 p-1.5 sm:p-2 overflow-x-auto scrollbar-hide">
             {['Tất cả', 'Học tập', 'Sự kiện', 'Thảo luận', 'Tài liệu', 'Tài liệu giảng viên'].map((category) => (
               <button
@@ -2635,12 +2634,12 @@ const UserHome = () => {
 
         {/* Posts */}
         {loading ? (
-          <div className="text-center py-12">
+          <div className="bg-[var(--fb-surface)] py-12 text-center max-lg:bg-transparent lg:rounded-lg lg:border lg:border-[var(--fb-divider)] lg:shadow-sm">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-[var(--fb-text-secondary)] text-sm mt-2">Đang tải...</p>
+            <p className="mt-2 text-sm text-[var(--fb-text-secondary)]">Đang tải...</p>
           </div>
         ) : posts.length === 0 ? (
-          <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-12 text-center">
+          <div className="border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-12 text-center max-lg:border-0 max-lg:bg-transparent lg:rounded-lg lg:shadow-sm">
             <div className="w-16 h-16 bg-[var(--fb-input)] rounded-full flex items-center justify-center mx-auto mb-4">
               <Home className="w-8 h-8 text-[var(--fb-icon)] opacity-70" />
             </div>
@@ -2652,6 +2651,7 @@ const UserHome = () => {
             <React.Fragment key={post._id}>{renderPostCard(post)}</React.Fragment>
           ))
         )}
+        </div>
         </div>
       </div>
 
@@ -2878,10 +2878,11 @@ const UserHome = () => {
     );
 
     return (
-      <div className="mx-auto max-w-7xl px-2 pb-6 sm:px-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="mx-auto max-w-7xl px-0 pb-6 sm:px-4">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:gap-4 max-lg:gap-0">
+          <div className="flex flex-col overflow-hidden max-lg:divide-y max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm lg:contents">
           <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[300px] xl:w-[320px]">
-            <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 shadow-sm">
+            <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 shadow-sm max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-[22px] font-bold text-[var(--fb-text-primary)]">Nhóm</h2>
               </div>
@@ -2990,10 +2991,10 @@ const UserHome = () => {
             </div>
           </aside>
 
-          <main className="min-w-0 flex-1">
+          <main className="min-w-0 flex-1 max-lg:px-2 max-lg:py-3">
             {groupsSubTab === 'myGroups' ? (
               <>
-                <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-2 max-lg:mb-3">
                   <h3 className="text-lg font-bold text-[var(--fb-text-primary)] sm:text-xl">
                     Tất cả các nhóm bạn đã tham gia ({sortedMyGroups.length})
                   </h3>
@@ -3373,6 +3374,7 @@ const UserHome = () => {
               </>
             )}
           </main>
+          </div>
         </div>
       </div>
     );
@@ -3383,7 +3385,7 @@ const UserHome = () => {
     const items = isRequests ? friendsHubRequests : friendsHubAll;
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-7xl mx-auto">
+      <div className="grid max-w-7xl mx-auto grid-cols-1 gap-0 lg:grid-cols-12 lg:gap-4">
         <aside className="hidden lg:block lg:col-span-3">
           <div className="sticky top-20 rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3">
             <h2 className="px-2 py-1 text-2xl font-bold text-[var(--fb-text-primary)]">Bạn bè</h2>
@@ -3416,9 +3418,9 @@ const UserHome = () => {
           </div>
         </aside>
 
-        <section className="lg:col-span-9">
+        <section className="lg:col-span-9 max-lg:overflow-hidden max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm">
           {/* Mobile: tab ngang cuộn được (giống Facebook) */}
-          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:hidden">
+          <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden lg:hidden max-lg:mb-0 max-lg:border-b max-lg:border-[var(--fb-divider)] max-lg:px-2 max-lg:py-2">
             <button
               type="button"
               onClick={() => {
@@ -3448,7 +3450,7 @@ const UserHome = () => {
               Tất cả bạn bè ({friendsHubAll.length})
             </button>
           </div>
-          <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 lg:p-4">
+          <div className="rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-3 lg:p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[var(--fb-text-primary)]">
                 {isRequests ? 'Lời mời kết bạn' : 'Tất cả bạn bè'}
@@ -3537,19 +3539,8 @@ const UserHome = () => {
   };
 
   const renderDocuments = () => {
-    // Check if user can post documents (admin or lecturer only)
-    // This is checked on every render to ensure permissions are up-to-date
-    const canPostDocument = canPostLecturerDocuments;
-    
-    // Debug: Log current permissions
-    console.log('📋 Documents Tab - Current User Permissions:', {
-      role: user?.role,
-      studentRole: user?.studentRole,
-      canPostDocument
-    });
-    
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 lg:gap-6 max-w-7xl mx-auto px-0 sm:px-2 lg:px-4">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-0 px-0 sm:px-2 lg:grid-cols-12 lg:gap-6 lg:px-4">
         <aside className="hidden lg:block lg:col-span-3">
           <div className="sticky top-20 space-y-4">
             <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden hover:shadow-md transition-shadow">
@@ -3588,7 +3579,7 @@ const UserHome = () => {
                     <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
                       <BookOpen className="w-5 h-5 text-blue-600" />
                     </div>
-                    <span className="text-sm font-medium text-[var(--fb-text-primary)]">Tài liệu giảng viên</span>
+                    <span className="text-sm font-medium text-[var(--fb-text-primary)]">Phân tích tài liệu</span>
                   </button>
                   <button
                     onClick={() => handleTabChange('groups')}
@@ -3643,270 +3634,7 @@ const UserHome = () => {
 
         <div className="lg:col-span-6">
           <div className="mx-auto w-full max-w-[min(100%,760px)] 2xl:max-w-[820px]">
-        {/* New Post Form - Hiển thị khi showNewPost = true */}
-        {showNewPost && canPostDocument && (
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Đăng tài liệu mới</h3>
-              <button
-                onClick={() => {
-                  setShowNewPost(false);
-                  setNewPostContent('');
-                  setNewPostCategory('Tài liệu');
-                  setNewPostImages([]);
-                  setNewPostFiles([]);
-                  setNewPostTextBackground('');
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-3">
-              <textarea
-                value={newPostContent}
-                onChange={(e) => setNewPostContent(e.target.value)}
-                placeholder="Mô tả về tài liệu bạn muốn chia sẻ..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows="4"
-              />
-
-              {newPostImages.length === 0 && newPostFiles.length === 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nền cho bài viết chữ</label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {TEXT_POST_BACKGROUNDS.map((item) => {
-                      const active = newPostTextBackground === item.background;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          title={item.label}
-                          onClick={() => setNewPostTextBackground(item.background)}
-                          className={`h-8 w-8 rounded-full border-2 transition-transform ${active ? 'border-blue-500 scale-105' : 'border-gray-200 hover:scale-105'}`}
-                          style={{ background: item.background || 'linear-gradient(135deg,#f3f4f6,#e5e7eb)' }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
-              {/* Category - Auto set to Tài liệu */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Loại bài viết</label>
-                <select
-                  value={newPostCategory}
-                  onChange={(e) => setNewPostCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="Tài liệu">📄 Tài liệu</option>
-                  <option value="Học tập">📚 Học tập</option>
-                  <option value="Thảo luận">💬 Thảo luận</option>
-                  <option value="Sự kiện">📅 Sự kiện</option>
-                  <option value="Khác">📌 Khác</option>
-                </select>
-              </div>
-
-              {/* Image / video preview */}
-              {newPostImages.length > 0 && (
-                <div className="grid grid-cols-3 gap-2">
-                  {newPostImages.map((img, index) => (
-                    <div key={`${img.name}-${index}`} className="relative group">
-                      {img.type?.startsWith('video/') ? (
-                        <video
-                          src={URL.createObjectURL(img)}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className="h-32 w-full rounded-lg bg-black object-cover"
-                        />
-                      ) : (
-                        <img
-                          src={URL.createObjectURL(img)}
-                          alt={`Preview ${index}`}
-                          className="h-32 w-full rounded-lg object-cover"
-                        />
-                      )}
-                      <button
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* File List */}
-              {newPostFiles.length > 0 && (
-                <div className="space-y-2">
-                  {newPostFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-2">
-                        <BookOpen className="w-5 h-5 text-orange-600" />
-                        <span className="text-sm text-gray-700">{file.name}</span>
-                        <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(2)} KB)</span>
-                      </div>
-                      <button
-                        onClick={() => removeFile(index)}
-                        className="p-1 hover:bg-red-50 rounded transition-colors"
-                      >
-                        <X className="w-4 h-4 text-red-500" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <div className="flex space-x-2">
-                  <input
-                    type="file"
-                    id="doc-image-upload"
-                    accept="image/*,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/x-matroska,video/avi,.mp4,.webm,.mov,.mkv,.avi,.m4v,.ogv,.mpeg,.mpg"
-                    multiple
-                    onChange={handleImageSelect}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="doc-image-upload"
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                    title="Thêm ảnh hoặc video"
-                  >
-                    <Image className="w-5 h-5 text-green-600" />
-                  </label>
-                  
-                  <input
-                    type="file"
-                    id="doc-file-upload"
-                    multiple
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="doc-file-upload"
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-                    title="Thêm tệp/tài liệu"
-                  >
-                    <BookOpen className="w-5 h-5 text-orange-600" />
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setShowNewPost(false);
-                      setNewPostContent('');
-                      setNewPostCategory('Tài liệu');
-                      setNewPostImages([]);
-                      setNewPostFiles([]);
-                      setNewPostTextBackground('');
-                    }}
-                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    onClick={handlePost}
-                    disabled={!newPostContent.trim() && newPostImages.length === 0 && newPostFiles.length === 0}
-                    className="px-4 py-2 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-                  >
-                    Đăng bài
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AI Document Analyzer */}
-        <DocumentAnalyzer />
-
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <BookOpen className="w-7 h-7 mr-3 text-orange-600" />
-                    Tài liệu giảng viên
-                  </h2>
-                </div>
-                <button
-                  onClick={async () => {
-                    await checkAuth();
-                    notify('✅ Đã cập nhật quyền hạn');
-                  }}
-                  className="text-sm text-gray-500 hover:text-orange-600 transition-colors flex items-center space-x-1"
-                  title="Cập nhật quyền hạn mới nhất"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>Làm mới</span>
-                </button>
-              </div>
-              {!canPostDocument && (
-                <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2">
-                  <p className="text-sm text-orange-800 font-medium">Chỉ giáo viên và admin mới đăng bài được tại đây.</p>
-                </div>
-              )}
-            </div>
-            {canPostDocument && (
-              <button
-                onClick={() => {
-                  setShowNewPost(true);
-                  setNewPostCategory('Tài liệu'); // Auto-set category to Tài liệu
-                }}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all ml-4 shadow-md hover:shadow-lg"
-              >
-                <Plus className="w-5 h-5" />
-                <span>Đăng tài liệu</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-          {/* Documents Grid */}
-          {loading ? (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-md p-12 text-center">
-              <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Chưa có bài viết nào trong mục Tài liệu</h3>
-              <p className="text-gray-500 mb-4">
-                {canPostDocument
-                  ? 'Hãy là người đầu tiên chia sẻ tài liệu chuyên môn cho sinh viên!'
-                  : 'Chưa có bài nào. Vui lòng quay lại sau hoặc xem Trang chủ.'}
-              </p>
-              {canPostDocument && (
-                <button
-                  onClick={() => {
-                    setShowNewPost(true);
-                    setNewPostCategory('Tài liệu');
-                  }}
-                  className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-blue-600 text-white rounded-lg hover:from-orange-600 hover:to-blue-700 transition-all shadow-md hover:shadow-lg"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span>Đăng tài liệu ngay</span>
-                </button>
-              )}
-              {!canPostDocument && (
-                <p className="text-sm text-gray-400 mt-4">
-                  💡 Mẹo: Bạn vẫn có thể chia sẻ tài liệu ở <button onClick={() => handleTabChange('home')} className="text-blue-600 hover:underline font-medium">Trang chủ</button> với category "Tài liệu"
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {posts.map((post) => (
-                <React.Fragment key={post._id}>{renderPostCard(post)}</React.Fragment>
-              ))}
-            </div>
-          )}
+            <DocumentAnalyzer />
           </div>
         </div>
 
@@ -3974,7 +3702,9 @@ const UserHome = () => {
 
   const renderEvents = () => (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="flex flex-col lg:gap-6 max-lg:gap-0">
+        <div className="flex flex-col overflow-hidden max-lg:divide-y max-lg:divide-gray-200 max-lg:border-x-0 max-lg:border-y max-lg:border-gray-200 max-lg:bg-white max-lg:shadow-sm lg:contents">
+      <div className="mb-6 bg-white p-6 shadow-md max-lg:mb-0 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none lg:mb-6 lg:rounded-lg lg:border lg:border-gray-200">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-800">Sự kiện</h2>
           <button
@@ -4031,13 +3761,13 @@ const UserHome = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 max-lg:px-2 max-lg:py-3">
         {loading ? (
           <div className="col-span-full text-center py-8">
             <p className="text-gray-500">Đang tải sự kiện...</p>
           </div>
         ) : events.length === 0 ? (
-          <div className="col-span-full bg-white rounded-lg shadow-md p-8 text-center">
+          <div className="col-span-full bg-white rounded-lg shadow-md p-8 text-center max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
             <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">
               {eventFilter === 'all' 
@@ -4306,6 +4036,8 @@ const UserHome = () => {
         })
         )}
       </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -4370,7 +4102,7 @@ const UserHome = () => {
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-3 sm:py-4">
+      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 max-lg:pt-0 pb-3 sm:pb-4 lg:py-4">
         {/* Render active tab content - keep container static to prevent flicker */}
         <div className="tab-content">
           {activeTab === 'home' && renderHome()}
@@ -5501,7 +5233,9 @@ const UserHome = () => {
                   className="w-full px-3 py-2 border border-[var(--fb-divider)] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                 >
                   <option value="Học tập">📚 Học tập</option>
-                  {canPostLecturerDocuments && <option value="Tài liệu">📄 Tài liệu giảng viên</option>}
+                  {canPostLecturerDocuments ? (
+                    <option value="Tài liệu">📄 Tài liệu giảng viên</option>
+                  ) : null}
                   <option value="Thảo luận">💬 Thảo luận</option>
                   <option value="Sự kiện">📅 Sự kiện</option>
                   <option value="Khác">📌 Khác</option>

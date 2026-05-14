@@ -158,6 +158,8 @@ const EventDetailPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const canPostLecturerDocuments =
+    user?.role === 'admin' || String(user?.studentRole || '').trim() === 'Giảng viên';
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -700,6 +702,10 @@ const EventDetailPage = () => {
     const canSubmit =
       Boolean(text) || discussionImages.length > 0 || discussionFiles.length > 0;
     if (!id || !canSubmit || discussionSubmitting) return;
+    if (discussionCategory === 'Tài liệu' && !canPostLecturerDocuments) {
+      notify('Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên');
+      return;
+    }
     setDiscussionSubmitting(true);
     try {
       const fd = new FormData();
@@ -1104,8 +1110,8 @@ const EventDetailPage = () => {
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
       {/* Hero — một thẻ lớn (bìa + tiêu đề), giống khối đầu trang Nhóm */}
-      <div className="mx-auto max-w-7xl px-4 pt-4">
-        <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm">
+      <div className="mx-auto max-w-7xl px-0 pt-4 max-lg:pt-0 sm:px-4">
+        <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none">
           <div className="relative aspect-[21/9] min-h-[200px] w-full max-h-[min(420px,44vh)] overflow-hidden rounded-t-xl bg-[var(--fb-surface)] sm:min-h-[220px] md:min-h-[260px]">
             <input
               ref={eventCoverFileInputRef}
@@ -1325,11 +1331,11 @@ const EventDetailPage = () => {
                         </div>
 
       {/* Nội dung dưới — cột Giới thiệu + tab (giống Nhóm học tập), phần này thấp hơn khối hero */}
-      <div className="mx-auto mt-5 max-w-[min(100%,calc(300px+680px+1rem))] px-4 pb-10">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,300px)_minmax(0,680px)] lg:gap-4">
+      <div className="mx-auto mt-5 max-w-[min(100%,calc(300px+680px+1rem))] px-0 pb-10 max-lg:mt-0 sm:px-4">
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(260px,300px)_minmax(0,680px)] lg:gap-4">
           <aside className="min-w-0">
-            <div className="sticky top-20 space-y-4">
-              <div className="rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-4 shadow-md">
+            <div className="sticky top-20 space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm max-lg:overflow-hidden lg:space-y-4 lg:border-0 lg:bg-transparent lg:shadow-none">
+              <div className="rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] p-4 shadow-md max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 <h2 className="mb-2 text-base font-bold text-[var(--fb-text-primary)]">Giới thiệu</h2>
                 <p className="text-sm leading-relaxed text-[var(--fb-text-secondary)] whitespace-pre-wrap">
                   {ev.description?.trim()
@@ -1354,7 +1360,7 @@ const EventDetailPage = () => {
                 ) : null}
               </div>
 
-              <div className="overflow-hidden rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-md">
+              <div className="overflow-hidden rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-md max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 {mapSrc ? (
                   <iframe
                     title="Bản đồ"
@@ -2920,7 +2926,9 @@ const EventDetailPage = () => {
                     className="w-full rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 py-2 text-sm text-[var(--fb-text-primary)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="Học tập">📚 Học tập</option>
-                    <option value="Tài liệu">📄 Tài liệu</option>
+                    {canPostLecturerDocuments ? (
+                      <option value="Tài liệu">📄 Tài liệu giảng viên</option>
+                    ) : null}
                     <option value="Thảo luận">💬 Thảo luận</option>
                     <option value="Sự kiện">📅 Sự kiện</option>
                     <option value="Khác">📌 Khác</option>

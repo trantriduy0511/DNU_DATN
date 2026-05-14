@@ -2070,8 +2070,8 @@ const GroupDetail = () => {
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)] animate-fadeIn">
       {/* Ảnh bìa + header — một khung căn max-w-7xl, kiểu Facebook */}
-      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 pt-4">
-        <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm">
+      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 pt-4 max-lg:pt-0">
+        <div className="overflow-visible rounded-xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-sm max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none lg:rounded-xl lg:border lg:shadow-sm">
           <div className="relative aspect-[21/9] min-h-[180px] w-full max-h-[360px] overflow-hidden rounded-t-xl bg-gradient-to-r from-blue-400 to-purple-500 sm:min-h-[200px] md:min-h-[240px]">
             {groupHeroImageUrl ? (
               <button
@@ -2341,7 +2341,7 @@ const GroupDetail = () => {
             </div>
           </div>
         )}
-        <div className="mx-auto grid w-full max-w-[min(100%,calc(300px+680px+1rem))] grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,300px)_minmax(0,680px)] lg:gap-4">
+        <div className="mx-auto grid w-full max-w-[min(100%,calc(300px+680px+1rem))] grid-cols-1 gap-0 px-0 sm:px-0 lg:grid-cols-[minmax(260px,300px)_minmax(0,680px)] lg:gap-4">
           {/* Left Sidebar — gần cột bài viết, cả khối căn giữa trang */}
           <div className="min-w-0">
             <div className="sticky top-20 space-y-4">
@@ -2458,7 +2458,7 @@ const GroupDetail = () => {
 
           {/* Main Content — luồng bài viết */}
           <div className="min-w-0">
-            <div className="mx-auto w-full max-w-[min(100%,680px)] space-y-4">
+            <div className="mx-auto w-full max-w-[min(100%,680px)] space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] lg:space-y-4">
             {/* Tabs */}
             <div
               id="group-feed-tabs"
@@ -2725,7 +2725,7 @@ const GroupDetail = () => {
             {activeTab === 'posts' && (
               <>
                 {/* Composer: thu gọn như trang chủ — mở rộng khi bấm */}
-                <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
+                <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none">
                   {!isMember ? (
                     <div className="p-4 border-2 border-dashed border-[var(--fb-divider)] rounded-lg m-4 text-center">
                       <div className="mb-4">
@@ -2766,7 +2766,7 @@ const GroupDetail = () => {
                 </div>
 
                 {/* Search Posts */}
-                <div className="mb-4">
+                <div className="mb-4 max-lg:mb-0 max-lg:border-b max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:px-2 max-lg:py-2">
                   <div className="relative">
                     <Search className="w-5 h-5 text-[var(--fb-icon)] absolute left-3 top-3" />
                     <input
@@ -2780,9 +2780,9 @@ const GroupDetail = () => {
                 </div>
 
                 {/* Bài viết trong nhóm — cùng luồng hiển thị như trang chủ */}
-                <div className="space-y-4">
+                <div className="space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] lg:space-y-4">
                   {filteredPosts.length === 0 ? (
-                    <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-12 text-center">
+                    <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-12 text-center max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                       <FileText className="w-16 h-16 text-[var(--fb-icon)] opacity-70 mx-auto mb-4" />
                       <p className="text-[var(--fb-text-secondary)]">
                         {postSearchQuery.trim() 
@@ -2803,7 +2803,7 @@ const GroupDetail = () => {
                   <div
                     key={postDomId}
                     id={postDomId}
-                    className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden hover:shadow-md transition-shadow scroll-mt-24"
+                    className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden transition-shadow scroll-mt-24 max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none lg:hover:shadow-md"
                   >
                     <div className="p-3 flex items-center justify-between">
                       <div

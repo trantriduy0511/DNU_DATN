@@ -112,12 +112,13 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-[var(--fb-text-primary)] mb-4">
+      <div className="max-w-4xl mx-auto px-0 sm:px-4 max-lg:pt-0 pb-6 lg:py-6">
+        <h1 className="text-2xl font-bold text-[var(--fb-text-primary)] mb-4 px-4 sm:px-0">
           Cài đặt
         </h1>
 
-        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mb-6 flex items-center gap-3">
+        <div className="flex flex-col max-lg:overflow-hidden max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm max-lg:divide-y max-lg:divide-[var(--fb-divider)] lg:divide-none lg:border-0 lg:bg-transparent lg:shadow-none">
+        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mb-6 flex items-center gap-3 max-lg:mb-0 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none max-lg:bg-transparent lg:mb-6 lg:rounded-xl lg:border lg:border-[var(--fb-divider)] lg:shadow-sm px-4 sm:px-4 lg:px-4">
           <img
             src={
               user?.avatar
@@ -135,7 +136,7 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mb-6">
+        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mb-6 max-lg:mb-0 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none max-lg:bg-transparent px-4 sm:px-4 lg:mb-6 lg:rounded-xl lg:border lg:border-[var(--fb-divider)] lg:shadow-sm lg:bg-[var(--fb-surface)]">
           <h2 className="text-lg font-semibold text-[var(--fb-text-primary)] flex items-center gap-2 mb-3">
             <Moon className="w-5 h-5 text-indigo-500" />
             Giao diện
@@ -161,7 +162,7 @@ const SettingsPage = () => {
           </div>
         </div>
 
-        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mt-6">
+        <div className="bg-[var(--fb-surface)] rounded-xl shadow-sm border border-[var(--fb-divider)] p-4 mt-0 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none max-lg:bg-transparent px-4 sm:px-4 lg:mt-6 lg:rounded-xl lg:border lg:border-[var(--fb-divider)] lg:shadow-sm lg:bg-[var(--fb-surface)]">
           <h2 className="text-lg font-semibold text-[var(--fb-text-primary)] flex items-center gap-2 mb-3">
             <Lock className="w-5 h-5 text-indigo-500" />
             Đổi mật khẩu
@@ -266,6 +267,7 @@ const SettingsPage = () => {
               {pwSaving ? 'Đang lưu...' : 'Cập nhật mật khẩu'}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

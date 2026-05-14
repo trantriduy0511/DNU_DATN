@@ -574,8 +574,8 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)]">
-      <main className="max-w-3xl mx-auto px-3 sm:px-4 py-4">
-        <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
+      <main className="max-w-3xl mx-auto px-0 sm:px-4 max-lg:pt-0 pb-4 lg:py-4">
+        <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none">
           <div className="p-4 sm:p-5 border-b border-[var(--fb-divider)] flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <button

@@ -23,6 +23,19 @@ const cleanDisplayText = (value) => {
     .trim();
 };
 
+/** Tên file: NFC + bỏ ký tự ẩn / khoảng Unicode lạ (không dùng escape/decodeURIComponent — dễ làm hỏng UTF-8 đúng). */
+const cleanFileNameDisplay = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "Tài liệu";
+  const s = raw
+    .normalize("NFC")
+    .replace(/[\u200B-\u200D\uFEFF\u2060\u00AD\u034F]/g, "")
+    .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000]/g, "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
+  return s || "Tài liệu";
+};
+
 const cleanAnalysisText = (value) => {
   const fixed = normalizeBrokenVietnamese(value);
   return fixed
@@ -140,6 +153,8 @@ const DocumentAnalyzer = () => {
 
     try {
       const formData = new FormData();
+      // UTF-8 đúng từ File API — ưu tiên trên server khi multipart filename từ multer bị lệch encoding
+      formData.append("originalFileName", file.name);
       // Backend middleware `uploadFiles` sử dụng field name `files`
       formData.append("files", file);
 
@@ -213,7 +228,7 @@ const DocumentAnalyzer = () => {
         {fileName && (
           <span className="inline-flex items-center px-2 py-1 rounded-full bg-[var(--fb-input)] border border-[var(--fb-divider)]">
             <FileText className="w-3 h-3 mr-1 text-[var(--fb-icon)] opacity-70" />
-            {cleanDisplayText(fileName)}
+            {cleanFileNameDisplay(fileName)}
           </span>
         )}
         {fileType && (
@@ -236,7 +251,7 @@ const DocumentAnalyzer = () => {
   };
 
   return (
-    <div className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-md border border-[var(--fb-divider)] overflow-hidden mb-6">
+    <div className="mb-6 bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-md border border-[var(--fb-divider)] overflow-hidden max-lg:mb-0 max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none lg:mb-6">
       <div className="px-6 py-4 border-b border-[var(--fb-divider)] flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 rounded-lg">
@@ -347,7 +362,7 @@ const DocumentAnalyzer = () => {
                 <div key={job.jobId} className="flex items-center justify-between border border-[var(--fb-divider)] rounded-md px-3 py-2">
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-[var(--fb-text-primary)] truncate">
-                      {cleanDisplayText(job.metadata?.fileName || "Tài liệu")}
+                      {cleanFileNameDisplay(job.metadata?.fileName || "Tài liệu")}
                     </p>
                     <p className="text-xs text-[var(--fb-text-secondary)]">
                       Trạng thái: {job.status} {typeof job.progress === "number" ? `(${job.progress}%)` : ""}

@@ -430,7 +430,7 @@ const NavigationBar = () => {
   const appsMenuItems = [
     {
       id: 'lecturer-docs',
-      label: 'Tài liệu giảng viên',
+      label: 'Phân tích tài liệu',
       icon: BookOpen,
       iconWrapClassName: 'rounded-lg bg-sky-100 dark:bg-sky-900/40',
       iconClassName: 'h-4 w-4 text-blue-600 dark:text-sky-300',
@@ -805,8 +805,8 @@ const NavigationBar = () => {
           </div>
           </div>
 
-          {/* Mobile Search - Facebook style: search row under top nav */}
-          <div className="md:hidden pb-2 search-container">
+          {/* Mobile Search — pb-0 để nối liền với nội dung trang bên dưới (mọi route) */}
+          <div className="md:hidden pb-0 search-container">
             <div className="relative w-full">
               <Search className="w-5 h-5 text-[var(--fb-icon)] absolute left-3 top-2.5" />
               <input

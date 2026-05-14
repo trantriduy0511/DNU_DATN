@@ -225,8 +225,8 @@ export default function SavedPostsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)]">
-      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 max-lg:pt-0 pb-4 lg:py-4">
+        <div className="grid grid-cols-1 gap-0 lg:grid-cols-12 lg:gap-6">
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-20 space-y-4">
               <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden">
@@ -337,9 +337,9 @@ export default function SavedPostsPage() {
             </div>
           </aside>
 
-          <section className="lg:col-span-9">
-            <div className="max-w-3xl mx-auto">
-              <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-4 mb-4">
+          <section className="lg:col-span-9 max-lg:overflow-hidden max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm">
+            <div className="max-w-3xl mx-auto max-lg:max-w-none">
+              <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-4 mb-0 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none lg:mb-4 lg:rounded-lg lg:border lg:border-[var(--fb-divider)] lg:shadow-sm">
                 <div className="flex items-center justify-between">
                   <h1 className="text-lg font-bold text-[var(--fb-text-primary)]">
                     {filterCollectionId === 'all'
@@ -445,21 +445,21 @@ export default function SavedPostsPage() {
               </div>
 
               {loading ? (
-                <div className="text-center py-12">
+                <div className="text-center py-12 max-lg:border-t max-lg:border-[var(--fb-divider)]">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : filteredPosts.length === 0 ? (
-                <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-12 text-center">
+                <div className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] p-12 text-center max-lg:rounded-none max-lg:border-x-0 max-lg:border-b-0 max-lg:border-t max-lg:border-[var(--fb-divider)] max-lg:shadow-none">
                   <Bookmark className="w-16 h-16 text-[var(--fb-icon)] opacity-40 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-[var(--fb-text-primary)] mb-2">Không có bài viết phù hợp</h3>
                   <p className="text-sm text-[var(--fb-text-secondary)]">Thử đổi bộ lọc hoặc từ khóa tìm kiếm</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] lg:space-y-4">
                   {filteredPosts.map((post) => (
                     <article
                       key={post._id}
-                      className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-visible"
+                      className="bg-[var(--fb-surface)] rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-visible max-lg:rounded-none max-lg:border-0 max-lg:shadow-none"
                     >
                       {(() => {
                         const media = getPreviewMedia(post);

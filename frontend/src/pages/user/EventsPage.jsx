@@ -770,9 +770,9 @@ const EventsPage = () => {
 
   return (
     <div className="min-h-screen bg-[var(--fb-app)] text-[var(--fb-text-primary)]">
-      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 py-6">
+      <div className="max-w-7xl mx-auto px-0 sm:px-2 lg:px-4 max-lg:pt-0 pb-6 lg:py-6">
         {/* Header */}
-        <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-4 sm:p-6 mb-6">
+        <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-4 sm:p-6 mb-0 max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none lg:mb-6 lg:rounded-lg lg:border lg:border-[var(--fb-divider)] lg:shadow-md">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-[var(--fb-text-primary)] flex items-center gap-2">
@@ -826,12 +826,12 @@ const EventsPage = () => {
 
         {/* Events Grid */}
         {loading ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 max-lg:bg-[var(--fb-surface)] max-lg:px-2">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             <p className="mt-4 text-[var(--fb-text-secondary)]">Đang tải sự kiện...</p>
           </div>
         ) : visibleEvents.length === 0 ? (
-          <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-12 text-center">
+          <div className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)] p-12 text-center max-lg:rounded-none max-lg:border-x-0 max-lg:border-0 max-lg:shadow-none">
             <Calendar className="w-20 h-20 text-[var(--fb-icon)] opacity-70 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-[var(--fb-text-primary)] mb-2">Chưa có sự kiện nào</h3>
             <p className="text-[var(--fb-text-secondary)] mb-6">Hãy tạo sự kiện đầu tiên của bạn!</p>
@@ -843,7 +843,7 @@ const EventsPage = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 max-lg:bg-[var(--fb-surface)] max-lg:px-2 max-lg:py-3">
             {visibleEvents.map((event) => {
               const status = getEventStatus(event.date);
               const rsvp = getUserEventRsvp(event, user?.id);

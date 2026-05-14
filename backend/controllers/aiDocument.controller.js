@@ -5,6 +5,10 @@ import { fileURLToPath } from 'url';
 import mammoth from 'mammoth';
 import AIAnalysisJob from '../models/AIAnalysisJob.model.js';
 import { enqueueDocumentAnalysisJob } from '../queues/documentAnalysis.queue.js';
+import {
+  normalizeUploadedFileName,
+  pickDocumentUploadFileName,
+} from '../utils/uploadFileName.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,19 +16,6 @@ const JOB_RETENTION_MS = 60 * 60 * 1000; // 1 hour
 
 const cleanupStaleJobs = async () => {
   await AIAnalysisJob.deleteMany({ expiresAt: { $lte: new Date() } });
-};
-
-const normalizeUploadedFileName = (name) => {
-  const raw = String(name || '').trim();
-  if (!raw) return 'unknown';
-  // Sửa lỗi mojibake phổ biến khi UTF-8 bị đọc thành latin1/win1252
-  try {
-    const recovered = Buffer.from(raw, 'latin1').toString('utf8');
-    if (recovered && recovered !== raw) return recovered;
-  } catch {
-    // ignore
-  }
-  return raw;
 };
 
 /**
@@ -182,7 +173,7 @@ export const analyzeDocumentUpload = async (req, res) => {
 
     // Lấy file đầu tiên
     const file = req.uploadedFiles[0];
-    const fileName = normalizeUploadedFileName(file.originalname);
+    const fileName = pickDocumentUploadFileName(file, req);
     const userId = req.user?._id?.toString();
     if (!userId) {
       return res.status(401).json({

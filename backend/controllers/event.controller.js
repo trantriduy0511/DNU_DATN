@@ -554,6 +554,15 @@ export const createEventPost = async (req, res) => {
       category = 'Sự kiện';
     }
 
+    const canPostLecturerDocument =
+      req.user.role === 'admin' || String(req.user.studentRole || '').trim() === 'Giảng viên';
+    if (category === 'Tài liệu' && !canPostLecturerDocument) {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên'
+      });
+    }
+
     let tags = [];
     if (req.body.tags != null) {
       try {

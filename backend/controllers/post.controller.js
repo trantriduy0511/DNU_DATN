@@ -27,7 +27,8 @@ export const createPost = async (req, res) => {
     // Validate category (nếu có)
     const validCategories = ['Học tập', 'Sự kiện', 'Thảo luận', 'Tài liệu', 'Nhóm', 'Khác'];
     const postCategory = category && validCategories.includes(category) ? category : 'Khác';
-    const canPostLecturerDocument = req.user.role === 'admin' || req.user.studentRole === 'Giảng viên';
+    const canPostLecturerDocument =
+      req.user.role === 'admin' || String(req.user.studentRole || '').trim() === 'Giảng viên';
     if (postCategory === 'Tài liệu' && !canPostLecturerDocument) {
       return res.status(403).json({
         success: false,
@@ -450,7 +451,8 @@ export const updatePost = async (req, res) => {
     if (req.body.category !== undefined) {
       const validCategories = ['Học tập', 'Sự kiện', 'Thảo luận', 'Tài liệu', 'Nhóm', 'Khác'];
       const nextCategory = validCategories.includes(req.body.category) ? req.body.category : 'Khác';
-      const canPostLecturerDocument = req.user.role === 'admin' || req.user.studentRole === 'Giảng viên';
+      const canPostLecturerDocument =
+      req.user.role === 'admin' || String(req.user.studentRole || '').trim() === 'Giảng viên';
       if (nextCategory === 'Tài liệu' && post.category !== 'Tài liệu' && !canPostLecturerDocument) {
         return res.status(403).json({
           success: false,

@@ -1088,7 +1088,7 @@ export default function UserProfile() {
   }, [showImageLightbox, allPhotoUrls, lightboxIndex, lightboxImage]);
 
   const PostCard = ({ post }) => (
-    <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] shadow-sm hover:shadow-md transition-shadow mb-4 overflow-hidden">
+    <div className="mb-4 bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] shadow-sm transition-shadow overflow-hidden max-lg:mb-0 max-lg:rounded-none max-lg:border-x-0 max-lg:shadow-none lg:mb-4 lg:hover:shadow-md">
       {/* Post Header */}
       <div className="p-4 border-b border-[var(--fb-divider)]">
         <div className="flex items-start justify-between">
@@ -1557,13 +1557,13 @@ export default function UserProfile() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-0 sm:px-2 lg:px-4 py-4">
+      <div className="max-w-6xl mx-auto px-0 sm:px-2 lg:px-4 max-lg:pt-0 pb-4 lg:py-4">
         {activeTab === 'posts' ? (
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+          <div className="grid grid-cols-1 items-start gap-0 md:grid-cols-12 lg:gap-4">
             {/* Left column */}
-            <aside className="md:col-span-5 lg:col-span-5 xl:col-span-4 space-y-4 lg:sticky lg:top-[76px] lg:self-start">
+            <aside className="md:col-span-5 lg:col-span-5 xl:col-span-4 space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm max-lg:overflow-hidden lg:sticky lg:top-[76px] lg:self-start lg:space-y-4 lg:border-0 lg:bg-transparent lg:shadow-none">
               {/* Intro */}
-              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
+              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Giới thiệu</h2>
                   {isMe && (
@@ -1613,7 +1613,7 @@ export default function UserProfile() {
               </div>
 
               {/* Photos preview */}
-              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
+              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Ảnh</h2>
                   <button
@@ -1654,7 +1654,7 @@ export default function UserProfile() {
               </div>
 
               {/* Friends preview */}
-              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
+              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Bạn bè</h2>
                   <button
@@ -1701,11 +1701,11 @@ export default function UserProfile() {
             </aside>
 
             {/* Right column */}
-            <main className="md:col-span-7 lg:col-span-7 xl:col-span-8">
-              <div className="mx-auto lg:mx-0 w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-4">
+            <main className="md:col-span-7 lg:col-span-7 xl:col-span-8 max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm lg:border-0 lg:bg-transparent lg:shadow-none">
+              <div className="mx-auto lg:mx-0 w-full max-w-[min(100%,760px)] 2xl:max-w-[820px] space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] lg:space-y-4">
               {/* Composer (only me) */}
               {isMe && (
-                <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
+                <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                   <div className="flex items-center gap-3">
                     <img
                       src={resolveAvatarUrl(profileUser.avatar, profileUser.name, '3b82f6')}
@@ -1724,7 +1724,7 @@ export default function UserProfile() {
 
               {/* Posts */}
               {userPosts.length === 0 ? (
-                <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-12 text-center">
+                <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-12 text-center max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                   <ImageIcon className="w-16 h-16 text-[var(--fb-text-secondary)]/40 mx-auto mb-4" />
                   <p className="text-[var(--fb-text-secondary)] text-lg">Chưa có bài viết nào</p>
                 </div>
@@ -1735,9 +1735,9 @@ export default function UserProfile() {
             </main>
           </div>
         ) : activeTab === 'about' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <aside className="lg:col-span-4 space-y-4">
-              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4">
+          <div className="grid grid-cols-1 gap-0 lg:grid-cols-12 lg:gap-4">
+            <aside className="lg:col-span-4 space-y-0 max-lg:divide-y max-lg:divide-[var(--fb-divider)] max-lg:border-x-0 max-lg:border-y max-lg:border-[var(--fb-divider)] max-lg:bg-[var(--fb-surface)] max-lg:shadow-sm max-lg:overflow-hidden lg:space-y-4 lg:border-0 lg:bg-transparent lg:shadow-none">
+              <div className="bg-[var(--fb-surface)] rounded-xl border border-[var(--fb-divider)] p-4 max-lg:rounded-none max-lg:border-0 max-lg:shadow-none">
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-extrabold text-[var(--fb-text-primary)]">Giới thiệu</h2>
                   {isMe && (
