@@ -2165,8 +2165,8 @@ const UserHome = () => {
       id={`post-${String(post._id)}`}
       className="bg-[var(--fb-surface)] text-[var(--fb-text-primary)] max-lg:rounded-none max-lg:border-0 max-lg:shadow-none rounded-lg shadow-sm border border-[var(--fb-divider)] overflow-hidden max-lg:hover:shadow-none lg:hover:shadow-md transition-shadow scroll-mt-24"
     >
-      {/* Header - Facebook Style */}
-      <div className="p-3 flex items-center justify-between">
+      {/* Header — cùng lề ngang với nội dung trên mobile */}
+      <div className="flex items-center justify-between px-3 py-2.5 sm:px-3 sm:py-3">
         <div 
           className="flex items-center space-x-2 cursor-pointer flex-1 min-w-0 hover:bg-[var(--fb-hover)] -mx-3 px-3 py-1.5 rounded-lg transition-colors"
           onClick={() => navigate(`/profile/${post.author?._id}`)}
@@ -2316,8 +2316,8 @@ const UserHome = () => {
         </div>
       </div>
 
-      {/* Content - Facebook Style */}
-      <div className="px-4 pb-3">
+      {/* Nội dung chữ + hashtag (lề khớp header); ảnh/gallery full viền bên dưới */}
+      <div className="px-3 pb-2 pt-0 sm:px-4 sm:pb-3">
         {post.textBackground && (!post.images || post.images.length === 0) && (!post.files || post.files.length === 0) ? (
           <div
             className={`w-full min-h-[200px] sm:min-h-[260px] md:min-h-[320px] max-h-[55vh] overflow-y-auto rounded-xl px-4 sm:px-5 py-6 sm:py-8 flex items-center justify-center text-center text-xl sm:text-2xl md:text-[29px] font-semibold leading-relaxed whitespace-pre-wrap break-words break-all [overflow-wrap:anywhere] ${isDarkBackground(post.textBackground) ? 'text-white' : 'text-[var(--fb-text-primary)]'}`}
@@ -2351,24 +2351,24 @@ const UserHome = () => {
         />
       )}
 
-      {/* Files / video đính kèm */}
+      {/* Files / video đính kèm — video tràn ngang mobile (bù padding); file trong lề */}
       {post.files && post.files.length > 0 && (
-        <div className="px-4 pb-3 space-y-2">
+        <div className="space-y-2 px-3 pb-2 sm:px-4 sm:pb-3">
           <div className="space-y-2">
             {post.files.map((file, index) =>
               isPostAttachmentVideo(file) ? (
-                <div key={index} className="md:col-span-2">
+                <div key={index} className="w-full max-lg:-mx-3 max-lg:w-[calc(100%+1.5rem)] sm:mx-0 sm:w-full">
                   <video
                     src={videoPreviewSrc(postAttachmentUrl(file))}
                     controls
                     playsInline
                     preload="metadata"
                     data-scroll-autoplay="true"
-                    className="h-auto w-full max-h-[min(55vh,500px)] rounded-lg bg-black object-contain"
+                    className="h-auto w-full max-h-[min(55vh,500px)] max-lg:max-h-[min(60vh,560px)] bg-black object-contain max-lg:rounded-none sm:rounded-lg"
                   />
                 </div>
               ) : (
-                <div key={index} className="w-full flex items-center justify-between p-3 bg-[var(--fb-input)] rounded-lg border border-[var(--fb-divider)] hover:bg-[var(--fb-hover)] transition-colors">
+                <div key={index} className="flex w-full items-center justify-between rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-input)] p-3 transition-colors hover:bg-[var(--fb-hover)]">
                   <div className="flex items-center space-x-3 flex-1 min-w-0 pr-3">
                     <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
                       <BookOpen className="w-5 h-5 text-orange-600" />
@@ -2394,70 +2394,71 @@ const UserHome = () => {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="px-4 py-2.5 flex items-center justify-between text-xs text-[var(--fb-text-secondary)] border-t border-[var(--fb-divider)]">
-        <button
-          type="button"
-          onClick={() => openLikesModal(post)}
-          className="text-[13px] hover:underline"
-        >
-          {(post.likes?.length || 0) + (likedPosts.has(post._id) && !post.likes?.includes(user?.id) ? 1 : 0)} lượt thích
-        </button>
-        <div className="flex items-center gap-4">
+      {/* Thống kê + hành động — một khối liền, một viền mỏng giữa hai hàng (kiểu Facebook) */}
+      <div className="border-t border-[var(--fb-divider)] max-lg:bg-[var(--fb-input)]/35 max-lg:dark:bg-[var(--fb-input)]/20">
+        <div className="flex items-center justify-between px-3 py-1.5 text-xs text-[var(--fb-text-secondary)] sm:px-4 sm:py-2">
           <button
             type="button"
-            onClick={() => toggleComments(post._id)}
+            onClick={() => openLikesModal(post)}
             className="text-[13px] hover:underline"
           >
-            {post.comments?.length || 0} bình luận
+            {(post.likes?.length || 0) + (likedPosts.has(post._id) && !post.likes?.includes(user?.id) ? 1 : 0)} lượt thích
+          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => toggleComments(post._id)}
+              className="text-[13px] hover:underline"
+            >
+              {post.comments?.length || 0} bình luận
+            </button>
+            <button
+              type="button"
+              onClick={() => openShareModal(post)}
+              disabled={shareSending && shareModalPost?._id === post._id}
+              className="text-[13px] hover:underline disabled:cursor-wait disabled:opacity-60"
+            >
+              {post.shares || 0} chia sẻ
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-around border-t border-[var(--fb-divider)] px-0.5 py-0.5 sm:px-2">
+          <button
+            onClick={() => toggleLike(post._id)}
+            className={`flex flex-1 items-center justify-center space-x-2 rounded-md px-2 py-1.5 transition-colors max-lg:rounded-none sm:px-4 sm:py-2 sm:rounded-lg ${
+              likedPosts.has(post._id)
+                ? 'text-blue-600 hover:bg-blue-50'
+                : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
+            }`}
+          >
+            <Heart className={`h-5 w-5 shrink-0 ${likedPosts.has(post._id) ? 'fill-current' : ''}`} />
+            <span className="text-sm font-semibold">{likedPosts.has(post._id) ? 'Đã thích' : 'Thích'}</span>
+          </button>
+          <button
+            onClick={() => toggleComments(post._id)}
+            className={`flex flex-1 items-center justify-center space-x-2 rounded-md px-2 py-1.5 transition-colors max-lg:rounded-none sm:px-4 sm:py-2 sm:rounded-lg ${
+              showComments.has(post._id)
+                ? 'text-blue-600 hover:bg-blue-50'
+                : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
+            }`}
+          >
+            <MessageCircle className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-semibold">Bình luận</span>
           </button>
           <button
             type="button"
             onClick={() => openShareModal(post)}
             disabled={shareSending && shareModalPost?._id === post._id}
-            className="text-[13px] hover:underline disabled:cursor-wait disabled:opacity-60"
+            title="Chia sẻ bài viết tới bạn bè"
+            className="flex flex-1 items-center justify-center space-x-2 rounded-md px-2 py-1.5 text-[var(--fb-text-secondary)] transition-colors hover:bg-[var(--fb-hover)] max-lg:rounded-none disabled:cursor-wait disabled:opacity-60 sm:px-4 sm:py-2 sm:rounded-lg"
           >
-            {post.shares || 0} chia sẻ
+            <Share2 className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-semibold">
+              {shareSending && shareModalPost?._id === post._id ? 'Đang gửi…' : 'Chia sẻ'}
+            </span>
           </button>
         </div>
-      </div>
-
-      {/* Actions - Facebook Style */}
-      <div className="px-2 py-1 flex items-center justify-around border-t border-[var(--fb-divider)]">
-        <button
-          onClick={() => toggleLike(post._id)}
-          className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors flex-1 ${
-            likedPosts.has(post._id) 
-              ? 'text-blue-600 hover:bg-blue-50' 
-              : 'text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]'
-          }`}
-        >
-          <Heart className={`w-5 h-5 ${likedPosts.has(post._id) ? 'fill-current' : ''}`} />
-          <span className="font-medium text-sm">{likedPosts.has(post._id) ? 'Đã thích' : 'Thích'}</span>
-        </button>
-        <button
-          onClick={() => toggleComments(post._id)}
-          className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors flex-1 ${
-            showComments.has(post._id) 
-              ? 'text-blue-600 hover:bg-blue-50' 
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <MessageCircle className="w-5 h-5" />
-          <span className="font-medium text-sm">Bình luận</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => openShareModal(post)}
-          disabled={shareSending && shareModalPost?._id === post._id}
-          title="Chia sẻ bài viết tới bạn bè"
-          className="flex items-center justify-center space-x-2 px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors flex-1 disabled:opacity-60 disabled:cursor-wait"
-        >
-          <Share2 className="w-5 h-5" />
-          <span className="font-medium text-sm">
-            {shareSending && shareModalPost?._id === post._id ? 'Đang gửi…' : 'Chia sẻ'}
-          </span>
-        </button>
       </div>
 
       {/* Comments Section */}

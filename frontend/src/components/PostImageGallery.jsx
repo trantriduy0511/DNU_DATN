@@ -1,6 +1,7 @@
 import React from 'react';
 
-const GAP = 'gap-0.5';
+/** Mobile: không khe giữa các ô (sát viền); desktop: khe mảnh. */
+const GAP = 'gap-0 lg:gap-0.5';
 
 /**
  * Bố cục gallery kiểu Facebook: không còn ô trống khi có 3 ảnh; nhiều ảnh dùng object-cover đồng đều.
@@ -121,16 +122,20 @@ export default function PostImageGallery({
     </div>
   );
 
-  /** Một ảnh: giữ object-contain như trước */
+  /** Một ảnh: mobile full viền; desktop giữ max-height */
   if (n === 1) {
-    return <div className="w-full">{cellShell(0, false, 'max-h-[min(55vh,460px)]')}</div>;
+    return (
+      <div className="w-full max-lg:overflow-hidden max-lg:rounded-none">
+        {cellShell(0, false, 'max-h-[min(55vh,460px)] max-lg:max-h-[min(70vh,520px)]')}
+      </div>
+    );
   }
 
   /** Hai ảnh: hai ô vuông cạnh nhau — aspect cố định, không bị video dọc kéo dài */
   if (n === 2) {
     return (
       <div
-        className={`grid w-full grid-cols-2 overflow-hidden ${GAP} aspect-[2/1] max-h-[min(55vh,460px)]`}
+        className={`grid w-full max-lg:rounded-none grid-cols-2 overflow-hidden ${GAP} aspect-[2/1] max-h-[min(55vh,460px)]`}
       >
         {cellShell(0, true, 'min-h-0 h-full')}
         {cellShell(1, true, 'min-h-0 h-full')}
@@ -142,7 +147,7 @@ export default function PostImageGallery({
   if (n === 3) {
     return (
       <div
-        className={`grid max-h-[min(55vh,460px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
+        className={`grid max-h-[min(55vh,460px)] w-full max-lg:rounded-none grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
       >
         {cellShell(0, true, 'row-span-2 min-h-0 h-full')}
         {cellShell(1, true, 'min-h-0 h-full')}
@@ -155,7 +160,7 @@ export default function PostImageGallery({
   if (n === 5) {
     return (
       <div
-        className={`grid max-h-[min(55vh,500px)] w-full grid-cols-6 grid-rows-2 overflow-hidden ${GAP} aspect-[3/2]`}
+        className={`grid max-h-[min(55vh,500px)] w-full max-lg:rounded-none grid-cols-6 grid-rows-2 overflow-hidden ${GAP} aspect-[3/2]`}
       >
         {cellShell(0, true, 'col-span-3 min-h-0 h-full')}
         {cellShell(1, true, 'col-span-3 min-h-0 h-full')}
@@ -170,7 +175,7 @@ export default function PostImageGallery({
   const extra = n - 4;
   return (
     <div
-      className={`grid max-h-[min(55vh,460px)] w-full grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
+      className={`grid max-h-[min(55vh,460px)] w-full max-lg:rounded-none grid-cols-2 grid-rows-2 overflow-hidden ${GAP} aspect-square`}
     >
       {cellShell(0, true, 'min-h-0 h-full')}
       {cellShell(1, true, 'min-h-0 h-full')}

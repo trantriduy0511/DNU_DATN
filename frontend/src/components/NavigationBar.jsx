@@ -36,6 +36,10 @@ function writeSearchHistoryToStorage(items) {
   }
 }
 
+/** Ô tìm kiếm trên thanh nav — kiểu Facebook: pill cố định cao, nền tách khỏi header, icon kính lúp gọn. */
+const NAV_SEARCH_INPUT_CLASS =
+  'h-10 w-full rounded-full border border-transparent bg-[var(--fb-input)] pl-10 pr-3 text-[15px] leading-5 text-[var(--fb-text-primary)] shadow-none transition-[background-color,border-color] duration-150 placeholder:font-normal placeholder:text-[var(--fb-text-secondary)] placeholder:opacity-80 focus:border-[var(--fb-divider)] focus:bg-[var(--fb-input-focus)] focus:outline-none focus:ring-0 dark:border-white/[0.08] dark:focus:border-white/20';
+
 const NavigationBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,8 +53,10 @@ const NavigationBar = () => {
   const [searchHistory, setSearchHistory] = useState(() => readSearchHistoryFromStorage());
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [showAppsMenu, setShowAppsMenu] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchTimeoutRef = useRef(null);
   const appsMenuRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
 
   const appendSearchHistory = (rawQuery) => {
     const q = String(rawQuery || '').trim();
@@ -328,6 +334,7 @@ const NavigationBar = () => {
     }
     
     setShowSearchResults(false);
+    setMobileSearchOpen(false);
     setSearchQuery('');
     
     if (result.type === 'user') {
@@ -361,6 +368,7 @@ const NavigationBar = () => {
     try {
       const res = await api.get(`/messages/conversation/${userId}`);
       setShowSearchResults(false);
+      setMobileSearchOpen(false);
       setSearchQuery('');
       emitAppEvent('openChat', { conversationId: res.data.conversation._id });
     } catch (error) {
@@ -371,6 +379,7 @@ const NavigationBar = () => {
 
   const handleNavigate = (path) => {
     setShowSearchResults(false);
+    setMobileSearchOpen(false);
     if (path === '/home') {
       const p = location.pathname;
       if (p === '/home' || p === '/') {
@@ -385,6 +394,7 @@ const NavigationBar = () => {
 
   const handleNavigateToTab = (tab) => {
     setShowSearchResults(false);
+    setMobileSearchOpen(false);
     if (location.pathname === '/home' || location.pathname === '/') {
       navigate(`/home?tab=${tab}`, { replace: true });
     } else {
@@ -394,6 +404,7 @@ const NavigationBar = () => {
 
   const handleNavigateToHome = () => {
     setShowSearchResults(false);
+    setMobileSearchOpen(false);
     if (location.pathname === '/home' || location.pathname === '/') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -403,6 +414,7 @@ const NavigationBar = () => {
 
   const handleRefreshHome = () => {
     setShowSearchResults(false);
+    setMobileSearchOpen(false);
     window.location.assign('/home');
   };
 
@@ -426,6 +438,12 @@ const NavigationBar = () => {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showAppsMenu]);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const id = window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, [mobileSearchOpen]);
 
   const appsMenuItems = [
     {
@@ -459,13 +477,159 @@ const NavigationBar = () => {
   return (
     <>
       <header className="sticky top-0 z-50 w-full bg-[var(--fb-surface)] shadow-sm border-b border-[var(--fb-divider)]">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-center gap-3 h-16">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4">
+          {/* Mobile: logo + menu (trái) | cụm tìm/tin/chuông/tài khoản căn phải, khoảng cách đều */}
+          <div className="grid h-12 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 px-1 md:hidden">
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleNavigateToHome}
+                className="flex shrink-0 cursor-pointer items-center"
+                aria-label="Về trang chủ"
+              >
+                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-orange-200 bg-white shadow-sm">
+                  <img src="/dainam-logo.png" alt="" className="h-7 w-7 object-contain" />
+                </div>
+              </button>
+              <div className="relative shrink-0" ref={appsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setShowAppsMenu((prev) => !prev)}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                    showAppsMenu
+                      ? 'bg-[var(--fb-input)] text-blue-600'
+                      : 'bg-[var(--fb-input)] text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]'
+                  }`}
+                  title="Menu"
+                  aria-label="Menu"
+                  aria-expanded={showAppsMenu}
+                >
+                  <Grid3x3 className="h-5 w-5" />
+                </button>
+                {showAppsMenu && (
+                  <div className="absolute left-0 top-full z-[80] mt-1 w-60 max-w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] py-1 shadow-xl">
+                    {appsMenuItems.map((item) => {
+                      const Icon = item.icon;
+                      const iconCls = item.iconClassName || 'h-4 w-4 text-[var(--fb-text-primary)]';
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setShowAppsMenu(false);
+                            item.onClick?.();
+                          }}
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
+                        >
+                          <span
+                            className={
+                              item.iconWrapClassName
+                                ? `relative inline-flex h-8 w-8 shrink-0 items-center justify-center ${item.iconWrapClassName}`
+                                : 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--fb-input)]'
+                            }
+                          >
+                            <Icon className={iconCls} />
+                            {typeof item.badge === 'number' && item.badge > 0 && (
+                              <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                                {item.badge > 9 ? '9+' : item.badge}
+                              </span>
+                            )}
+                          </span>
+                          <span className="truncate font-medium">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex min-w-0 w-full items-center justify-end gap-2.5 sm:gap-3 pr-0.5">
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen((o) => !o)}
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  mobileSearchOpen
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/35 dark:text-blue-300'
+                    : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
+                }`}
+                title="Tìm kiếm"
+                aria-label="Tìm kiếm"
+                aria-expanded={mobileSearchOpen}
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => emitAppEvent('openChatWindow')}
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--fb-icon)] transition-colors hover:bg-[var(--fb-hover)]"
+                title="Tin nhắn"
+                aria-label="Tin nhắn"
+              >
+                <MessageCircle className="h-5 w-5" />
+                {unreadMessagesCount > 0 && (
+                  <span className="absolute right-0.5 top-0.5 inline-flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                    {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                  </span>
+                )}
+              </button>
+              <NotificationBell />
+              <AccountSwitcher />
+            </div>
+          </div>
+
+          {/* Mobile: thanh tab tràn ngang — gạch chân tab đang chọn (giống Facebook app) */}
+          <nav
+            className="flex h-[52px] min-h-[52px] items-stretch border-b border-[var(--fb-divider)] md:hidden"
+            aria-label="Điều hướng chính"
+          >
+            <button
+              type="button"
+              onClick={handleRefreshHome}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-end gap-1 pb-1 pt-2 text-[var(--fb-icon)] transition-colors ${
+                activeTab === 'home'
+                  ? 'border-b-[3px] border-[#1877F2] text-[#1877F2]'
+                  : 'border-b-[3px] border-transparent hover:text-[var(--fb-text-primary)]'
+              }`}
+              title="Trang chủ"
+              aria-current={activeTab === 'home' ? 'page' : undefined}
+            >
+              <Home className="h-6 w-6 shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigateToTab('groups')}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-end gap-1 pb-1 pt-2 transition-colors ${
+                activeTab === 'groups' || location.pathname.startsWith('/groups')
+                  ? 'border-b-[3px] border-[#1877F2] text-[#1877F2]'
+                  : 'border-b-[3px] border-transparent text-[var(--fb-icon)] hover:text-[var(--fb-text-primary)]'
+              }`}
+              title="Nhóm"
+              aria-current={activeTab === 'groups' || location.pathname.startsWith('/groups') ? 'page' : undefined}
+            >
+              <Users className="h-6 w-6 shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigate('/events')}
+              className={`flex min-w-0 flex-1 flex-col items-center justify-end gap-1 pb-1 pt-2 transition-colors ${
+                activeTab === 'events' || location.pathname.startsWith('/events')
+                  ? 'border-b-[3px] border-[#1877F2] text-[#1877F2]'
+                  : 'border-b-[3px] border-transparent text-[var(--fb-icon)] hover:text-[var(--fb-text-primary)]'
+              }`}
+              title="Sự kiện"
+              aria-current={activeTab === 'events' || location.pathname.startsWith('/events') ? 'page' : undefined}
+            >
+              <Calendar className="h-6 w-6 shrink-0" />
+            </button>
+          </nav>
+
+          <div className="hidden md:grid md:h-16 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
+          <div className="flex min-w-0 items-center gap-2 md:gap-3">
           {/* Logo */}
           <button
             type="button"
             onClick={handleNavigateToHome}
-            className="flex min-w-0 flex-shrink-0 items-center space-x-2 sm:space-x-3 cursor-pointer"
+            className="flex shrink-0 cursor-pointer items-center"
             aria-label="Về trang chủ"
           >
             <div className="w-10 h-10 rounded-xl bg-white border border-orange-200 flex items-center justify-center shadow-sm overflow-hidden">
@@ -475,23 +639,19 @@ const NavigationBar = () => {
                 className="w-8 h-8 object-contain"
               />
             </div>
-            <div className="hidden sm:flex flex-col leading-tight">
-              <span className="text-[11px] font-bold text-orange-500 uppercase tracking-wide">
-                DAI NAM UNIVERSITY
-              </span>
-              <span className="text-base font-bold text-blue-700">
-                DNU Workspace
-              </span>
-            </div>
           </button>
 
-          {/* Search - Facebook Style */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-2 search-container">
-            <div className="relative w-full">
-              <Search className="w-5 h-5 text-[var(--fb-icon)] absolute left-3 top-2.5" />
+          {/* Search — desktop: pill kiểu Facebook, rộng tối đa ~264px (+20% so với 220px) sau logo */}
+          <div className="search-container mx-0 min-w-0 flex-1 justify-start hidden md:flex md:mx-2">
+            <div className="relative w-full max-w-[264px]">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--fb-icon)] opacity-65 dark:opacity-80"
+              />
               <input
-                type="text"
-                placeholder="Tìm kiếm người dùng, bài viết, nhóm..."
+                type="search"
+                enterKeyHint="search"
+                placeholder="Tìm kiếm"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => {
@@ -499,7 +659,8 @@ const NavigationBar = () => {
                     setShowSearchResults(true);
                   }
                 }}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--fb-input)] rounded-full focus:outline-none focus:ring-0 focus:bg-[var(--fb-input-focus)] border border-transparent focus:border-[var(--fb-divider)] transition-all text-sm text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)]"
+                className={NAV_SEARCH_INPUT_CLASS}
+                aria-label="Tìm kiếm"
               />
               
               {/* Search Results Dropdown - Facebook Style */}
@@ -564,14 +725,14 @@ const NavigationBar = () => {
                       {searchResults.filter(r => r.type === 'user').length > 0 && (
                         <div className="p-2">
                           <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Người dùng</div>
-                          <div className="divide-y divide-[var(--fb-divider)]">
-                            {searchResults.filter(r => r.type === 'user').map((result, index) => (
+                          <div className="flex flex-col">
+                            {searchResults.filter(r => r.type === 'user').map((result, index, arr) => (
+                              <div key={`user-${index}`} className="flex flex-col">
                               <div
-                                key={`user-${index}`}
                                 onClick={(e) => handleSearchResultClick(result, e)}
-                                className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors group"
+                                className="cursor-pointer p-3 transition-colors group hover:bg-[var(--fb-hover)]"
                               >
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-2.5">
                                   <div className="relative flex-shrink-0">
                                     <img
                                       src={
@@ -580,10 +741,10 @@ const NavigationBar = () => {
                                           : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
                                       }
                                       alt={result.name}
-                                      className="w-12 h-12 rounded-full border-2 border-gray-200"
+                                      className="h-9 w-9 rounded-full border border-[var(--fb-divider)] object-cover"
                                     />
                                     {result.isOnline && (
-                                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></span>
+                                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--fb-surface)] bg-green-500"></span>
                                     )}
                                   </div>
                                   <div className="flex-1 min-w-0">
@@ -616,12 +777,18 @@ const NavigationBar = () => {
                                   </div>
                                 </div>
                               </div>
+                              {index < arr.length - 1 ? (
+                                <div
+                                  aria-hidden
+                                  className="-mr-2 ml-[58px] h-px bg-[var(--fb-divider)]"
+                                />
+                              ) : null}
+                            </div>
                             ))}
                           </div>
                         </div>
                       )}
-                      
-                      {/* Other results */}
+
                       {searchResults.filter(r => r.type !== 'user').length > 0 && (
                         <div className="p-2 border-t border-[var(--fb-divider)]">
                           <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Khác</div>
@@ -632,11 +799,11 @@ const NavigationBar = () => {
                                 onClick={(e) => handleSearchResultClick(result, e)}
                                 className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors group"
                               >
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-2.5">
                                   {result.type === 'post' && (
                                     <>
-                                      <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                                        <FileText className="w-6 h-6 text-blue-600" />
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                                        <FileText className="h-5 w-5 text-blue-600" />
                                       </div>
                                       <div className="flex-1 min-w-0">
                                         <p className="font-medium text-[var(--fb-text-primary)] text-sm truncate">{result.content?.substring(0, 80)}...</p>
@@ -650,7 +817,7 @@ const NavigationBar = () => {
                                   )}
                                   {result.type === 'group' && (
                                     <>
-                                      <div className="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center text-xl flex-shrink-0">
+                                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-base">
                                         {result.avatar || '📚'}
                                       </div>
                                       <div className="flex-1 min-w-0">
@@ -685,63 +852,14 @@ const NavigationBar = () => {
               )}
             </div>
           </div>
+          </div>
 
-          {/* Right Icons - Facebook Style */}
-          <div className="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0 ml-auto">
-            {/* Apps menu (chỉ hiển thị trên mobile) */}
-            <div className="relative md:hidden" ref={appsMenuRef}>
-              <button
-                type="button"
-                onClick={() => setShowAppsMenu((prev) => !prev)}
-                className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
-                  showAppsMenu
-                    ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
-                }`}
-                title="Menu"
-                aria-label="Menu"
-                aria-expanded={showAppsMenu}
-              >
-                <Grid3x3 className="w-5 h-5" />
-              </button>
-              {showAppsMenu && (
-                <div className="absolute left-0 top-full mt-1 w-60 rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-xl py-1 z-[80]">
-                  {appsMenuItems.map((item) => {
-                    const Icon = item.icon;
-                    const iconCls = item.iconClassName || 'h-4 w-4 text-[var(--fb-text-primary)]';
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setShowAppsMenu(false);
-                          item.onClick?.();
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
-                      >
-                        <span
-                          className={
-                            item.iconWrapClassName
-                              ? `relative inline-flex h-8 w-8 shrink-0 items-center justify-center ${item.iconWrapClassName}`
-                              : 'relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--fb-input)]'
-                          }
-                        >
-                          <Icon className={iconCls} />
-                          {typeof item.badge === 'number' && item.badge > 0 && (
-                            <span className="absolute -top-1 -right-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
-                              {item.badge > 9 ? '9+' : item.badge}
-                            </span>
-                          )}
-                        </span>
-                        <span className="truncate font-medium">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
+          <nav
+            className="hidden shrink-0 gap-8 sm:gap-12 md:flex md:items-center md:justify-center md:gap-16"
+            aria-label="Điều hướng chính"
+          >
             <button
+              type="button"
               onClick={handleRefreshHome}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 (location.pathname === '/home' || location.pathname === '/') && !location.search.includes('tab=')
@@ -755,8 +873,9 @@ const NavigationBar = () => {
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/2 h-1 bg-blue-600 rounded-t-full"></div>
               )}
             </button>
-            
+
             <button
+              type="button"
               onClick={() => handleNavigateToTab('groups')}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 activeTab === 'groups' || location.pathname.startsWith('/groups')
@@ -770,8 +889,9 @@ const NavigationBar = () => {
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/2 h-1 bg-blue-600 rounded-t-full transition-all duration-200"></div>
               )}
             </button>
-            
+
             <button
+              type="button"
               onClick={() => handleNavigate('/events')}
               className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 relative ${
                 activeTab === 'events' || location.pathname.startsWith('/events')
@@ -785,12 +905,16 @@ const NavigationBar = () => {
                 <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1/2 h-1 bg-blue-600 rounded-t-full transition-all duration-200"></div>
               )}
             </button>
-            
+          </nav>
+
+          {/* Phải: thông báo, chat, tài khoản (desktop) */}
+          <div className="hidden min-w-0 items-center justify-end gap-2.5 pl-2 sm:gap-3 sm:pl-3 md:flex">
             <NotificationBell />
-            
+
             <button
+              type="button"
               onClick={() => emitAppEvent('openChatWindow')}
-              className="hidden sm:inline-flex p-2 rounded-lg text-[var(--fb-icon)] hover:bg-[var(--fb-hover)] transition-colors relative"
+              className="inline-flex rounded-lg p-2 text-[var(--fb-icon)] transition-colors hover:bg-[var(--fb-hover)] relative"
               title="Tin nhắn"
             >
               <MessageCircle className="w-5 h-5" />
@@ -805,13 +929,18 @@ const NavigationBar = () => {
           </div>
           </div>
 
-          {/* Mobile Search — pb-0 để nối liền với nội dung trang bên dưới (mọi route) */}
-          <div className="md:hidden pb-0 search-container">
-            <div className="relative w-full">
-              <Search className="w-5 h-5 text-[var(--fb-icon)] absolute left-3 top-2.5" />
+          {mobileSearchOpen ? (
+          <div className="search-container border-b border-[var(--fb-divider)] px-2 pb-2 pt-1 sm:px-3 md:hidden">
+            <div className="relative mx-auto w-full max-w-lg">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--fb-icon)] opacity-65 dark:opacity-80"
+              />
               <input
-                type="text"
-                placeholder="Tìm kiếm người dùng, bài viết, nhóm..."
+                ref={mobileSearchInputRef}
+                type="search"
+                enterKeyHint="search"
+                placeholder="Tìm kiếm"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onFocus={() => {
@@ -819,7 +948,8 @@ const NavigationBar = () => {
                     setShowSearchResults(true);
                   }
                 }}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--fb-input)] rounded-full focus:outline-none focus:ring-0 focus:bg-[var(--fb-input-focus)] border border-transparent focus:border-[var(--fb-divider)] transition-all text-sm text-[var(--fb-text-primary)] placeholder:text-[var(--fb-text-secondary)]"
+                className={NAV_SEARCH_INPUT_CLASS}
+                aria-label="Tìm kiếm"
               />
 
               {showSearchResults && (
@@ -882,28 +1012,40 @@ const NavigationBar = () => {
                       {searchResults.filter(r => r.type === 'user').length > 0 && (
                         <div className="p-2">
                           <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Người dùng</div>
-                          <div className="divide-y divide-[var(--fb-divider)]">
-                            {searchResults.filter(r => r.type === 'user').map((result, index) => (
-                              <div
-                                key={`mobile-user-${index}`}
-                                onClick={(e) => handleSearchResultClick(result, e)}
-                                className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors"
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <img
-                                    src={
-                                      result.avatar
-                                        ? resolveMediaUrl(result.avatar)
-                                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
-                                    }
-                                    alt={result.name}
-                                    className="w-10 h-10 rounded-full border-2 border-gray-200"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-[var(--fb-text-primary)] text-sm truncate">{result.name}</p>
-                                    <p className="text-xs text-[var(--fb-text-secondary)] truncate">{result.studentRole} • {result.major}</p>
+                          <div className="flex flex-col">
+                            {searchResults.filter(r => r.type === 'user').map((result, index, arr) => (
+                              <div key={`mobile-user-${index}`} className="flex flex-col">
+                                <div
+                                  onClick={(e) => handleSearchResultClick(result, e)}
+                                  className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors"
+                                >
+                                  <div className="flex items-center space-x-2.5">
+                                    <img
+                                      src={
+                                        result.avatar
+                                          ? resolveMediaUrl(result.avatar)
+                                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
+                                      }
+                                      alt={result.name}
+                                      className="h-9 w-9 shrink-0 rounded-full border border-[var(--fb-divider)] object-cover"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-semibold text-[var(--fb-text-primary)]">{result.name}</p>
+                                      <p className="truncate text-xs text-[var(--fb-text-secondary)]">
+                                        {result.studentRole} • {result.major}
+                                      </p>
+                                      {result.email ? (
+                                        <p className="truncate text-xs text-[var(--fb-text-secondary)] opacity-80">{result.email}</p>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
+                                {index < arr.length - 1 ? (
+                                  <div
+                                    aria-hidden
+                                    className="-mr-2 ml-[58px] h-px bg-[var(--fb-divider)]"
+                                  />
+                                ) : null}
                               </div>
                             ))}
                           </div>
@@ -933,6 +1075,7 @@ const NavigationBar = () => {
               )}
             </div>
           </div>
+          ) : null}
         </div>
       </header>
 

@@ -1915,15 +1915,6 @@ export default function UserProfile() {
                   >
                     Tìm bạn bè
                   </button>
-
-                  <button
-                    type="button"
-                    className="px-3 py-2 rounded-lg bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] border border-[var(--fb-divider)] text-[var(--fb-text-primary)] font-semibold transition-colors"
-                    title="Tùy chọn"
-                    onClick={() => {}}
-                  >
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
 
