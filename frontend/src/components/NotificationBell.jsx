@@ -434,9 +434,9 @@ const NotificationBell = () => {
       <button
         type="button"
         onClick={toggleDropdown}
-        className="p-2 hover:bg-[var(--fb-hover)] rounded-full relative transition-colors"
+        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-[var(--fb-hover)]"
       >
-        <Bell className="w-6 h-6 text-[var(--fb-icon)]" />
+        <Bell className="h-5 w-5 text-[var(--fb-icon)]" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs rounded-full flex items-center justify-center px-1 font-bold">
             {unreadCount > 9 ? '9+' : unreadCount}

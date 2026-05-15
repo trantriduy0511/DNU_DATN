@@ -18,6 +18,7 @@ import { getSocket } from '../../utils/socket';
 import { resolveMediaUrl, resolveAvatarUrlWithFallback } from '../../utils/mediaUrl';
 import { PostCommentSection } from '../../components/PostCommentSection';
 import PostImageGallery from '../../components/PostImageGallery';
+import { emitAppEvent } from '../../shared/events/appEventBus';
 
 const TEXT_POST_BACKGROUNDS = [
   { id: 'none', label: 'Không nền', background: '' },
@@ -163,6 +164,8 @@ const GroupDetail = () => {
   const [newGroupPostImages, setNewGroupPostImages] = useState([]);
   const [newGroupPostFiles, setNewGroupPostFiles] = useState([]);
   const [showGroupPostModal, setShowGroupPostModal] = useState(false);
+  const [groupPostSubmitting, setGroupPostSubmitting] = useState(false);
+  const groupPostSubmittingRef = useRef(false);
   const [editingPost, setEditingPost] = useState(null);
   const [editPostContent, setEditPostContent] = useState('');
   const [editPostSaving, setEditPostSaving] = useState(false);
@@ -1497,6 +1500,7 @@ const GroupDetail = () => {
       notify('Vui lòng nhập nội dung hoặc đính kèm ảnh / file / video');
       return;
     }
+    if (groupPostSubmittingRef.current) return;
 
     // Double check membership before posting
     const currentIsMember = group?.members?.some(
@@ -1512,6 +1516,8 @@ const GroupDetail = () => {
       return;
     }
 
+    groupPostSubmittingRef.current = true;
+    setGroupPostSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('content', newGroupPostContent);
@@ -1561,6 +1567,9 @@ const GroupDetail = () => {
       if (error.response?.status === 403) {
         await fetchGroupDetail();
       }
+    } finally {
+      groupPostSubmittingRef.current = false;
+      setGroupPostSubmitting(false);
     }
   };
 
@@ -2464,11 +2473,11 @@ const GroupDetail = () => {
               id="group-feed-tabs"
               className="bg-[var(--fb-surface)] rounded-lg shadow-md border border-[var(--fb-divider)]"
             >
-              <div className="flex border-b border-[var(--fb-divider)]">
+              <div className="flex overflow-x-auto border-b border-[var(--fb-divider)] [-webkit-overflow-scrolling:touch] md:overflow-x-visible">
                 <button
                   type="button"
                   onClick={() => setActiveTab('posts')}
-                  className={`flex-1 px-3 sm:px-6 py-3 font-medium text-sm border-b-2 transition-colors flex flex-col items-center justify-center gap-0.5 ${
+                  className={`flex min-w-[5.75rem] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors md:min-w-0 md:flex-1 ${
                     activeTab === 'posts'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]'
@@ -2485,7 +2494,7 @@ const GroupDetail = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('members')}
-                  className={`flex-1 px-2 sm:px-3 py-3 font-medium text-sm border-b-2 transition-colors flex flex-col items-center justify-center gap-0.5 ${
+                  className={`flex min-w-[5.75rem] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors md:min-w-0 md:flex-1 ${
                     activeTab === 'members'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]'
@@ -2502,7 +2511,7 @@ const GroupDetail = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('media')}
-                  className={`flex-1 px-2 sm:px-3 py-3 font-medium text-sm border-b-2 transition-colors flex flex-col items-center justify-center gap-0.5 ${
+                  className={`flex min-w-[6.5rem] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors md:min-w-0 md:flex-1 ${
                     activeTab === 'media'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]'
@@ -2519,7 +2528,7 @@ const GroupDetail = () => {
                 <button
                   type="button"
                   onClick={() => setActiveTab('announcements')}
-                  className={`flex-1 px-2 sm:px-3 py-3 font-medium text-sm border-b-2 transition-colors flex flex-col items-center justify-center gap-0.5 ${
+                  className={`flex min-w-[5.75rem] shrink-0 flex-col items-center justify-center gap-0.5 border-b-2 px-4 py-3 text-sm font-medium transition-colors md:min-w-0 md:flex-1 ${
                     activeTab === 'announcements'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-[var(--fb-text-secondary)] hover:text-[var(--fb-text-primary)]'
@@ -4021,7 +4030,7 @@ const GroupDetail = () => {
         createPortal(
           <div
             className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4"
-            onClick={() => setShowGroupPostModal(false)}
+            onClick={() => { if (!groupPostSubmitting) setShowGroupPostModal(false); }}
             role="presentation"
           >
             <div
@@ -4032,8 +4041,9 @@ const GroupDetail = () => {
                 <h3 className="text-xl font-bold">Tạo bài viết</h3>
                 <button
                   type="button"
-                  onClick={() => setShowGroupPostModal(false)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-[var(--fb-input)] hover:bg-[var(--fb-hover)]"
+                  onClick={() => { if (!groupPostSubmitting) setShowGroupPostModal(false); }}
+                  disabled={groupPostSubmitting}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <X className="h-5 w-5 text-[var(--fb-icon)]" />
                 </button>
@@ -4184,13 +4194,15 @@ const GroupDetail = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        if (groupPostSubmitting) return;
                         setNewGroupPostContent('');
                         setNewGroupPostTextBackground('');
                         setNewGroupPostImages([]);
                         setNewGroupPostFiles([]);
                         setShowGroupPostModal(false);
                       }}
-                      className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)]"
+                      disabled={groupPostSubmitting}
+                      className="rounded-lg px-4 py-2 text-sm font-medium text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Hủy
                     </button>
@@ -4198,13 +4210,14 @@ const GroupDetail = () => {
                       type="button"
                       onClick={handleCreatePost}
                       disabled={
-                        !newGroupPostContent.trim() &&
-                        newGroupPostImages.length === 0 &&
-                        newGroupPostFiles.length === 0
+                        groupPostSubmitting ||
+                        (!newGroupPostContent.trim() &&
+                          newGroupPostImages.length === 0 &&
+                          newGroupPostFiles.length === 0)
                       }
                       className="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Đăng
+                      {groupPostSubmitting ? 'Đang đăng…' : 'Đăng'}
                     </button>
                   </div>
                 </div>
@@ -4775,7 +4788,7 @@ const GroupDetail = () => {
                         groupCoverCommentHighlight ? 'ring-2 ring-inset ring-blue-500' : ''
                       }`}
                     >
-                      <div className="flex shrink-0 items-center justify-between border-b border-[var(--fb-divider)] px-3 py-2">
+                      <div className="hidden shrink-0 items-center justify-between border-b border-[var(--fb-divider)] px-3 py-2 md:flex">
                         <span className="text-[15px] font-semibold text-[var(--fb-text-primary)]">
                           Bình luận
                         </span>
@@ -4852,7 +4865,18 @@ const GroupDetail = () => {
                                 type="text"
                                 value={groupCoverCommentDraft}
                                 onChange={(e) => setGroupCoverCommentDraft(e.target.value)}
-                                onFocus={() => setGroupCoverCommentTabActive(true)}
+                                onFocus={() => {
+                                  setGroupCoverCommentTabActive(true);
+                                  emitAppEvent('commentComposerActive', { active: true });
+                                }}
+                                onBlur={() => {
+                                  requestAnimationFrame(() => {
+                                    const el = document.getElementById('group-cover-theater-comment-input');
+                                    if (document.activeElement !== el) {
+                                      emitAppEvent('commentComposerActive', { active: false });
+                                    }
+                                  });
+                                }}
                                 placeholder={
                                   groupCoverReplyingTo
                                     ? 'Viết phản hồi…'

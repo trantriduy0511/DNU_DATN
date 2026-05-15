@@ -1428,12 +1428,12 @@ const EventDetailPage = () => {
 
           <div className="min-w-0">
             <div className="overflow-hidden rounded-lg border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-md">
-              <div className="flex border-b border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 sm:px-4">
-                              <div className="mx-auto flex w-full max-w-[680px] gap-1 sm:gap-6">
+              <div className="flex border-b border-[var(--fb-divider)] bg-[var(--fb-surface)] px-2 sm:px-4">
+                <div className="mx-auto flex w-full max-w-[680px] gap-5 overflow-x-auto [-webkit-overflow-scrolling:touch] sm:gap-8 md:overflow-x-visible">
                                 <button
                                   type="button"
                                   onClick={() => setEventDetailTab('about')}
-                                  className={`relative pb-2.5 pt-1 text-[15px] font-semibold ${
+                                  className={`relative shrink-0 whitespace-nowrap px-1 pb-2.5 pt-3 text-[15px] font-semibold ${
                                     eventDetailTab === 'about'
                                       ? 'text-blue-600'
                                       : 'text-[#65676B] hover:text-[#050505]'
@@ -1447,7 +1447,7 @@ const EventDetailPage = () => {
                                 <button
                                   type="button"
                                   onClick={() => setEventDetailTab('discussion')}
-                                  className={`relative pb-2.5 pt-1 text-[15px] font-semibold ${
+                                  className={`relative shrink-0 whitespace-nowrap px-1 pb-2.5 pt-3 text-[15px] font-semibold ${
                                     eventDetailTab === 'discussion'
                                       ? 'text-blue-600'
                                       : 'text-[#65676B] hover:text-[#050505]'
@@ -1461,7 +1461,7 @@ const EventDetailPage = () => {
                                 <button
                                   type="button"
                                   onClick={() => setEventDetailTab('media')}
-                                  className={`relative flex items-center gap-1 pb-2.5 pt-1 text-[15px] font-semibold ${
+                                  className={`relative flex shrink-0 items-center gap-1 whitespace-nowrap px-1 pb-2.5 pt-3 text-[15px] font-semibold ${
                                     eventDetailTab === 'media'
                                       ? 'text-blue-600'
                                       : 'text-[#65676B] hover:text-[#050505]'

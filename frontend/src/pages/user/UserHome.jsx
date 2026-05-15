@@ -206,6 +206,8 @@ const UserHome = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostTextBackground, setNewPostTextBackground] = useState('');
   const [showHomePostModal, setShowHomePostModal] = useState(false);
+  const [homePostSubmitting, setHomePostSubmitting] = useState(false);
+  const homePostSubmittingRef = useRef(false);
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPostCategory, setNewPostCategory] = useState('Khác');
   const [newPostImages, setNewPostImages] = useState([]); // Lưu File objects
@@ -1198,11 +1200,14 @@ const UserHome = () => {
     const text = newPostContent.trim();
     const hasMedia = newPostImages.length > 0 || newPostFiles.length > 0;
     if (!text && !hasMedia) return;
+    if (homePostSubmittingRef.current) return;
+    if (newPostCategory === 'Tài liệu' && !canPostLecturerDocuments) {
+      notify('Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên');
+      return;
+    }
+    homePostSubmittingRef.current = true;
+    setHomePostSubmitting(true);
     try {
-        if (newPostCategory === 'Tài liệu' && !canPostLecturerDocuments) {
-          notify('Chỉ Giảng viên hoặc Admin mới được đăng bài trong mục Tài liệu giảng viên');
-          return;
-        }
         // Tạo FormData để upload file
         const formData = new FormData();
         formData.append('content', text);
@@ -1243,6 +1248,9 @@ const UserHome = () => {
       console.error('Error response:', error.response?.data);
       const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
       notify('Lỗi đăng bài viết: ' + errorMessage);
+    } finally {
+      homePostSubmittingRef.current = false;
+      setHomePostSubmitting(false);
     }
   };
 
@@ -5170,7 +5178,7 @@ const UserHome = () => {
       )}
 
       {showHomePostModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[140] bg-black/60 flex items-center justify-center p-4" onClick={() => setShowHomePostModal(false)}>
+        <div className="fixed inset-0 z-[140] bg-black/60 flex items-center justify-center p-4" onClick={() => { if (!homePostSubmitting) setShowHomePostModal(false); }}>
           <div
             className="w-full max-w-[min(680px,96vw)] bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-2xl shadow-2xl border border-[var(--fb-divider)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
@@ -5179,8 +5187,9 @@ const UserHome = () => {
               <h3 className="text-xl font-bold">Tạo bài viết</h3>
               <button
                 type="button"
-                onClick={() => setShowHomePostModal(false)}
-                className="h-9 w-9 rounded-full bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] grid place-items-center"
+                onClick={() => { if (!homePostSubmitting) setShowHomePostModal(false); }}
+                disabled={homePostSubmitting}
+                className="h-9 w-9 rounded-full bg-[var(--fb-input)] hover:bg-[var(--fb-hover)] grid place-items-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <X className="w-5 h-5 text-[var(--fb-icon)]" />
               </button>
@@ -5333,7 +5342,9 @@ const UserHome = () => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <button
+                    type="button"
                     onClick={() => {
+                      if (homePostSubmitting) return;
                       setShowHomePostModal(false);
                       setNewPostContent('');
                       setNewPostCategory('Khác');
@@ -5341,16 +5352,21 @@ const UserHome = () => {
                       setNewPostFiles([]);
                       setNewPostTextBackground('');
                     }}
-                    className="px-4 py-2 text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] rounded-lg transition-colors font-medium text-sm"
+                    disabled={homePostSubmitting}
+                    className="px-4 py-2 text-[var(--fb-text-secondary)] hover:bg-[var(--fb-hover)] rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Hủy
                   </button>
                   <button
+                    type="button"
                     onClick={handlePost}
-                    disabled={!newPostContent.trim() && newPostImages.length === 0 && newPostFiles.length === 0}
+                    disabled={
+                      homePostSubmitting ||
+                      (!newPostContent.trim() && newPostImages.length === 0 && newPostFiles.length === 0)
+                    }
                     className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed text-sm shadow-sm hover:shadow-md"
                   >
-                    Đăng
+                    {homePostSubmitting ? 'Đang đăng…' : 'Đăng'}
                   </button>
                 </div>
               </div>

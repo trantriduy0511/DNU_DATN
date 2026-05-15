@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { User, ChevronDown, Plus, LogOut, Check, X, Bookmark, Settings, Shield } from 'lucide-react';
+import { User, ChevronDown, Plus, LogOut, X, Bookmark, Settings, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -85,7 +85,7 @@ const AccountSwitcher = () => {
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-[var(--fb-hover)] transition-colors"
+          className="flex items-center space-x-0.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-[var(--fb-hover)] md:space-x-2 md:px-3 md:py-2"
         >
           <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm">
             {user?.avatar ? (
@@ -114,7 +114,6 @@ const AccountSwitcher = () => {
           <div className="absolute right-0 mt-2 w-80 bg-[var(--fb-surface)] text-[var(--fb-text-primary)] rounded-lg shadow-xl border border-[var(--fb-divider)] z-50 max-h-[80vh] overflow-y-auto">
             {/* Current Account */}
             <div className="p-3 bg-[var(--fb-input)] border-b border-[var(--fb-divider)]">
-              <p className="text-xs text-[var(--fb-text-primary)] mb-2">Tài khoản hiện tại</p>
               <div
                 role="button"
                 tabIndex={0}
@@ -154,7 +153,6 @@ const AccountSwitcher = () => {
                     {user?.role === 'admin' ? '👑 Admin' : user?.studentRole === 'Giảng viên' ? '👨‍🏫 Giảng viên' : '👨‍🎓 Sinh viên'}
                   </p>
                 </div>
-                <Check className="w-5 h-5 text-green-500" />
               </div>
             </div>
 

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, Send, X, ChevronDown, BookOpen, Download, ImagePlus } from 'lucide-react';
+import { MessageCircle, Send, X, ChevronDown, ChevronLeft, BookOpen, Download, ImagePlus } from 'lucide-react';
 import api from '../utils/api';
 import { formatTimeAgo } from '../utils/formatTime';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import { notify, confirmAsync } from '../lib/notify';
+import { emitAppEvent } from '../shared/events/appEventBus';
 
 
 const resolveAvatarUrl = (avatar, name, background = '1877f2') => {
@@ -60,6 +61,36 @@ export function PostCommentSection({
     const isTheater = variant === 'theater';
     const commentListMeasureRef = useRef(null);
     const commentImageInputRef = useRef(null);
+    const commentComposerActiveRef = useRef(false);
+
+    const setCommentComposerActive = useCallback((active) => {
+      if (commentComposerActiveRef.current === active) return;
+      commentComposerActiveRef.current = active;
+      emitAppEvent('commentComposerActive', { active });
+    }, []);
+
+    const handleComposerFocusCapture = useCallback(() => {
+      setCommentComposerActive(true);
+    }, [setCommentComposerActive]);
+
+    const handleComposerBlurCapture = useCallback(
+      (e) => {
+        const root = e.currentTarget;
+        requestAnimationFrame(() => {
+          if (!root.contains(document.activeElement)) {
+            setCommentComposerActive(false);
+          }
+        });
+      },
+      [setCommentComposerActive]
+    );
+
+    useEffect(() => {
+      if (!isVisible) {
+        setCommentComposerActive(false);
+      }
+      return () => setCommentComposerActive(false);
+    }, [isVisible, setCommentComposerActive]);
 
     const updateCommentThreadLines = useCallback(() => {
       const root = commentListMeasureRef.current;
@@ -264,6 +295,177 @@ export function PostCommentSection({
     /** Phủ đuôi viền trái — trùng nền vùng cuộn (theater: fb-app, modal: fb-surface) */
     const threadTailMaskBg = isTheater ? 'bg-[var(--fb-app)]' : 'bg-[var(--fb-surface)]';
 
+    const composerShellCls =
+      'shrink-0 border-t border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]';
+
+    const renderCommentImagePreviews = () =>
+      commentImages.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {commentImages.map((img) => (
+            <div key={img.key} className="relative">
+              <img
+                src={img.previewUrl}
+                alt=""
+                className="h-16 w-16 rounded-lg border border-[var(--fb-divider)] object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => removeCommentImage(img.key)}
+                className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-white"
+                title="Xóa ảnh"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null;
+
+    const renderMainCommentComposer = (inputId) => {
+      const onComposerKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleSubmitComment();
+        }
+      };
+
+      if (replyToCommentId) {
+        return (
+          <div className="flex items-center justify-between gap-2 px-0.5 py-1">
+            <p className={`min-w-0 truncate text-xs ${cnTextMuted}`}>
+              Ô nhập nằm trong luồng bình luận phía trên
+            </p>
+            <button
+              type="button"
+              onClick={resetComposerToPost}
+              className={`shrink-0 text-xs font-semibold ${linkAccent}`}
+            >
+              Hủy
+            </button>
+          </div>
+        );
+      }
+
+      const hiddenFileInput = (
+        <input
+          ref={commentImageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={handlePickCommentImages}
+        />
+      );
+
+      const textInput = (
+        <input
+          id={inputId}
+          value={localCommentText}
+          onChange={(e) => setLocalCommentText(e.target.value)}
+          placeholder="Viết bình luận..."
+          className={replyInputCls}
+          onKeyDown={onComposerKeyDown}
+        />
+      );
+
+      const attachButton = (
+        <button
+          type="button"
+          onClick={() => commentImageInputRef.current?.click()}
+          className="rounded-full p-2 transition-colors hover:bg-[var(--fb-hover)]"
+          title="Thêm ảnh"
+        >
+          <ImagePlus className="h-5 w-5 text-[var(--fb-icon)]" />
+        </button>
+      );
+
+      const sendButton = (
+        <button
+          type="button"
+          onClick={handleSubmitComment}
+          disabled={!localCommentText.trim() && commentImages.length === 0}
+          className="rounded-full p-2 transition-colors hover:bg-[var(--fb-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+          title="Gửi"
+        >
+          <Send className="h-5 w-5 text-blue-600" />
+        </button>
+      );
+
+      return (
+        <>
+          {hiddenFileInput}
+          {/* Mobile — 2 hàng kiểu Facebook */}
+          <div className="space-y-0.5 md:hidden">
+            <div className="flex items-center gap-2 px-0.5">
+              <img
+                src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
+                alt={user?.name}
+                className="h-8 w-8 shrink-0 rounded-full object-cover"
+                onError={withAvatarFallback(user?.name, '1877f2')}
+              />
+              {textInput}
+            </div>
+            <div className="flex items-center justify-between pl-10 pr-0.5 pb-0.5">
+              <div className="flex items-center gap-0.5">{attachButton}</div>
+              {sendButton}
+            </div>
+          </div>
+          {/* Desktop — một hàng */}
+          <div className="hidden items-center gap-2 md:flex">
+            <img
+              src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
+              alt={user?.name}
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+              onError={withAvatarFallback(user?.name, '1877f2')}
+            />
+            <div className="flex flex-1 items-center gap-2">
+              {textInput}
+              {attachButton}
+              {sendButton}
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    const renderComposerFooter = (inputId) => (
+      <div
+        className={composerShellCls}
+        onFocusCapture={handleComposerFocusCapture}
+        onBlurCapture={handleComposerBlurCapture}
+      >
+        {renderCommentImagePreviews()}
+        {renderMainCommentComposer(inputId)}
+      </div>
+    );
+
+    const renderMobileCommentMetaBar = () => {
+      if (!post) return null;
+      const likeCount = post.likes?.length || 0;
+      const commentCount = comments.length || post.comments?.length || 0;
+      const shareCount = post.shares || 0;
+      return (
+        <div className="shrink-0 border-b border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 py-2 md:hidden">
+          <div className="flex items-center justify-between text-[13px] text-[var(--fb-text-secondary)]">
+            <span>{likeCount} lượt thích</span>
+            <div className="flex items-center gap-3">
+              <span>{commentCount} bình luận</span>
+              <span>{shareCount} lượt chia sẻ</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled
+            className="mt-2 flex cursor-default items-center gap-1 text-[15px] font-semibold text-[var(--fb-text-primary)] opacity-90"
+            title="Sắp có"
+          >
+            Phù hợp nhất
+            <ChevronDown className="h-4 w-4 text-[var(--fb-icon)]" />
+          </button>
+        </div>
+      );
+    };
+
     useLayoutEffect(() => {
       if (!isVisible) return;
       updateCommentThreadLines();
@@ -387,14 +589,18 @@ export function PostCommentSection({
                     className={`pointer-events-none absolute left-[calc(-1rem-2px)] top-[18px] z-[1] box-border h-4 w-4 rounded-bl-[10px] border-b-2 border-l-2 ${threadBorderCls} bg-[var(--fb-input)]`}
                     aria-hidden
                   />
-                  <div className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-2"
+                    onFocusCapture={handleComposerFocusCapture}
+                    onBlurCapture={handleComposerBlurCapture}
+                  >
                       <img
                         src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
                         alt={user?.name}
                         className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
                         onError={withAvatarFallback(user?.name, '1877f2')}
                       />
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
                         <input
                           value={localCommentText}
                           onChange={(e) => setLocalCommentText(e.target.value)}
@@ -435,16 +641,16 @@ export function PostCommentSection({
     if (isTheater) {
       return (
         <div className="flex flex-col flex-1 min-h-0 border-t border-[var(--fb-divider)] bg-[var(--fb-surface)]">
-          <div className="shrink-0 px-3 py-2 flex items-center justify-between border-b border-[var(--fb-divider)] bg-[var(--fb-surface)]">
+          <div className="hidden shrink-0 items-center justify-between border-b border-[var(--fb-divider)] bg-[var(--fb-surface)] px-3 py-2 md:flex">
             <span className="text-sm font-semibold text-[var(--fb-text-primary)]">Bình luận</span>
             <button
               type="button"
               disabled
-              className="text-xs flex items-center gap-1 text-[var(--fb-text-secondary)] bg-[var(--fb-input)] px-2 py-1.5 rounded-md border border-[var(--fb-divider)] cursor-default opacity-90"
+              className="flex cursor-default items-center gap-1 rounded-md border border-[var(--fb-divider)] bg-[var(--fb-input)] px-2 py-1.5 text-xs text-[var(--fb-text-secondary)] opacity-90"
               title="Sắp có"
             >
               Phù hợp nhất
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="h-3.5 w-3.5" />
             </button>
           </div>
           <div
@@ -469,99 +675,35 @@ export function PostCommentSection({
               </div>
             )}
           </div>
-          <div className="shrink-0 p-3 border-t border-[var(--fb-divider)] bg-[var(--fb-surface)]">
-            {replyToCommentId ? (
-              <div className="flex items-center justify-between gap-2 py-1">
-                <p className={`text-xs min-w-0 truncate ${cnTextMuted}`}>
-                  Ô nhập nằm trong luồng bình luận phía trên
-                </p>
-                <button
-                  type="button"
-                  onClick={resetComposerToPost}
-                  className={`shrink-0 text-xs font-semibold ${linkAccent}`}
-                >
-                  Hủy
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <img
-                  src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
-                  alt={user?.name}
-                  className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-                  onError={withAvatarFallback(user?.name, '1877f2')}
-                />
-                <div className="flex-1 flex items-center gap-2">
-                  <input
-                    ref={commentImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handlePickCommentImages}
-                  />
-                  <input
-                    id="theater-comment-input"
-                    value={localCommentText}
-                    onChange={(e) => setLocalCommentText(e.target.value)}
-                    placeholder="Viết bình luận công khai..."
-                    className={replyInputCls}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSubmitComment();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => commentImageInputRef.current?.click()}
-                    className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors"
-                    title="Thêm ảnh"
-                  >
-                    <ImagePlus className="w-5 h-5 text-[var(--fb-icon)]" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmitComment}
-                    disabled={!localCommentText.trim() && commentImages.length === 0}
-                    className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Gửi"
-                  >
-                    <Send className="w-5 h-5 text-blue-600" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {renderComposerFooter('theater-comment-input')}
         </div>
       );
     }
 
     return createPortal(
       <div
-        className="fixed inset-0 z-50 overscroll-none bg-black/40 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex overscroll-none bg-black/40 max-md:bg-[var(--fb-surface)] max-md:p-0 md:items-center md:justify-center md:p-4"
         onClick={handleClose}
       >
         <div
-          className="w-full max-w-2xl max-h-[min(92vh,880px)] bg-[var(--fb-surface)] rounded-2xl border border-[var(--fb-divider)] shadow-xl overflow-hidden overscroll-contain flex flex-col"
+          className="flex max-h-[min(92vh,880px)] w-full max-w-2xl flex-col overflow-hidden overscroll-contain rounded-2xl border border-[var(--fb-divider)] bg-[var(--fb-surface)] shadow-xl max-md:h-[100dvh] max-md:max-h-none max-md:max-w-none max-md:rounded-none max-md:border-0"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="h-14 shrink-0 px-4 flex items-center justify-between border-b border-[var(--fb-divider)]">
-            <div className="font-extrabold text-[var(--fb-text-primary)]">Bình luận</div>
-            <button
-              onClick={handleClose}
-              className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors"
-              title="Đóng"
-            >
-              <X className="w-5 h-5 text-[var(--fb-icon)]" />
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--fb-divider)] px-2 md:h-14 md:px-4">
+            <button type="button" onClick={handleClose} className="rounded-full p-2 hover:bg-[var(--fb-hover)] md:hidden" aria-label="Quay lại">
+              <ChevronLeft className="h-6 w-6 text-[var(--fb-text-primary)]" />
             </button>
+            <div className="flex-1 text-center text-[17px] font-bold text-[var(--fb-text-primary)] md:text-left md:text-base md:font-extrabold">Bình luận</div>
+            <button type="button" onClick={handleClose} className="hidden rounded-full p-2 hover:bg-[var(--fb-hover)] md:flex" title="Đóng">
+              <X className="h-5 w-5 text-[var(--fb-icon)]" />
+            </button>
+            <div className="w-10 md:hidden" aria-hidden />
           </div>
 
           {/* Bài viết gốc — luôn ở trên, ảnh lớn rõ */}
           {post && (
-            <div className="shrink-0 border-b border-[var(--fb-divider)] bg-[var(--fb-input)]/40 max-h-[min(48vh,420px)] overflow-y-auto overscroll-y-contain">
+            <div className="hidden shrink-0 max-h-[min(48vh,420px)] overflow-y-auto overscroll-y-contain border-b border-[var(--fb-divider)] bg-[var(--fb-input)]/40 md:block">
               <div className="p-4">
                 <p className="text-center text-sm font-bold text-[var(--fb-text-primary)] mb-3">
                   Bài viết của {post.author?.name || 'Thành viên'}
@@ -841,6 +983,8 @@ export function PostCommentSection({
             </div>
           )}
 
+          {renderMobileCommentMetaBar()}
+
           {/* List */}
           <div
             ref={commentListMeasureRef}
@@ -865,94 +1009,7 @@ export function PostCommentSection({
             )}
           </div>
 
-          {/* Input — bình luận gốc; trả lời comment dùng ô nhập gắn vào nhánh (có đường nối) */}
-          <div className="shrink-0 p-3 border-t border-[var(--fb-divider)] bg-[var(--fb-surface)]">
-            {commentImages.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {commentImages.map((img) => (
-                  <div key={img.key} className="relative">
-                    <img
-                      src={img.previewUrl}
-                      alt=""
-                      className="h-16 w-16 rounded-lg border border-[var(--fb-divider)] object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeCommentImage(img.key)}
-                      className="absolute -right-1 -top-1 rounded-full bg-black/70 p-0.5 text-white"
-                      title="Xóa ảnh"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {replyToCommentId ? (
-              <div className="flex items-center justify-between gap-2 py-1">
-                <p className="text-xs text-[var(--fb-text-secondary)] min-w-0 truncate">
-                  Ô nhập nằm trong luồng bình luận phía trên
-                </p>
-                <button
-                  type="button"
-                  onClick={resetComposerToPost}
-                  className={`shrink-0 text-xs font-semibold ${linkAccent}`}
-                >
-                  Hủy
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <img
-                    src={resolveAvatarUrl(user?.avatar, user?.name, '1877f2')}
-                    alt={user?.name}
-                    className="w-9 h-9 rounded-full flex-shrink-0 object-cover"
-                    onError={withAvatarFallback(user?.name, '1877f2')}
-                  />
-                  <div className="flex-1 flex items-center gap-2">
-                    <input
-                      ref={commentImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handlePickCommentImages}
-                    />
-                    <input
-                      value={localCommentText}
-                      onChange={(e) => setLocalCommentText(e.target.value)}
-                      placeholder="Viết bình luận công khai..."
-                      className={replyInputCls}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSubmitComment();
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => commentImageInputRef.current?.click()}
-                      className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors"
-                      title="Thêm ảnh"
-                    >
-                      <ImagePlus className="w-5 h-5 text-[var(--fb-icon)]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSubmitComment}
-                      disabled={!localCommentText.trim() && commentImages.length === 0}
-                      className="p-2 rounded-full hover:bg-[var(--fb-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Gửi"
-                    >
-                      <Send className="w-5 h-5 text-blue-600" />
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          {renderComposerFooter('modal-comment-input')}
         </div>
       </div>,
       document.body

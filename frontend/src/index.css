@@ -407,6 +407,17 @@ html .chat-ai-window-fixed-absolute,
   color: var(--fb-text-secondary) !important;
 }
 
+/* Logo nav — luôn nền trắng + viền cam (không bị .dark .bg-white ghi đè) */
+.nav-logo-wrap {
+  background-color: #ffffff;
+  border-color: #fed7aa;
+}
+
+.dark .nav-logo-wrap {
+  background-color: #ffffff !important;
+  border-color: #fed7aa !important;
+}
+
 
 
 

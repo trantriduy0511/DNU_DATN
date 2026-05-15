@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, MessageCircle } from 'lucide-react';
+import { onAppEvent } from '../shared/events/appEventBus';
+
+const MOBILE_COMMENT_COMPOSER_HEIGHT_PX = 88;
+const MOBILE_FAB_GAP_PX = 12;
 
 /**
  * Nút chat + Chat AI góc phải dưới — kích thước thống nhất mọi trang (đồng bộ với trang chủ).
@@ -9,6 +13,8 @@ export function FixedChatActionButtons({ unreadMessagesCount = 0 }) {
   const [isChatAIOpen, setIsChatAIOpen] = useState(false);
   const [isChatUsersOpen, setIsChatUsersOpen] = useState(false);
   const [isNarrowViewport, setIsNarrowViewport] = useState(false);
+  const [commentComposerActive, setCommentComposerActive] = useState(false);
+  const [fabBottomPx, setFabBottomPx] = useState(16);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -18,6 +24,38 @@ export function FixedChatActionButtons({ unreadMessagesCount = 0 }) {
     media.addEventListener('change', syncViewport);
     return () => media.removeEventListener('change', syncViewport);
   }, []);
+
+  useEffect(() => {
+    return onAppEvent('commentComposerActive', (event) => {
+      setCommentComposerActive(Boolean(event.detail?.active));
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isNarrowViewport || !commentComposerActive) {
+      setFabBottomPx(16);
+      return undefined;
+    }
+    const updateBottom = () => {
+      const vv = window.visualViewport;
+      if (!vv) {
+        setFabBottomPx(MOBILE_COMMENT_COMPOSER_HEIGHT_PX + MOBILE_FAB_GAP_PX);
+        return;
+      }
+      const keyboardLift = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setFabBottomPx(keyboardLift + MOBILE_COMMENT_COMPOSER_HEIGHT_PX + MOBILE_FAB_GAP_PX);
+    };
+    updateBottom();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', updateBottom);
+    vv?.addEventListener('scroll', updateBottom);
+    window.addEventListener('resize', updateBottom);
+    return () => {
+      vv?.removeEventListener('resize', updateBottom);
+      vv?.removeEventListener('scroll', updateBottom);
+      window.removeEventListener('resize', updateBottom);
+    };
+  }, [isNarrowViewport, commentComposerActive]);
 
   useEffect(() => {
     const handleAIViz = (event) => {
@@ -43,11 +81,13 @@ export function FixedChatActionButtons({ unreadMessagesCount = 0 }) {
       className="fixed-action-buttons flex flex-col gap-3"
       style={{
         position: 'fixed',
-        bottom: '1rem',
-        right: '1rem',
+        bottom: `${fabBottomPx}px`,
+        right: commentComposerActive && isNarrowViewport ? undefined : '1rem',
+        left: commentComposerActive && isNarrowViewport ? '1rem' : undefined,
         zIndex: 9999,
         transform: 'none',
         pointerEvents: 'none',
+        transition: 'bottom 0.2s ease, left 0.2s ease, right 0.2s ease',
       }}
     >
       <button

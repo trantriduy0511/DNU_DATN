@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Users, Search, MessageCircle, TrendingUp, FileText, UserPlus, Calendar, History, X, Grid3x3, Bookmark, Settings, BookOpen } from 'lucide-react';
+import { Home, Users, Search, MessageCircle, TrendingUp, FileText, UserPlus, Calendar, History, X, Grid3x3, Bookmark, Settings, BookOpen, ChevronLeft } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import api from '../utils/api';
 import { initializeSocket } from '../utils/socket';
 import NotificationBell from './NotificationBell';
 import AccountSwitcher from './AccountSwitcher';
+import MobileSearchOverlay from './MobileSearchOverlay';
 import ChatUsers from './ChatUsers';
 import ChatAI from './ChatAI';
 import { FixedChatActionButtons } from './FixedChatActionButtons';
@@ -54,9 +55,12 @@ const NavigationBar = () => {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [showAppsMenu, setShowAppsMenu] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const [searchHistoryEditMode, setSearchHistoryEditMode] = useState(false);
   const searchTimeoutRef = useRef(null);
   const appsMenuRef = useRef(null);
   const mobileSearchInputRef = useRef(null);
+  const desktopSearchInputRef = useRef(null);
 
   const appendSearchHistory = (rawQuery) => {
     const q = String(rawQuery || '').trim();
@@ -80,6 +84,7 @@ const NavigationBar = () => {
   const clearSearchHistory = (e) => {
     e?.stopPropagation?.();
     setSearchHistory([]);
+    setSearchHistoryEditMode(false);
     setShowSearchResults(false);
     try {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
@@ -207,17 +212,52 @@ const NavigationBar = () => {
     return () => clearInterval(id);
   }, [user?.id, token]);
 
-  // Close search dropdown when clicking outside
+  // Close desktop search dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (showSearchResults && !event.target.closest('.search-container')) {
-        setShowSearchResults(false);
+      if (
+        (showSearchResults || desktopSearchOpen) &&
+        !event.target.closest('.search-container') &&
+        !event.target.closest('.mobile-search-overlay')
+      ) {
+        closeDesktopSearch();
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showSearchResults]);
+  }, [showSearchResults, desktopSearchOpen]);
+
+  useEffect(() => {
+    if (!desktopSearchOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') closeDesktopSearch();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [desktopSearchOpen]);
+
+  const closeMobileSearch = () => {
+    setMobileSearchOpen(false);
+    setShowSearchResults(false);
+  };
+
+  const openMobileSearch = () => {
+    setMobileSearchOpen(true);
+    setShowSearchResults(true);
+  };
+
+  const closeDesktopSearch = () => {
+    setDesktopSearchOpen(false);
+    setShowSearchResults(false);
+    setSearchHistoryEditMode(false);
+    desktopSearchInputRef.current?.blur();
+  };
+
+  const openDesktopSearch = () => {
+    setDesktopSearchOpen(true);
+    setShowSearchResults(true);
+  };
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -333,8 +373,8 @@ const NavigationBar = () => {
       return;
     }
     
-    setShowSearchResults(false);
-    setMobileSearchOpen(false);
+    closeMobileSearch();
+    closeDesktopSearch();
     setSearchQuery('');
     
     if (result.type === 'user') {
@@ -367,8 +407,7 @@ const NavigationBar = () => {
     e.stopPropagation();
     try {
       const res = await api.get(`/messages/conversation/${userId}`);
-      setShowSearchResults(false);
-      setMobileSearchOpen(false);
+      closeMobileSearch();
       setSearchQuery('');
       emitAppEvent('openChat', { conversationId: res.data.conversation._id });
     } catch (error) {
@@ -378,8 +417,8 @@ const NavigationBar = () => {
   };
 
   const handleNavigate = (path) => {
-    setShowSearchResults(false);
-    setMobileSearchOpen(false);
+    closeDesktopSearch();
+    closeMobileSearch();
     if (path === '/home') {
       const p = location.pathname;
       if (p === '/home' || p === '/') {
@@ -393,8 +432,8 @@ const NavigationBar = () => {
   };
 
   const handleNavigateToTab = (tab) => {
-    setShowSearchResults(false);
-    setMobileSearchOpen(false);
+    closeDesktopSearch();
+    closeMobileSearch();
     if (location.pathname === '/home' || location.pathname === '/') {
       navigate(`/home?tab=${tab}`, { replace: true });
     } else {
@@ -403,8 +442,8 @@ const NavigationBar = () => {
   };
 
   const handleNavigateToHome = () => {
-    setShowSearchResults(false);
-    setMobileSearchOpen(false);
+    closeDesktopSearch();
+    closeMobileSearch();
     if (location.pathname === '/home' || location.pathname === '/') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -414,7 +453,7 @@ const NavigationBar = () => {
 
   const handleRefreshHome = () => {
     setShowSearchResults(false);
-    setMobileSearchOpen(false);
+    closeMobileSearch();
     window.location.assign('/home');
   };
 
@@ -438,12 +477,6 @@ const NavigationBar = () => {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [showAppsMenu]);
-
-  useEffect(() => {
-    if (!mobileSearchOpen) return;
-    const id = window.setTimeout(() => mobileSearchInputRef.current?.focus(), 0);
-    return () => window.clearTimeout(id);
-  }, [mobileSearchOpen]);
 
   const appsMenuItems = [
     {
@@ -487,7 +520,7 @@ const NavigationBar = () => {
                 className="flex shrink-0 cursor-pointer items-center"
                 aria-label="Về trang chủ"
               >
-                <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-orange-200 bg-white shadow-sm">
+                <div className="nav-logo-wrap flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border shadow-sm">
                   <img src="/dainam-logo.png" alt="" className="h-7 w-7 object-contain" />
                 </div>
               </button>
@@ -543,15 +576,11 @@ const NavigationBar = () => {
                 )}
               </div>
             </div>
-            <div className="flex min-w-0 w-full items-center justify-end gap-2.5 sm:gap-3 pr-0.5">
+            <div className="flex min-w-0 w-full items-center justify-end gap-0 pr-0.5">
               <button
                 type="button"
-                onClick={() => setMobileSearchOpen((o) => !o)}
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors ${
-                  mobileSearchOpen
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/35 dark:text-blue-300'
-                    : 'text-[var(--fb-icon)] hover:bg-[var(--fb-hover)]'
-                }`}
+                onClick={openMobileSearch}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--fb-icon)] transition-colors hover:bg-[var(--fb-hover)]"
                 title="Tìm kiếm"
                 aria-label="Tìm kiếm"
                 aria-expanded={mobileSearchOpen}
@@ -624,15 +653,18 @@ const NavigationBar = () => {
           </nav>
 
           <div className="hidden md:grid md:h-16 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-3">
-          <div className="flex min-w-0 items-center gap-2 md:gap-3">
-          {/* Logo */}
+          <div className="relative flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+          {/* Logo — có thể bị thanh tìm kiếm che khi mở rộng về trái */}
           <button
             type="button"
             onClick={handleNavigateToHome}
-            className="flex shrink-0 cursor-pointer items-center"
+            className={`flex shrink-0 cursor-pointer items-center transition-opacity ${
+              desktopSearchOpen ? 'pointer-events-none opacity-0' : ''
+            }`}
             aria-label="Về trang chủ"
+            tabIndex={desktopSearchOpen ? -1 : 0}
           >
-            <div className="w-10 h-10 rounded-xl bg-white border border-orange-200 flex items-center justify-center shadow-sm overflow-hidden">
+            <div className="nav-logo-wrap flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border shadow-sm">
               <img
                 src="/dainam-logo.png"
                 alt="Logo Dai Nam University"
@@ -641,9 +673,29 @@ const NavigationBar = () => {
             </div>
           </button>
 
-          {/* Search — desktop: pill kiểu Facebook, rộng tối đa ~264px (+20% so với 220px) sau logo */}
-          <div className="search-container mx-0 min-w-0 flex-1 justify-start hidden md:flex md:mx-2">
-            <div className="relative w-full max-w-[264px]">
+          {/* Search — desktop: mở rộng về trái (neo mép phải, che logo) */}
+          <div
+            className={`search-container hidden items-center gap-2 md:flex ${
+              desktopSearchOpen
+                ? 'absolute right-0 top-1/2 z-30 w-[min(680px,100%)] -translate-y-1/2'
+                : 'relative min-w-0 flex-1 md:mx-2'
+            }`}
+          >
+            {desktopSearchOpen ? (
+              <button
+                type="button"
+                onClick={closeDesktopSearch}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--fb-input)] text-[var(--fb-text-primary)] transition-colors hover:bg-[var(--fb-hover)]"
+                aria-label="Đóng tìm kiếm"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+            ) : null}
+            <div
+              className={`relative w-full transition-[max-width] duration-200 ease-out ${
+                desktopSearchOpen ? 'max-w-none' : 'max-w-[240px]'
+              }`}
+            >
               <Search
                 aria-hidden
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--fb-icon)] opacity-65 dark:opacity-80"
@@ -651,80 +703,112 @@ const NavigationBar = () => {
               <input
                 type="search"
                 enterKeyHint="search"
-                placeholder="Tìm kiếm"
+                ref={desktopSearchInputRef}
+                placeholder="Tìm kiếm trên DNU"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => {
-                  if (searchHistory.length > 0 && searchQuery.trim().length < 2) {
-                    setShowSearchResults(true);
-                  }
-                }}
+                onFocus={openDesktopSearch}
                 className={NAV_SEARCH_INPUT_CLASS}
-                aria-label="Tìm kiếm"
+                aria-label="Tìm kiếm trên DNU"
+                aria-expanded={showSearchResults}
+                aria-controls="desktop-search-dropdown"
               />
               
               {/* Search Results Dropdown - Facebook Style */}
               {showSearchResults && (
-                <div className="absolute top-full mt-1 w-full bg-[var(--fb-surface)] rounded-lg shadow-xl border border-[var(--fb-divider)] z-50 max-h-[500px] overflow-y-auto">
+                <div
+                  id="desktop-search-dropdown"
+                  className="absolute left-0 top-[calc(100%+8px)] z-50 max-h-[min(70vh,520px)] w-full min-w-[320px] overflow-y-auto rounded-xl bg-[var(--fb-surface)] py-2 shadow-[0_12px_28px_rgba(0,0,0,0.2),0_2px_6px_rgba(0,0,0,0.08)] ring-1 ring-[var(--fb-divider)]"
+                >
                   {searchLoading ? (
-                    <div className="p-6 text-center">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
-                      <p className="text-sm text-[var(--fb-text-secondary)] mt-2">Đang tìm kiếm...</p>
+                    <div className="px-4 py-8 text-center">
+                      <div className="mx-auto inline-block h-7 w-7 animate-spin rounded-full border-2 border-[var(--fb-divider)] border-t-[#1877F2]" />
+                      <p className="mt-3 text-sm text-[var(--fb-text-secondary)]">Đang tìm kiếm...</p>
                     </div>
                   ) : searchQuery.trim().length < 2 && searchHistory.length > 0 ? (
-                    <div className="p-2">
+                    <div className="px-1 pb-1">
                       <div className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-[var(--fb-text-secondary)]">
-                          <History className="h-3.5 w-3.5" />
-                          Lịch sử tìm kiếm
-                        </div>
-                        <button
-                          type="button"
-                          onClick={clearSearchHistory}
-                          className="text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          Xóa tất cả
-                        </button>
+                        <h3 className="text-[15px] font-bold text-[var(--fb-text-primary)]">Mới đây</h3>
+                        {searchHistoryEditMode ? (
+                          <button
+                            type="button"
+                            onClick={() => setSearchHistoryEditMode(false)}
+                            className="text-[15px] font-semibold text-[#1877F2] hover:underline"
+                          >
+                            Xong
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSearchHistoryEditMode(true)}
+                            className="text-[15px] font-semibold text-[#1877F2] hover:underline"
+                          >
+                            Chỉnh sửa
+                          </button>
+                        )}
                       </div>
-                      <ul className="divide-y divide-[var(--fb-divider)]">
+                      <ul>
                         {searchHistory.map((term) => (
                           <li key={term}>
-                            <div className="flex items-center gap-1 group">
+                            <div className="flex items-center rounded-lg px-1 hover:bg-[var(--fb-hover)]">
                               <button
                                 type="button"
-                                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
-                                onClick={() => applyHistoryQuery(term)}
+                                disabled={searchHistoryEditMode}
+                                className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-2 text-left disabled:cursor-default"
+                                onClick={() => !searchHistoryEditMode && applyHistoryQuery(term)}
                               >
-                                <Search className="h-4 w-4 shrink-0 text-[var(--fb-icon)] opacity-70" />
-                                <span className="truncate">{term}</span>
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--fb-input)]">
+                                  <History className="h-[18px] w-[18px] text-[var(--fb-icon)]" />
+                                </span>
+                                <span className="truncate text-[15px] font-semibold text-[var(--fb-text-primary)]">
+                                  {term}
+                                </span>
                               </button>
                               <button
                                 type="button"
                                 onClick={(e) => removeHistoryItem(term, e)}
-                                className="mr-1 rounded-full p-1.5 text-[var(--fb-text-secondary)] opacity-0 transition-opacity hover:bg-[var(--fb-hover)] group-hover:opacity-100"
+                                className={`mr-1 shrink-0 rounded-full p-2 text-[var(--fb-icon)] transition-opacity hover:bg-[var(--fb-hover)] ${
+                                  searchHistoryEditMode ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                                }`}
                                 title="Xóa khỏi lịch sử"
                                 aria-label={`Xóa ${term}`}
                               >
-                                <X className="h-4 w-4" />
+                                <X className="h-5 w-5" />
                               </button>
                             </div>
                           </li>
                         ))}
                       </ul>
-                      <p className="px-3 py-2 text-xs text-[var(--fb-text-secondary)]">Gõ ít nhất 2 ký tự để tìm mới.</p>
+                      {searchHistoryEditMode ? (
+                        <div className="border-t border-[var(--fb-divider)] px-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={clearSearchHistory}
+                            className="w-full rounded-lg py-2 text-center text-[15px] font-semibold text-[#1877F2] hover:bg-[var(--fb-hover)]"
+                          >
+                            Xóa tất cả
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : searchQuery.trim().length < 2 ? (
+                    <div className="px-4 py-8 text-center text-[var(--fb-text-secondary)]">
+                      <Search className="mx-auto mb-3 h-10 w-10 opacity-40" />
+                      <p className="text-[15px] font-semibold text-[var(--fb-text-primary)]">Tìm kiếm trên DNU</p>
+                      <p className="mt-1 text-sm">Gõ ít nhất 2 ký tự để tìm người dùng, nhóm hoặc bài viết.</p>
                     </div>
                   ) : searchQuery.trim().length >= 2 && searchResults.length === 0 ? (
-                    <div className="p-6 text-center text-[var(--fb-text-secondary)]">
-                      <Search className="w-12 h-12 mx-auto mb-2 text-[var(--fb-icon)] opacity-60" />
-                      <p className="text-sm font-medium text-[var(--fb-text-primary)]">Không tìm thấy kết quả</p>
-                      <p className="text-xs text-[var(--fb-text-secondary)] mt-1">Thử tìm kiếm với từ khóa khác</p>
+                    <div className="px-4 py-8 text-center text-[var(--fb-text-secondary)]">
+                      <Search className="mx-auto mb-3 h-10 w-10 opacity-40" />
+                      <p className="text-[15px] font-semibold text-[var(--fb-text-primary)]">Không tìm thấy kết quả</p>
+                      <p className="mt-1 text-sm">Thử tìm kiếm với từ khóa khác</p>
                     </div>
                   ) : (
                     <>
                       {/* Group results by type */}
                       {searchResults.filter(r => r.type === 'user').length > 0 && (
                         <div className="p-2">
-                          <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Người dùng</div>
+                          <h3 className="px-3 py-2 text-[15px] font-bold text-[var(--fb-text-primary)]">Người dùng</h3>
                           <div className="flex flex-col">
                             {searchResults.filter(r => r.type === 'user').map((result, index, arr) => (
                               <div key={`user-${index}`} className="flex flex-col">
@@ -791,7 +875,7 @@ const NavigationBar = () => {
 
                       {searchResults.filter(r => r.type !== 'user').length > 0 && (
                         <div className="p-2 border-t border-[var(--fb-divider)]">
-                          <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Khác</div>
+                          <h3 className="px-3 py-2 text-[15px] font-bold text-[var(--fb-text-primary)]">Khác</h3>
                           <div className="divide-y divide-[var(--fb-divider)]">
                             {searchResults.filter(r => r.type !== 'user').map((result, index) => (
                               <div
@@ -832,7 +916,7 @@ const NavigationBar = () => {
                                           } else {
                                             navigate('/home?tab=groups');
                                           }
-                                          setShowSearchResults(false);
+                                          closeDesktopSearch();
                                         }}
                                         className="px-3 py-1.5 bg-purple-50 text-purple-600 rounded-lg text-xs font-medium hover:bg-purple-100 transition-colors flex-shrink-0"
                                       >
@@ -929,155 +1013,23 @@ const NavigationBar = () => {
           </div>
           </div>
 
-          {mobileSearchOpen ? (
-          <div className="search-container border-b border-[var(--fb-divider)] px-2 pb-2 pt-1 sm:px-3 md:hidden">
-            <div className="relative mx-auto w-full max-w-lg">
-              <Search
-                aria-hidden
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--fb-icon)] opacity-65 dark:opacity-80"
-              />
-              <input
-                ref={mobileSearchInputRef}
-                type="search"
-                enterKeyHint="search"
-                placeholder="Tìm kiếm"
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                onFocus={() => {
-                  if (searchHistory.length > 0 && searchQuery.trim().length < 2) {
-                    setShowSearchResults(true);
-                  }
-                }}
-                className={NAV_SEARCH_INPUT_CLASS}
-                aria-label="Tìm kiếm"
-              />
-
-              {showSearchResults && (
-                <div className="absolute top-full mt-1 w-full bg-[var(--fb-surface)] rounded-lg shadow-xl border border-[var(--fb-divider)] z-50 max-h-[60vh] overflow-y-auto">
-                  {searchLoading ? (
-                    <div className="p-6 text-center">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
-                      <p className="text-sm text-[var(--fb-text-secondary)] mt-2">Đang tìm kiếm...</p>
-                    </div>
-                  ) : searchQuery.trim().length < 2 && searchHistory.length > 0 ? (
-                    <div className="p-2">
-                      <div className="flex items-center justify-between px-3 py-2">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-[var(--fb-text-secondary)]">
-                          <History className="h-3.5 w-3.5" />
-                          Lịch sử tìm kiếm
-                        </div>
-                        <button
-                          type="button"
-                          onClick={clearSearchHistory}
-                          className="text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          Xóa tất cả
-                        </button>
-                      </div>
-                      <ul className="divide-y divide-[var(--fb-divider)]">
-                        {searchHistory.map((term) => (
-                          <li key={`mobile-${term}`}>
-                            <div className="flex items-center gap-1 group">
-                              <button
-                                type="button"
-                                className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--fb-text-primary)] hover:bg-[var(--fb-hover)]"
-                                onClick={() => applyHistoryQuery(term)}
-                              >
-                                <Search className="h-4 w-4 shrink-0 text-[var(--fb-icon)] opacity-70" />
-                                <span className="truncate">{term}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => removeHistoryItem(term, e)}
-                                className="mr-1 rounded-full p-1.5 text-[var(--fb-text-secondary)] opacity-0 transition-opacity hover:bg-[var(--fb-hover)] group-hover:opacity-100"
-                                title="Xóa khỏi lịch sử"
-                                aria-label={`Xóa ${term}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                      <p className="px-3 py-2 text-xs text-[var(--fb-text-secondary)]">Gõ ít nhất 2 ký tự để tìm mới.</p>
-                    </div>
-                  ) : searchQuery.trim().length >= 2 && searchResults.length === 0 ? (
-                    <div className="p-6 text-center text-[var(--fb-text-secondary)]">
-                      <Search className="w-12 h-12 mx-auto mb-2 text-[var(--fb-icon)] opacity-60" />
-                      <p className="text-sm font-medium text-[var(--fb-text-primary)]">Không tìm thấy kết quả</p>
-                      <p className="text-xs text-[var(--fb-text-secondary)] mt-1">Thử tìm kiếm với từ khóa khác</p>
-                    </div>
-                  ) : (
-                    <>
-                      {searchResults.filter(r => r.type === 'user').length > 0 && (
-                        <div className="p-2">
-                          <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Người dùng</div>
-                          <div className="flex flex-col">
-                            {searchResults.filter(r => r.type === 'user').map((result, index, arr) => (
-                              <div key={`mobile-user-${index}`} className="flex flex-col">
-                                <div
-                                  onClick={(e) => handleSearchResultClick(result, e)}
-                                  className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors"
-                                >
-                                  <div className="flex items-center space-x-2.5">
-                                    <img
-                                      src={
-                                        result.avatar
-                                          ? resolveMediaUrl(result.avatar)
-                                          : `https://ui-avatars.com/api/?name=${encodeURIComponent(result.name)}&background=1877f2&color=fff`
-                                      }
-                                      alt={result.name}
-                                      className="h-9 w-9 shrink-0 rounded-full border border-[var(--fb-divider)] object-cover"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-semibold text-[var(--fb-text-primary)]">{result.name}</p>
-                                      <p className="truncate text-xs text-[var(--fb-text-secondary)]">
-                                        {result.studentRole} • {result.major}
-                                      </p>
-                                      {result.email ? (
-                                        <p className="truncate text-xs text-[var(--fb-text-secondary)] opacity-80">{result.email}</p>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
-                                {index < arr.length - 1 ? (
-                                  <div
-                                    aria-hidden
-                                    className="-mr-2 ml-[58px] h-px bg-[var(--fb-divider)]"
-                                  />
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {searchResults.filter(r => r.type !== 'user').length > 0 && (
-                        <div className="p-2 border-t border-[var(--fb-divider)]">
-                          <div className="px-3 py-2 text-xs font-semibold text-[var(--fb-text-secondary)] uppercase">Khác</div>
-                          <div className="divide-y divide-[var(--fb-divider)]">
-                            {searchResults.filter(r => r.type !== 'user').map((result, index) => (
-                              <div
-                                key={`mobile-other-${index}`}
-                                onClick={(e) => handleSearchResultClick(result, e)}
-                                className="p-3 hover:bg-[var(--fb-hover)] cursor-pointer transition-colors"
-                              >
-                                <p className="font-medium text-[var(--fb-text-primary)] text-sm truncate">
-                                  {result.type === 'group' ? result.name : `${result.content?.substring(0, 80)}...`}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          ) : null}
         </div>
       </header>
+
+      <MobileSearchOverlay
+        open={mobileSearchOpen}
+        onClose={closeMobileSearch}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearch}
+        searchInputRef={mobileSearchInputRef}
+        searchLoading={searchLoading}
+        searchHistory={searchHistory}
+        searchResults={searchResults}
+        onClearHistory={clearSearchHistory}
+        onRemoveHistoryItem={removeHistoryItem}
+        onApplyHistoryQuery={applyHistoryQuery}
+        onResultClick={handleSearchResultClick}
+      />
 
       {/* Global overlays (available on all pages with navbar) */}
       <FixedChatActionButtons unreadMessagesCount={unreadMessagesCount} />
